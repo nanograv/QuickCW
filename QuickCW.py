@@ -38,6 +38,8 @@ import json
 import time
 import re
 
+import h5py
+
 import CWFastLikelihoodNumba
 import CWFastPrior
 
@@ -46,7 +48,7 @@ import CWFastPrior
 #MAIN MCMC ENGINE
 #
 ################################################################################
-def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int_block = 100, n_extrinsic_step=10, save_every_n=100, savefile=None):
+def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int_block = 100, n_extrinsic_step=10, save_every_n=100, thin=10, savefile=None):
     #freq = 1e-8
 
     #use PTA used in current CW search
@@ -155,10 +157,10 @@ def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int
     print("Using {0} temperature chains with a geometric spacing of {1:.3f}.\nTemperature ladder is:\n".format(n_chain,c),Ts)
 
     #set up samples array
-    samples = np.zeros((n_chain, N, len(par_names)))
+    samples = np.zeros((n_chain, n_int_block*save_every_n+1, len(par_names)))
 
     #set up log_likelihood array
-    log_likelihood = np.zeros((n_chain,N))
+    log_likelihood = np.zeros((n_chain,n_int_block*save_every_n+1))
 
     print("Setting up first sample")
     for j in range(n_chain):
@@ -231,7 +233,31 @@ def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int
         #print(i*n_int_block)
         if savefile is not None and i%save_every_n==0 and i!=0:
             acc_fraction = a_yes/(a_no+a_yes)
-            np.savez(savefile, samples=samples[0,:i*n_int_block,:], par_names=par_names, acc_fraction=acc_fraction, log_likelihood=log_likelihood[:,:i*n_int_block])
+            #np.savez(savefile, samples=samples[0,:i*n_int_block,:], par_names=par_names, acc_fraction=acc_fraction, log_likelihood=log_likelihood[:,:i*n_int_block])
+            if i>save_every_n:
+                print("Append to HDF5 file...")
+                with h5py.File(savefile, 'a') as f:
+                    f['samples_cold'].resize((f['samples_cold'].shape[0] + int((samples.shape[1] - 1)/thin)), axis=0)
+                    f['samples_cold'][-int((samples.shape[1]-1)/thin):] = np.copy(samples[0,:-1:thin,:])
+                    f['log_likelihood'].resize((f['log_likelihood'].shape[1] + int((log_likelihood.shape[1] - 1)/thin)), axis=1)
+                    f['log_likelihood'][:,-int((log_likelihood.shape[1]-1)/thin):] = np.copy(log_likelihood[:,:-1:thin])
+                    f['acc_fraction'][...] = np.copy(acc_fraction)
+            else:
+                print("Create HDF5 file...")
+                with h5py.File(savefile, 'w') as f:
+                    f.create_dataset('samples_cold', data=samples[0,:-1:thin,:], compression="gzip", chunks=True, maxshape=(int(N/thin),samples.shape[2]))
+                    f.create_dataset('log_likelihood', data=log_likelihood[:,:-1:thin], compression="gzip", chunks=True, maxshape=(samples.shape[0],int(N/thin)))
+                    f.create_dataset('par_names', data=np.array(par_names, dtype='S'))
+                    f.create_dataset('acc_fraction', data=acc_fraction)
+            #clear out log_likelihood and samples arrays
+            samples_now = samples[:,-1,:]
+            log_likelihood_now = log_likelihood[:,-1]
+            samples = np.zeros((n_chain, n_int_block*save_every_n+1, len(par_names)))
+            log_likelihood = np.zeros((n_chain,n_int_block*save_every_n+1))
+            samples[:,0,:] = np.copy(samples_now)
+            log_likelihood[:,0] = np.copy(log_likelihood_now)
+
+
         if i%n_status_update==0:
             acc_fraction = a_yes/(a_no+a_yes)
             print('Progress: {0:2.2f}% '.format(i*n_int_block/N*100) +
@@ -239,12 +265,12 @@ def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int
             print(acc_fraction)
         #update extrinsic parameters sometimes
         if i%n_extrinsic_step==0 and i!=0:
-            sample_updates = List(do_extrinsic_update(n_chain, psrs, pta, samples, i*n_int_block, Ts, a_yes, a_no, x0s, FastLs, FLIs, FastPrior, par_names, par_names_cw, par_names_cw_ext, par_names_cw_int, log_likelihood))
+            sample_updates = List(do_extrinsic_update(n_chain, psrs, pta, samples, i*n_int_block, Ts, a_yes, a_no, x0s, FastLs, FLIs, FastPrior, par_names, par_names_cw, par_names_cw_ext, par_names_cw_int, log_likelihood, n_int_block, save_every_n))
             ext_update = List([True,]*n_chain)
             #print("ext_update")
         #do actual MCMC step
         #do_fisher_jump(n_chain, pta, samples, i, Ts, a_yes, a_no, x0s, FastLs, FastPrior, par_names, par_names_cw, par_names_cw_ext, log_likelihood, sample_updates)
-        do_intrinsic_block(n_chain, samples, i*n_int_block, Ts, a_yes, a_no, x0s, FLIs, FPI, par_names, par_names_cw, par_names_cw_ext, log_likelihood, sample_updates, ext_update, n_int_block)
+        do_intrinsic_block(n_chain, samples, i*n_int_block, Ts, a_yes, a_no, x0s, FLIs, FPI, par_names, par_names_cw, par_names_cw_ext, log_likelihood, sample_updates, ext_update, n_int_block, save_every_n)
         #do a PT step at the end of each intrinsic block (only do it if all intrinsic update was accepted, and don;t do at the last step)
         #if i != int(N/n_int_block)-1:
         #    if not any(ext_update):
@@ -256,21 +282,29 @@ def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int
         #            log_likelihood[j,(i+1)*n_int_block] = log_likelihood[j,(i+1)*n_int_block-1]
 
     acc_fraction = a_yes/(a_no+a_yes)
-    return samples, par_names, acc_fraction, pta, log_likelihood
+    print("Append to HDF5 file...")
+    with h5py.File(savefile, 'a') as f:
+        f['samples_cold'].resize((f['samples_cold'].shape[0] + int((samples.shape[1] - 1)/thin)), axis=0)
+        f['samples_cold'][-int((samples.shape[1]-1)/thin):] = np.copy(samples[0,:-1:thin,:])
+        f['log_likelihood'].resize((f['log_likelihood'].shape[1] + int((log_likelihood.shape[1] - 1)/thin)), axis=1)
+        f['log_likelihood'][:,-int((log_likelihood.shape[1]-1)/thin):] = np.copy(log_likelihood[:,:-1:thin])
+        f['acc_fraction'][...] = np.copy(acc_fraction)
+    #return samples, par_names, acc_fraction, pta, log_likelihood
+    return pta
 
 ################################################################################
 #
 #UPDATE EXTRINSIC PARAMETERS AND RECALCULATE FILTERS
 #
 ################################################################################
-def do_extrinsic_update(n_chain, psrs, pta, samples, i, Ts, a_yes, a_no, x0s, FastLs, FLIs, FastPrior, par_names, par_names_cw, par_names_cw_ext, par_names_cw_int, log_likelihood):
+def do_extrinsic_update(n_chain, psrs, pta, samples, i, Ts, a_yes, a_no, x0s, FastLs, FLIs, FastPrior, par_names, par_names_cw, par_names_cw_ext, par_names_cw_int, log_likelihood, n_int_block, save_every_n):
     sample_updates = []
     for j in range(n_chain):
         jump_select = np.random.randint(len(par_names_cw_int))
         jump = np.zeros(len(par_names))
         jump[par_names.index(par_names_cw_int[jump_select])] = 0.03
         
-        sample_update = np.copy(samples[j,i,:]) + jump*np.random.normal()
+        sample_update = np.copy(samples[j,i%(n_int_block*save_every_n),:]) + jump*np.random.normal()
         #if j==0:
         #    print(samples[j,i,:])
         #    print(sample_update)
@@ -309,13 +343,13 @@ def do_extrinsic_update(n_chain, psrs, pta, samples, i, Ts, a_yes, a_no, x0s, Fa
 ################################################################################
 #def do_fisher_jump(n_chain, pta, samples, i, Ts, a_yes, a_no, x0s, FastLs, FastPrior, par_names, par_names_cw, par_names_cw_ext, log_likelihood, sample_updates):
 @njit(parallel=False)
-def do_intrinsic_block(n_chain, samples, i, Ts, a_yes, a_no, x0s, FLIs, FPI, par_names, par_names_cw, par_names_cw_ext, log_likelihood, sample_updates, ext_update, n_int_block):
+def do_intrinsic_block(n_chain, samples, i, Ts, a_yes, a_no, x0s, FLIs, FPI, par_names, par_names_cw, par_names_cw_ext, log_likelihood, sample_updates, ext_update, n_int_block, save_every_n):
     #print("FISHER")
     #print("-"*100)
     for j in prange(0,n_chain):
         for k in range(n_int_block-1):
             #print(j,i+k)
-            samples_current = np.copy(samples[j,i+k,:])
+            samples_current = np.copy(samples[j,(i+k)%(n_int_block*save_every_n),:])
 
             jump_select = np.random.randint(len(par_names_cw_ext))
             jump = np.zeros(len(par_names))
@@ -350,7 +384,7 @@ def do_intrinsic_block(n_chain, samples, i, Ts, a_yes, a_no, x0s, FLIs, FPI, par
             log_acc_ratio += CWFastPrior.get_lnprior_helper(new_point, FPI.uniform_par_ids, FPI.uniform_lows, FPI.uniform_highs,
                                                                        FPI.normal_par_ids, FPI.normal_mus, FPI.normal_sigs)
             #if j==0: print(log_acc_ratio)
-            log_acc_ratio += -log_likelihood[j,i+k]/Ts[j]
+            log_acc_ratio += -log_likelihood[j,(i+k)%(n_int_block*save_every_n)]/Ts[j]
             #log_acc_ratio += -FastPrior.get_lnprior(samples_current)
             log_acc_ratio += -CWFastPrior.get_lnprior_helper(samples_current, FPI.uniform_par_ids, FPI.uniform_lows, FPI.uniform_highs,
                                                                               FPI.normal_par_ids, FPI.normal_mus, FPI.normal_sigs)
@@ -364,22 +398,22 @@ def do_intrinsic_block(n_chain, samples, i, Ts, a_yes, a_no, x0s, FLIs, FPI, par
             acc_decide = uniform(0.0, 1.0, 1)
             if acc_decide<=acc_ratio:
                 #if j==0: print("yeah")
-                samples[j,i+k+1,:] = np.copy(new_point)
-                log_likelihood[j,i+k+1] = log_L
+                samples[j,(i+k)%(n_int_block*save_every_n)+1,:] = np.copy(new_point)
+                log_likelihood[j,(i+k)%(n_int_block*save_every_n)+1] = log_L
                 a_yes[1,j]+=1
                 ext_update[j] = False
             else:
                 #if j==0: print("ohh")
-                samples[j,i+k+1,:] = np.copy(samples[j,i+k,:])
+                samples[j,(i+k)%(n_int_block*save_every_n)+1,:] = np.copy(samples[j,(i+k)%(n_int_block*save_every_n),:])
                 x0s[j].cw_p_phases = np.array([samples_current[par_names.index(par)] for par in par_names if "_cw0_p_phase" in par])
                 x0s[j].cos_inc = samples_current[par_names.index("0_cos_inc")]
                 x0s[j].log10_h = samples_current[par_names.index("0_log10_h")]
                 x0s[j].phase0 = samples_current[par_names.index("0_phase0")]
                 x0s[j].psi = samples_current[par_names.index("0_psi")]
-                log_likelihood[j,i+k+1] = log_likelihood[j,i+k]
+                log_likelihood[j,(i+k)%(n_int_block*save_every_n)+1] = log_likelihood[j,(i+k)%(n_int_block*save_every_n)]
                 a_no[1,j]+=1
 
-    iii = i+n_int_block-1
+    iii = (i+n_int_block-1)%(n_int_block*save_every_n)
 
     #set up map to help keep track of swaps
     swap_map = list(range(n_chain))
