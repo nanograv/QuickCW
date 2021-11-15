@@ -267,8 +267,12 @@ def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int
         if i%n_extrinsic_step==0 and i!=0:
             do_extrinsic_update(n_chain, psrs, pta, samples, i*n_int_block, Ts, a_yes, a_no, x0s, FastLs, FLIs, FastPrior, par_names, par_names_cw, par_names_cw_ext, par_names_cw_int, log_likelihood, n_int_block, save_every_n)
             do_intrinsic_block(n_chain, samples, i*n_int_block+1, Ts, a_yes, a_no, x0s, FLIs, FPI, par_names, par_names_cw, par_names_cw_ext, log_likelihood, n_int_block-1, save_every_n)
+            do_pt_swap(n_chain, pta, samples, (i+1)*n_int_block-1, Ts, a_yes, a_no, x0s, FastLs, FLIs, FPI, par_names, par_names_cw, par_names_cw_ext, log_likelihood, n_int_block, save_every_n)
+            #do_intrinsic_block(n_chain, pta, samples, i*n_int_block+1, Ts, a_yes, a_no, x0s, FastLs, FLIs, FPI, par_names, par_names_cw, par_names_cw_ext, log_likelihood, n_int_block-1, save_every_n)
         else:
             do_intrinsic_block(n_chain, samples, i*n_int_block, Ts, a_yes, a_no, x0s, FLIs, FPI, par_names, par_names_cw, par_names_cw_ext, log_likelihood, n_int_block, save_every_n)
+            #do_intrinsic_block(n_chain, pta, samples, i*n_int_block, Ts, a_yes, a_no, x0s, FastLs, FLIs, FPI, par_names, par_names_cw, par_names_cw_ext, log_likelihood, n_int_block, save_every_n)
+            do_pt_swap(n_chain, pta, samples, (i+1)*n_int_block-1, Ts, a_yes, a_no, x0s, FastLs, FLIs, FPI, par_names, par_names_cw, par_names_cw_ext, log_likelihood, n_int_block, save_every_n)
 
     acc_fraction = a_yes/(a_no+a_yes)
     print("Append to HDF5 file...")
@@ -309,7 +313,7 @@ def do_extrinsic_update(n_chain, psrs, pta, samples, i, Ts, a_yes, a_no, x0s, Fa
                                               new_point[par_names.index("0_log10_mc")],
                                               new_point[par_names.index("0_phase0")],
                                               new_point[par_names.index("0_psi")])
-        
+
         if "_cw0_p_dist" in par_names_cw_int[jump_select]:
             #print("psr diatance update for " + par_names_cw_int[jump_select][:-11])
             FastLs[j].update_pulsar_distance(x0s[j], pta.pulsars.index(par_names_cw_int[jump_select][:-11]))
@@ -373,7 +377,7 @@ def do_extrinsic_update(n_chain, psrs, pta, samples, i, Ts, a_yes, a_no, x0s, Fa
 #REGULAR MCMC JUMP ROUTINE (JUMPING ALONG EIGENDIRECTIONS)
 #
 ################################################################################
-#def do_fisher_jump(n_chain, pta, samples, i, Ts, a_yes, a_no, x0s, FastLs, FastPrior, par_names, par_names_cw, par_names_cw_ext, log_likelihood, sample_updates):
+#def do_intrinsic_block(n_chain, pta, samples, i, Ts, a_yes, a_no, x0s, FastLs, FLIs, FPI, par_names, par_names_cw, par_names_cw_ext, log_likelihood, n_int_block, save_every_n):
 @njit(parallel=False)
 def do_intrinsic_block(n_chain, samples, i, Ts, a_yes, a_no, x0s, FLIs, FPI, par_names, par_names_cw, par_names_cw_ext, log_likelihood, n_int_block, save_every_n):
     #print("FISHER")
@@ -403,6 +407,9 @@ def do_intrinsic_block(n_chain, samples, i, Ts, a_yes, a_no, x0s, FLIs, FPI, par
             x0s[j].psi = new_point[par_names.index("0_psi")]
 
             log_L = CWFastLikelihoodNumba.get_lnlikelihood_helper(x0s[j],FLIs[j].resres,FLIs[j].logdet,FLIs[j].pos,FLIs[j].pdist,FLIs[j].NN,FLIs[j].MM_chol)
+            #if j==0 and (i+k)%500==0:
+            #    print("New log_L=", str(log_L))
+            #    print("Old log_L=", str(pta.get_lnlikelihood(new_point)))
             log_acc_ratio = log_L/Ts[j]
             log_acc_ratio += CWFastPrior.get_lnprior_helper(new_point, FPI.uniform_par_ids, FPI.uniform_lows, FPI.uniform_highs,
                                                                        FPI.normal_par_ids, FPI.normal_mus, FPI.normal_sigs)
@@ -433,7 +440,16 @@ def do_intrinsic_block(n_chain, samples, i, Ts, a_yes, a_no, x0s, FLIs, FPI, par
                 log_likelihood[j,(i+k)%save_every_n+1] = log_likelihood[j,(i+k)%save_every_n]
                 a_no[1,j]+=1
 
-    iii = (i+n_int_block-1)%save_every_n
+
+################################################################################
+#
+#PARALLEL TEMPERING SWAP JUMP ROUTINE
+#
+################################################################################
+def do_pt_swap(n_chain, pta, samples, i, Ts, a_yes, a_no, x0s, FastLs, FLIs, FPI, par_names, par_names_cw, par_names_cw_ext, log_likelihood, n_int_block, save_every_n):
+    #print("PT")
+
+    iii = i%save_every_n
     #print("PT")
     #print(i+n_int_block-1)
     #print(save_every_n)
@@ -464,55 +480,19 @@ def do_intrinsic_block(n_chain, samples, i, Ts, a_yes, a_no, x0s, FLIs, FPI, par
             a_no[0,swap_chain]+=1
 
     #loop through the chains and record the new samples and log_Ls
-    FLIs_new = []
-    for j in range(n_chain):
-        samples[j,iii+1,:] = samples[swap_map[j],iii,:]
-        log_likelihood[j,iii+1] = log_likelihood[swap_map[j],iii]
-        FLIs_new.append(FLIs[swap_map[j]])
-
-    FLIs = FLIs_new
-
-################################################################################
-#
-#PARALLEL TEMPERING SWAP JUMP ROUTINE
-#
-################################################################################
-def do_pt_swap(n_chain, pta, samples, i, Ts, a_yes, a_no, x0s, FastLs, FLIs, FastPrior, par_names, par_names_cw, par_names_cw_ext, log_likelihood):
-    #print("PT")
-    #print(i)
-    #set up map to help keep track of swaps
-    swap_map = list(range(n_chain))
-
-    #get log_Ls from all the chains
-    log_Ls = []
-    for j in range(n_chain):
-        log_Ls.append(log_likelihood[j,i])
-
-    #loop through and propose a swap at each chain (starting from hottest chain and going down in T) and keep track of results in swap_map
-    for swap_chain in reversed(range(n_chain-1)):
-        log_acc_ratio = -log_Ls[swap_map[swap_chain]] / Ts[swap_chain]
-        log_acc_ratio += -log_Ls[swap_map[swap_chain+1]] / Ts[swap_chain+1]
-        log_acc_ratio += log_Ls[swap_map[swap_chain+1]] / Ts[swap_chain]
-        log_acc_ratio += log_Ls[swap_map[swap_chain]] / Ts[swap_chain+1]
-
-        acc_ratio = np.exp(log_acc_ratio)
-        if np.random.uniform()<=acc_ratio:
-            swap_map[swap_chain], swap_map[swap_chain+1] = swap_map[swap_chain+1], swap_map[swap_chain]
-            a_yes[0,swap_chain]+=1
-        else:
-            a_no[0,swap_chain]+=1
-
-    #loop through the chains and record the new samples and log_Ls
     FastLs_new = []
     FLIs_new = []
+    x0s_new = []
     for j in range(n_chain):
-        samples[j,i+1,:] = samples[swap_map[j],i,:]
-        log_likelihood[j,i+1] = log_likelihood[swap_map[j],i]
+        samples[j,iii+1,:] = np.copy(samples[swap_map[j],iii,:])
+        log_likelihood[j,iii+1] = log_likelihood[swap_map[j],iii]
         FastLs_new.append(FastLs[swap_map[j]])
         FLIs_new.append(FLIs[swap_map[j]])
+        x0s_new.append(x0s[swap_map[j]])
 
-    FastLs = FastLs_new
-    FLIs = FLIs_new
+    FastLs[:] = FastLs_new
+    FLIs[:] = List(FLIs_new)
+    x0s[:] = List(x0s_new)
 
 
 ################################################################################
