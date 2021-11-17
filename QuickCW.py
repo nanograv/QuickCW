@@ -48,7 +48,7 @@ import CWFastPrior
 #MAIN MCMC ENGINE
 #
 ################################################################################
-def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int_block=100, n_extrinsic_step=10, save_every_n=10_000, thin=10, savefile=None):
+def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int_block=100, n_extrinsic_step=10, save_every_n=10_000, thin=10, savefile=None, n_update_fisher=100_000):
     #freq = 1e-8
 
     #use PTA used in current CW search
@@ -119,7 +119,8 @@ def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int
 
     #s = ef + eq + ec + rn + crn + cw + tm
     #s = ef + eq + ec + rn + cw + tm
-    s = ef + eq + ec + cw + tm
+    #s = ef + eq + ec + cw + tm
+    s = ef + cw + tm
 
     models = [s(psr) for psr in psrs]
 
@@ -177,13 +178,21 @@ def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int
             #samples[j,0,par_names.index(psr + "_red_noise_log10_A")] = noisedict[psr + "_red_noise_log10_A"]
 
         #also set external parameters for further testing
-        #samples[j,0,par_names.index("0_cos_inc")] = np.cos(1.0)
-        #samples[j,0,par_names.index("0_log10_h")] = np.log10(2e-15)
-        #samples[j,0,par_names.index("0_phase0")] = 1.0
-        #samples[j,0,par_names.index("0_psi")] = 1.0
-        #p_phases = [2.6438308, 3.227938129, 2.95118811, 5.358659229, 1.06395234]
-        #for ii, psr in enumerate(pta.pulsars):
-        #    samples[j,0,par_names.index(psr + "_cw0_p_phase")] = p_phases[ii]
+        samples[j,0,par_names.index("0_cos_inc")] = np.cos(1.0)
+        samples[j,0,par_names.index("0_log10_h")] = np.log10(1e-15)
+        samples[j,0,par_names.index("0_phase0")] = 1.0
+        samples[j,0,par_names.index("0_psi")] = 1.0
+        p_phases = [2.6438308,3.2279381,2.9511881,5.3586592,1.0639523,
+                    2.1564047,1.1287014,5.9545189,4.3189053,1.3181107,
+                    0.1205947,1.1594364,3.5189818,5.8613215,3.6653746,
+                    0.0653161,4.3756635,2.2423111,4.5429403,5.1370920,
+                    1.9794586,1.0159356,2.9529407,1.7553771,1.5110336,
+                    4.0558141,1.6855663,3.5614665,4.1527070,5.2239841,
+                    4.4504891,4.8126553,3.6622998,4.4647441,2.8561429,
+                    0.6874573,0.3762146,1.6691351,0.8147172,0.3051969,
+                    1.6177042,2.8609930,5.0392969,0.3359030,1.0489710]
+        for ii, psr in enumerate(pta.pulsars):
+            samples[j,0,par_names.index(psr + "_cw0_p_phase")] = p_phases[ii]
 
     #set up fast likelihoods
     FastLs = []
@@ -204,9 +213,16 @@ def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int
         FastLs.append(CWFastLikelihoodNumba.CWFastLikelihood(psrs, pta, {pname:x for pname,x in zip(par_names,samples[j,0,:])}, x0s[j]))
         FLIs.append(FastLikeInfo(FastLs[j].resres,FastLs[j].logdet,FastLs[j].pos,FastLs[j].pdist,FastLs[j].NN,FastLs[j].MM_chol))
 
+    #calculate the diagonal elements of the fisher matrix
+    fisher_diag = np.ones((n_chain, len(par_names)))
+    for j in range(n_chain):
+        fisher_diag[j,:] = get_fihser_diagonal(pta, Ts[j], samples[j,0,:], par_names, par_names_cw_ext, x0s[j], FLIs[j])
+        print(fisher_diag[j,:])
+
+
     #setting up arrays to record acceptance and swaps
-    a_yes=np.zeros((3,n_chain)) #columns: chain number; rows: proposal type (PT, intrinsic fisher, extrinsic update)
-    a_no=np.zeros((3,n_chain))
+    a_yes=np.zeros((11,n_chain)) #columns: chain number; rows: proposal type (PT, cos_gwtheta, cos_inc, gwphi, fgw, h, mc, phase0, psi, p_phases, p_dists)
+    a_no=np.zeros((11,n_chain))
     acc_fraction = a_yes/(a_no+a_yes)
 
     #printing info about initial parameters
@@ -242,6 +258,7 @@ def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int
                     f['log_likelihood'].resize((f['log_likelihood'].shape[1] + int((log_likelihood.shape[1] - 1)/thin)), axis=1)
                     f['log_likelihood'][:,-int((log_likelihood.shape[1]-1)/thin):] = np.copy(log_likelihood[:,:-1:thin])
                     f['acc_fraction'][...] = np.copy(acc_fraction)
+                    f['fisher_diag'][...] = np.copy(fisher_diag)
             else:
                 print("Create HDF5 file...")
                 with h5py.File(savefile, 'w') as f:
@@ -249,6 +266,7 @@ def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int
                     f.create_dataset('log_likelihood', data=log_likelihood[:,:-1:thin], compression="gzip", chunks=True, maxshape=(samples.shape[0],int(N/thin)))
                     f.create_dataset('par_names', data=np.array(par_names, dtype='S'))
                     f.create_dataset('acc_fraction', data=acc_fraction)
+                    f.create_dataset('fisher_diag', data=fisher_diag)
             #clear out log_likelihood and samples arrays
             samples_now = samples[:,-1,:]
             log_likelihood_now = log_likelihood[:,-1]
@@ -256,22 +274,26 @@ def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int
             log_likelihood = np.zeros((n_chain,save_every_n+1))
             samples[:,0,:] = np.copy(samples_now)
             log_likelihood[:,0] = np.copy(log_likelihood_now)
-
-
+        if (i*n_int_block)%n_update_fisher==0 and i!=0:
+            print("Updating Fihser diagonals")
+            for j in range(n_chain):
+                fisher_diag[j,:] = get_fihser_diagonal(pta, Ts[j], samples[j,(i*n_int_block)%save_every_n,:], par_names, par_names_cw_ext, x0s[j], FLIs[j])
         if i%n_status_update==0:
             acc_fraction = a_yes/(a_no+a_yes)
             print('Progress: {0:2.2f}% '.format(i*n_int_block/N*100) +
-                      'Acceptance fraction #columns: chain number; rows: proposal type (PT, intrinsic, extrinsic):')
+                      'Acceptance fraction #columns: chain number; rows: proposal type (PT, cos_gwtheta, cos_inc, gwphi, fgw, h, mc, phase0, psi, p_phases, p_dists):')
             print(acc_fraction)
+            print("New log_L=", str(CWFastLikelihoodNumba.get_lnlikelihood_helper(x0s[0],FLIs[0].resres,FLIs[0].logdet,FLIs[0].pos,FLIs[0].pdist,FLIs[0].NN,FLIs[0].MM_chol)))
+            print("Old log_L=", str(pta.get_lnlikelihood(samples[0,(i*n_int_block)%save_every_n,:])))
         #update extrinsic parameters sometimes
         if i%n_extrinsic_step==0 and i!=0:
-            do_extrinsic_update(n_chain, psrs, pta, samples, i*n_int_block, Ts, a_yes, a_no, x0s, FastLs, FLIs, FastPrior, par_names, par_names_cw, par_names_cw_ext, par_names_cw_int, log_likelihood, n_int_block, save_every_n)
-            do_intrinsic_block(n_chain, samples, i*n_int_block+1, Ts, a_yes, a_no, x0s, FLIs, FPI, par_names, par_names_cw, par_names_cw_ext, log_likelihood, n_int_block-1, save_every_n)
+            do_intrinsic_update(n_chain, psrs, pta, samples, i*n_int_block, Ts, a_yes, a_no, x0s, FastLs, FLIs, FastPrior, par_names, par_names_cw, par_names_cw_ext, par_names_cw_int, log_likelihood, n_int_block, save_every_n, fisher_diag)
+            do_extrinsic_block(n_chain, samples, i*n_int_block+1, Ts, a_yes, a_no, x0s, FLIs, FPI, par_names, par_names_cw, par_names_cw_ext, log_likelihood, n_int_block-1, save_every_n, fisher_diag)
+            #do_extrinsic_block(n_chain, pta, samples, i*n_int_block+1, Ts, a_yes, a_no, x0s, FastLs, FLIs, FPI, par_names, par_names_cw, par_names_cw_ext, log_likelihood, n_int_block-1, save_every_n)
             do_pt_swap(n_chain, pta, samples, (i+1)*n_int_block-1, Ts, a_yes, a_no, x0s, FastLs, FLIs, FPI, par_names, par_names_cw, par_names_cw_ext, log_likelihood, n_int_block, save_every_n)
-            #do_intrinsic_block(n_chain, pta, samples, i*n_int_block+1, Ts, a_yes, a_no, x0s, FastLs, FLIs, FPI, par_names, par_names_cw, par_names_cw_ext, log_likelihood, n_int_block-1, save_every_n)
         else:
-            do_intrinsic_block(n_chain, samples, i*n_int_block, Ts, a_yes, a_no, x0s, FLIs, FPI, par_names, par_names_cw, par_names_cw_ext, log_likelihood, n_int_block, save_every_n)
-            #do_intrinsic_block(n_chain, pta, samples, i*n_int_block, Ts, a_yes, a_no, x0s, FastLs, FLIs, FPI, par_names, par_names_cw, par_names_cw_ext, log_likelihood, n_int_block, save_every_n)
+            do_extrinsic_block(n_chain, samples, i*n_int_block, Ts, a_yes, a_no, x0s, FLIs, FPI, par_names, par_names_cw, par_names_cw_ext, log_likelihood, n_int_block, save_every_n, fisher_diag)
+            #do_extrinsic_block(n_chain, pta, samples, i*n_int_block, Ts, a_yes, a_no, x0s, FastLs, FLIs, FPI, par_names, par_names_cw, par_names_cw_ext, log_likelihood, n_int_block, save_every_n)
             do_pt_swap(n_chain, pta, samples, (i+1)*n_int_block-1, Ts, a_yes, a_no, x0s, FastLs, FLIs, FPI, par_names, par_names_cw, par_names_cw_ext, log_likelihood, n_int_block, save_every_n)
 
     acc_fraction = a_yes/(a_no+a_yes)
@@ -282,21 +304,22 @@ def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int
         f['log_likelihood'].resize((f['log_likelihood'].shape[1] + int((log_likelihood.shape[1] - 1)/thin)), axis=1)
         f['log_likelihood'][:,-int((log_likelihood.shape[1]-1)/thin):] = np.copy(log_likelihood[:,:-1:thin])
         f['acc_fraction'][...] = np.copy(acc_fraction)
+        f['fisher_diag'][...] = np.copy(fisher_diag)
     #return samples, par_names, acc_fraction, pta, log_likelihood
     return pta
 
 ################################################################################
 #
-#UPDATE EXTRINSIC PARAMETERS AND RECALCULATE FILTERS
+#UPDATE INTRINSIC PARAMETERS AND RECALCULATE FILTERS
 #
 ################################################################################
-def do_extrinsic_update(n_chain, psrs, pta, samples, i, Ts, a_yes, a_no, x0s, FastLs, FLIs, FPI, par_names, par_names_cw, par_names_cw_ext, par_names_cw_int, log_likelihood, n_int_block, save_every_n):
+def do_intrinsic_update(n_chain, psrs, pta, samples, i, Ts, a_yes, a_no, x0s, FastLs, FLIs, FPI, par_names, par_names_cw, par_names_cw_ext, par_names_cw_int, log_likelihood, n_int_block, save_every_n, fisher_diag):
     #print("EXT")
     #print(i)
     for j in range(n_chain):
         jump_select = np.random.randint(len(par_names_cw_int))
         jump = np.zeros(len(par_names))
-        jump[par_names.index(par_names_cw_int[jump_select])] = 0.1
+        jump[par_names.index(par_names_cw_int[jump_select])] = fisher_diag[j, par_names.index(par_names_cw_int[jump_select])] #0.1
         
         samples_current = np.copy(samples[j,i%save_every_n,:])
 
@@ -317,9 +340,18 @@ def do_extrinsic_update(n_chain, psrs, pta, samples, i, Ts, a_yes, a_no, x0s, Fa
         if "_cw0_p_dist" in par_names_cw_int[jump_select]:
             #print("psr diatance update for " + par_names_cw_int[jump_select][:-11])
             FastLs[j].update_pulsar_distance(x0s[j], pta.pulsars.index(par_names_cw_int[jump_select][:-11]))
+            acc_idx = 10
         else:
             #print("sky location, frequency, or chirp mass update")
             FastLs[j].update_intrinsic_params(x0s[j])
+            if par_names_cw_int[jump_select]=="0_cos_gwtheta":
+                acc_idx = 1
+            elif par_names_cw_int[jump_select]=="0_gwphi":
+                acc_idx = 3
+            elif par_names_cw_int[jump_select]=="0_log10_fgw":
+                acc_idx = 4
+            elif par_names_cw_int[jump_select]=="0_log10_mc":
+                acc_idx = 6
 
         #update FLIs too
         FLIs[j] = FastLikeInfo(FastLs[j].resres,FastLs[j].logdet,FastLs[j].pos,FastLs[j].pdist,FastLs[j].NN,FastLs[j].MM_chol)
@@ -343,12 +375,12 @@ def do_extrinsic_update(n_chain, psrs, pta, samples, i, Ts, a_yes, a_no, x0s, Fa
             #if j==0: print("yeah")
             samples[j,i%save_every_n+1,:] = np.copy(new_point)
             log_likelihood[j,i%save_every_n+1] = log_L
-            a_yes[2,j]+=1
+            a_yes[acc_idx,j]+=1
         else:
             #if j==0: print("ohh")
             samples[j,i%save_every_n+1,:] = np.copy(samples[j,i%save_every_n,:])
             log_likelihood[j,i%save_every_n+1] = log_likelihood[j,i%save_every_n]
-            a_no[2,j]+=1
+            a_no[acc_idx,j]+=1
             #set back FastL stuuf to old sample
             x0s[j] = CWFastLikelihoodNumba.CWInfo(len(pta.pulsars),
                                               np.array([samples_current[par_names.index(par)] for par in par_names if "_cw0_p_phase" in par]),
@@ -379,7 +411,7 @@ def do_extrinsic_update(n_chain, psrs, pta, samples, i, Ts, a_yes, a_no, x0s, Fa
 ################################################################################
 #def do_intrinsic_block(n_chain, pta, samples, i, Ts, a_yes, a_no, x0s, FastLs, FLIs, FPI, par_names, par_names_cw, par_names_cw_ext, log_likelihood, n_int_block, save_every_n):
 @njit(parallel=False)
-def do_intrinsic_block(n_chain, samples, i, Ts, a_yes, a_no, x0s, FLIs, FPI, par_names, par_names_cw, par_names_cw_ext, log_likelihood, n_int_block, save_every_n):
+def do_extrinsic_block(n_chain, samples, i, Ts, a_yes, a_no, x0s, FLIs, FPI, par_names, par_names_cw, par_names_cw_ext, log_likelihood, n_int_block, save_every_n, fisher_diag):
     #print("FISHER")
     #print(i)
     #print("-"*100)
@@ -390,9 +422,20 @@ def do_intrinsic_block(n_chain, samples, i, Ts, a_yes, a_no, x0s, FLIs, FPI, par
 
             jump_select = np.random.randint(len(par_names_cw_ext))
             jump = np.zeros(len(par_names))
-            jump[par_names.index(par_names_cw_ext[jump_select])] = 0.5
+            jump[par_names.index(par_names_cw_ext[jump_select])] = fisher_diag[j, par_names.index(par_names_cw_ext[jump_select])] #0.5
 
             new_point = samples_current + jump*np.random.normal()
+
+            if "_cw0_p_phase" in par_names_cw_ext[jump_select]:
+                acc_idx = 9
+            elif par_names_cw_ext[jump_select]=="0_cos_inc":
+                acc_idx = 2
+            elif par_names_cw_ext[jump_select]=="0_log10_h":
+                acc_idx = 5
+            elif par_names_cw_ext[jump_select]=="0_phase0":
+                acc_idx = 7
+            elif par_names_cw_ext[jump_select]=="0_psi":
+                acc_idx = 8
 
             #if j==0: print(samples_current)
 
@@ -428,7 +471,7 @@ def do_intrinsic_block(n_chain, samples, i, Ts, a_yes, a_no, x0s, FLIs, FPI, par
                 #if j==0: print("yeah")
                 samples[j,(i+k)%save_every_n+1,:] = np.copy(new_point)
                 log_likelihood[j,(i+k)%save_every_n+1] = log_L
-                a_yes[1,j]+=1
+                a_yes[acc_idx,j]+=1
             else:
                 #if j==0: print("ohh")
                 samples[j,(i+k)%save_every_n+1,:] = np.copy(samples[j,(i+k)%save_every_n,:])
@@ -438,7 +481,7 @@ def do_intrinsic_block(n_chain, samples, i, Ts, a_yes, a_no, x0s, FLIs, FPI, par
                 x0s[j].phase0 = samples_current[par_names.index("0_phase0")]
                 x0s[j].psi = samples_current[par_names.index("0_psi")]
                 log_likelihood[j,(i+k)%save_every_n+1] = log_likelihood[j,(i+k)%save_every_n]
-                a_no[1,j]+=1
+                a_no[acc_idx,j]+=1
 
 
 ################################################################################
@@ -541,6 +584,75 @@ def do_draw_from_prior(n_chain, pta, samples, i, Ts, a_yes, a_no, x0s, FastLs, F
             x0s[j].psi = samples_current[par_names.index("0_psi")]
             log_likelihood[j,i+1] = log_likelihood[j,i]
             a_no[1,j]+=1
+
+
+################################################################################
+#
+#CALCULATE FISHER DIAGONAL
+#
+################################################################################
+def get_fihser_diagonal(pta, T_chain, samples_current, par_names, par_names_cw_ext, x0, FLI, epsilon=1e-2):
+    dim = len(par_names)
+    fisher_diag = np.zeros(dim)
+    
+    #current location
+    nn = CWFastLikelihoodNumba.get_lnlikelihood_helper(x0,FLI.resres,FLI.logdet,FLI.pos,FLI.pdist,FLI.NN,FLI.MM_chol)
+    #print(nn)
+
+    #calculate diagonal elements
+    for i in range(dim):
+        paramsPP = np.copy(samples_current)
+        paramsMM = np.copy(samples_current)
+        paramsPP[i] += 2*epsilon
+        paramsMM[i] -= 2*epsilon
+
+        if par_names[i] in par_names_cw_ext:
+            #use fast likelihood
+            x0.cw_p_phases = np.array([paramsPP[par_names.index(par)] for par in par_names if "_cw0_p_phase" in par])
+            x0.cos_inc = paramsPP[par_names.index("0_cos_inc")]
+            x0.log10_h = paramsPP[par_names.index("0_log10_h")]
+            x0.phase0 = paramsPP[par_names.index("0_phase0")]
+            x0.psi = paramsPP[par_names.index("0_psi")]
+            
+            pp = CWFastLikelihoodNumba.get_lnlikelihood_helper(x0,FLI.resres,FLI.logdet,FLI.pos,FLI.pdist,FLI.NN,FLI.MM_chol)
+
+            x0.cw_p_phases = np.array([paramsMM[par_names.index(par)] for par in par_names if "_cw0_p_phase" in par])
+            x0.cos_inc = paramsMM[par_names.index("0_cos_inc")]
+            x0.log10_h = paramsMM[par_names.index("0_log10_h")]
+            x0.phase0 = paramsMM[par_names.index("0_phase0")]
+            x0.psi = paramsMM[par_names.index("0_psi")]
+
+            mm = CWFastLikelihoodNumba.get_lnlikelihood_helper(x0,FLI.resres,FLI.logdet,FLI.pos,FLI.pdist,FLI.NN,FLI.MM_chol)
+
+            x0.cw_p_phases = np.array([samples_current[par_names.index(par)] for par in par_names if "_cw0_p_phase" in par])
+            x0.cos_inc = samples_current[par_names.index("0_cos_inc")]
+            x0.log10_h = samples_current[par_names.index("0_log10_h")]
+            x0.phase0 = samples_current[par_names.index("0_phase0")]
+            x0.psi = samples_current[par_names.index("0_psi")]
+        else:
+            pp = pta.get_lnlikelihood(paramsPP)
+            mm = pta.get_lnlikelihood(paramsMM)
+
+        #print(par_names[i])
+        #print(pp)
+        #print(mm)
+        #calculate diagonal elements of the Hessian from a central finite element scheme
+        #note the minus sign compared to the regular Hessian
+        fisher_diag[i] = -(pp - 2.0*nn + mm)/(4.0*epsilon*epsilon)
+        
+    #correct for the given temperature of the chain
+    fisher_diag = fisher_diag/T_chain
+
+    #filer out nans and negative values - set them to 1.0 which will result in 
+    Fisher_diag = np.where(np.isfinite(fisher_diag), fisher_diag, 1.0)
+    FISHER_diag = np.where(fisher_diag>0.0, Fisher_diag, 1.0)
+
+    #filter values smaller than 4 and set those to 4 -- Neil's trick -- effectively not allow jump Gaussian stds larger than 0.5=1/sqrt(4)
+    eig_limit = 4.0
+    W = np.where(FISHER_diag>eig_limit, FISHER_diag, eig_limit)
+
+    return 1/np.sqrt(W)
+
 
 @jitclass([('resres',nb.float64),('logdet',nb.float64),('pos',nb.float64[:,:]),\
            ('pdist',nb.float64[:,:]),('NN',nb.float64[:,:]),('MM_chol',nb.float64[:,:,:])])
