@@ -71,7 +71,7 @@ class CWFastLikelihood:
 
     def update_intrinsic_params(self,x0):
         """Recalculate filters with updated intrinsic parameters - not quite the same as the setup, since a few things are already stored"""
-        update_intrinsic_params(x0,self.Sigmas,self.Ts,self.Nvecs,self.pos,self.pdist,self.tref,self.toas,self.residuals, self.NN, self.MM_chol)
+        update_intrinsic_params(x0,self.Sigmas,self.Ts,self.Nvecs,self.pos,self.pdist,self.tref,self.toas,self.residuals, self.NN, self.MMs, self.MM_chol)
 
 @jitclass([('Npsr',nb.int64),('cw_p_dists',nb.float64[:]),('cw_p_phases',nb.float64[:]),('cos_gwtheta',nb.float64),\
         ('cos_inc',nb.float64),('gwphi',nb.float64),('log10_fgw',nb.float64),('log10_h',nb.float64),\
@@ -280,7 +280,7 @@ def get_MM_NN_resres_logdet(x0,Sigmas,Ts,Nvecs,pos,pdist,tref,toas,residuals):
 
         #get MM
         #diagonal
-        MM[0,0] = esNes - dotSigmaTNes
+        MM[0,0] = esNes - dotSigmaTNes 
         MM[1,1] = ecNec - dotSigmaTNec
         MM[2,2] = psNps - dotSigmaTNps
         MM[3,3] = pcNpc - dotSigmaTNpc
@@ -299,7 +299,29 @@ def get_MM_NN_resres_logdet(x0,Sigmas,Ts,Nvecs,pos,pdist,tref,toas,residuals):
         MM[1,3] = MM[3,1]
         MM[2,3] = MM[3,2]
 
-
+        try:
+            eig_val, eig_vec = np.linalg.eigh(MM)
+            if np.min(eig_val)<0.0: #if there are negative eigenvalues in the matrix
+                eig_val_fix = np.where(eig_val>0.0, eig_val, 1.0) #make them 1.0 (which is smaller than the typical eigenvalue we see (1e10)
+                MM = np.dot(np.dot(eig_vec,np.diag(eig_val_fix)), eig_vec.T) #and reconstruct the matrix with the fixed eigenvalues
+            eigv_val, eigv_vec = np.linalg.eigh(MM)
+            if np.min(eigv_val)<10.0:
+                print(MM)
+                print(np.linalg.eigh(MM))
+                print(x0.log10_fgw)
+                print(x0.log10_mc)
+                print(x0.cos_gwtheta)
+                print(x0.gwphi)
+                print(x0.cw_p_dists)
+        except:
+            print("M matrix error")
+            print(MM)
+            print(x0.log10_fgw)
+            print(x0.log10_mc)
+            print(x0.cos_gwtheta)
+            print(x0.gwphi)
+            print(x0.cw_p_dists)
+ 
         MMs[ii,:,:] = np.copy(MM)
         #we only actually need the cholesky decomposition
         MM_chol[ii] = np.linalg.cholesky(MM)
@@ -453,6 +475,28 @@ def update_MM_NN_new_psr_dist(x0,Sigmas,Ts,Nvecs,pos,pdist,tref,toas,residuals, 
     MM[1,2] = MM[2,1]
     MM[1,3] = MM[3,1]
     MM[2,3] = MM[3,2]
+    try:
+        eig_val, eig_vec = np.linalg.eigh(MM)
+        if np.min(eig_val)<0.0: #if there are negative eigenvalues in the matrix
+            eig_val_fix = np.where(eig_val>0.0, eig_val, 1.0) #make them 1.0 (which is smaller than the typical eigenvalue we see (1e10)
+            MM = np.dot(np.dot(eig_vec,np.diag(eig_val_fix)), eig_vec.T) #and reconstruct the matrix with the fixed eigenvalues
+        eigv_val, eigv_vec = np.linalg.eigh(MM)
+        if np.min(eigv_val)<10.0:
+            print(MM)
+            print(np.linalg.eigh(MM))
+            print(x0.log10_fgw)
+            print(x0.log10_mc)
+            print(x0.cos_gwtheta)
+            print(x0.gwphi)
+            print(x0.cw_p_dists)
+    except:
+        print("M matrix error")
+        print(MM)
+        print(x0.log10_fgw)
+        print(x0.log10_mc)
+        print(x0.cos_gwtheta)
+        print(x0.gwphi)
+        print(x0.cw_p_dists)
 
     MMs[ii,:,:] = np.copy(MM)
     #we only actually need the cholesky decomposition
@@ -461,7 +505,7 @@ def update_MM_NN_new_psr_dist(x0,Sigmas,Ts,Nvecs,pos,pdist,tref,toas,residuals, 
 
 
 @njit()
-def update_intrinsic_params(x0,Sigmas,Ts,Nvecs,pos,pdist,tref,toas,residuals,NN,MM_chol):
+def update_intrinsic_params(x0,Sigmas,Ts,Nvecs,pos,pdist,tref,toas,residuals,NN,MMs,MM_chol):
     '''Calculate inner products N=(res|S), M=(S|S)'''
 
     w0 = np.pi * 10.0**x0.log10_fgw
@@ -586,7 +630,7 @@ def update_intrinsic_params(x0,Sigmas,Ts,Nvecs,pos,pdist,tref,toas,residuals,NN,
 
         #get MM
         #diagonal
-        MM[0,0] = esNes - dotSigmaTNes
+        MM[0,0] = esNes - dotSigmaTNes 
         MM[1,1] = ecNec - dotSigmaTNec
         MM[2,2] = psNps - dotSigmaTNps
         MM[3,3] = pcNpc - dotSigmaTNpc
@@ -604,7 +648,30 @@ def update_intrinsic_params(x0,Sigmas,Ts,Nvecs,pos,pdist,tref,toas,residuals,NN,
         MM[1,2] = MM[2,1]
         MM[1,3] = MM[3,1]
         MM[2,3] = MM[3,2]
+        try:
+            eig_val, eig_vec = np.linalg.eigh(MM)
+            if np.min(eig_val)<0.0: #if there are negative eigenvalues in the matrix
+                eig_val_fix = np.where(eig_val>0.0, eig_val, 1.0) #make them 1.0 (which is smaller than the typical eigenvalue we see (1e10)
+                MM = np.dot(np.dot(eig_vec,np.diag(eig_val_fix)), eig_vec.T) #and reconstruct the matrix with the fixed eigenvalues
+            eigv_val, eigv_vec = np.linalg.eigh(MM)
+            if np.min(eigv_val)<10.0:
+                print(MM)
+                print(np.linalg.eigh(MM))
+                print(x0.log10_fgw)
+                print(x0.log10_mc)
+                print(x0.cos_gwtheta)
+                print(x0.gwphi)
+                print(x0.cw_p_dists)
+        except:
+            print("M matrix error")
+            print(MM)
+            print(x0.log10_fgw)
+            print(x0.log10_mc)
+            print(x0.cos_gwtheta)
+            print(x0.gwphi)
+            print(x0.cw_p_dists)
 
+        MMs[ii,:,:] = np.copy(MM)
         #we only actually need the cholesky decomposition
         MM_chol[ii] = np.linalg.cholesky(MM)
 
