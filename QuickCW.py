@@ -17,7 +17,6 @@ from numba import jit,njit,prange
 from numba.experimental import jitclass
 from numba.typed import List
 #from numba_stats import uniform as uniform_numba
-np.random.seed(315)
 from numpy.random import uniform
 
 
@@ -427,7 +426,7 @@ def summarize_a_ext(a_counts,par_inds_cw_p_phase_ext):
 #REGULAR MCMC JUMP ROUTINE (JUMPING ALONG EIGENDIRECTIONS)
 #
 ################################################################################
-#@njit(parallel=True)
+@njit(parallel=True)
 def do_extrinsic_block(n_chain, samples, i, Ts, x0s, FLIs, FPI, n_par_tot, n_par_ext, log_likelihood, n_int_block, save_every_n, fisher_diag):
     #print("FISHER")
     #print("-"*100)
