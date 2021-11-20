@@ -26,9 +26,11 @@ import glob
 import json
 
 import QuickCW
+import CWFastLikelihoodNumba
 
 #with open('data/fast_like_test_psrs_A2e-15_M5e9_f2e-8_evolve_no_gwb_no_rn_no_ecorr_no_equad.pkl', 'rb') as psr_pkl:
 with open('data/fast_like_test_psrs_A1e-15_M5e9_f2e-8_evolve_no_gwb_no_rn_no_ecorr_no_equad.pkl', 'rb') as psr_pkl:
+#with open('data/fast_like_test_psrs.pkl', 'rb') as psr_pkl:
     psrs = pickle.load(psr_pkl)
 
 print(len(psrs))

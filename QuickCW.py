@@ -2,6 +2,11 @@
 MCMC for CW fast likelihood (w/ Neil Cornish and Matthew Digman)"""
 import pickle
 
+from time import perf_counter
+import glob
+import json
+import time
+
 import numpy as np
 import numba as nb
 #make sure to use the right threading layer
@@ -12,7 +17,9 @@ from numba import jit,njit,prange
 from numba.experimental import jitclass
 from numba.typed import List
 #from numba_stats import uniform as uniform_numba
+np.random.seed(315)
 from numpy.random import uniform
+
 
 import corner
 import enterprise
@@ -33,23 +40,22 @@ import libstempo as T2
 import libstempo.toasim as LT
 import libstempo.plot as LP
 
-import glob
-import json
-import time
-import re
+#import re
 
 import h5py
 
 import CWFastLikelihoodNumba
 import CWFastPrior
+import const_mcmc as cm
 
 ################################################################################
 #
 #MAIN MCMC ENGINE
 #
 ################################################################################
-def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int_block=100, n_extrinsic_step=10, save_every_n=10_000, thin=10, savefile=None, n_update_fisher=100_000):
+def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int_block=100, n_extrinsic_step=1000, save_every_n=10_000, thin=10, savefile=None, n_update_fisher=100_000):
     #freq = 1e-8
+    ti = perf_counter()
 
     #use PTA used in current CW search
     tmin = [p.toas.min() for p in psrs]
@@ -101,12 +107,10 @@ def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int
     log10_h = parameter.Uniform(-18, -11)('0_log10_h')
     #log10_h = parameter.LinearExp(-18, -11)('0_log10_h')
 
-    tref = 53000*86400
-
     cw_wf = deterministic.cw_delay(cos_gwtheta=cos_gwtheta, gwphi=gwphi, log10_mc=log10_mc,
                                    log10_h=log10_h, log10_fgw=log10_fgw, phase0=phase0, psrTerm=True,
                                    p_phase=p_phase, p_dist=p_dist, evolve=True,
-                                   psi=psi, cos_inc=cos_inc, tref=53000*86400)
+                                   psi=psi, cos_inc=cos_inc, tref=cm.tref)
     cw = deterministic.CWSignal(cw_wf, psrTerm=True, name='cw0')
 
     log10_Agw = parameter.Constant(-16.27)('gwb_log10_A')
@@ -145,12 +149,15 @@ def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int
                          '0_log10_mc', '0_phase0', '0_psi'])
     par_names_cw_ext = List(['0_cos_inc', '0_log10_h', '0_phase0', '0_psi'])
     par_names_cw_int = List(['0_cos_gwtheta', '0_gwphi', '0_log10_fgw', '0_log10_mc'])
-    for psr in pta.pulsars:
+
+    par_inds_cw_p_phase_ext = np.zeros(len(pta.pulsars),dtype=np.int64)
+
+    for i,psr in enumerate(pta.pulsars):
         par_names_cw.append(psr + "_cw0_p_dist")
+        par_inds_cw_p_phase_ext[i] = len(par_names_cw)
         par_names_cw.append(psr + "_cw0_p_phase")
         par_names_cw_ext.append(psr + "_cw0_p_phase")
         par_names_cw_int.append(psr + "_cw0_p_dist")
-
 
     #using geometric spacing
     c = T_max**(1.0/(n_chain-1))
@@ -195,34 +202,22 @@ def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int
             samples[j,0,par_names.index(psr + "_cw0_p_phase")] = p_phases[ii]
 
     #set up fast likelihoods
-    FastLs = []
     x0s = List([])
-    FLIs = List([])
+    FLIs  = List([])
     for j in range(n_chain):
-        x0s.append( CWFastLikelihoodNumba.CWInfo(len(pta.pulsars),
-                                                 np.array([samples[j,0,par_names.index(par)] for par in par_names if "_cw0_p_phase" in par]),
-                                                 np.array([samples[j,0,par_names.index(par)] for par in par_names if "_cw0_p_dist" in par]),
-                                                 samples[j,0,par_names.index("0_cos_gwtheta")],
-                                                 samples[j,0,par_names.index("0_cos_inc")],
-                                                 samples[j,0,par_names.index("0_gwphi")],
-                                                 samples[j,0,par_names.index("0_log10_fgw")],
-                                                 samples[j,0,par_names.index("0_log10_h")],
-                                                 samples[j,0,par_names.index("0_log10_mc")],
-                                                 samples[j,0,par_names.index("0_phase0")],
-                                                 samples[j,0,par_names.index("0_psi")]) )
-        FastLs.append(CWFastLikelihoodNumba.CWFastLikelihood(psrs, pta, {pname:x for pname,x in zip(par_names,samples[j,0,:])}, x0s[j]))
-        FLIs.append(FastLikeInfo(FastLs[j].resres,FastLs[j].logdet,FastLs[j].pos,FastLs[j].pdist,FastLs[j].NN,FastLs[j].MM_chol))
+        x0s.append( CWFastLikelihoodNumba.CWInfo(len(pta.pulsars),samples[j,0],par_names,par_names_cw_ext))
+        FLIs.append(CWFastLikelihoodNumba.get_FastLikeInfo(psrs, pta, dict(zip(par_names, samples[j, 0, :])), x0s[j]))
 
     #calculate the diagonal elements of the fisher matrix
     fisher_diag = np.ones((n_chain, len(par_names)))
     for j in range(n_chain):
-        fisher_diag[j,:] = get_fihser_diagonal(pta, Ts[j], samples[j,0,:], par_names, par_names_cw_ext, x0s[j], FLIs[j])
+        fisher_diag[j,:] = get_fisher_diagonal(Ts[j], samples[j,0,:], par_names, par_names_cw_ext, x0s[j], FLIs[j])
         print(fisher_diag[j,:])
 
 
     #setting up arrays to record acceptance and swaps
-    a_yes=np.zeros((11,n_chain)) #columns: chain number; rows: proposal type (PT, cos_gwtheta, cos_inc, gwphi, fgw, h, mc, phase0, psi, p_phases, p_dists)
-    a_no=np.zeros((11,n_chain))
+    a_yes=np.zeros((11,n_chain),dtype=np.int64) #columns: chain number; rows: proposal type (PT, cos_gwtheta, cos_inc, gwphi, fgw, h, mc, phase0, psi, p_phases, p_dists)
+    a_no=np.zeros((11,n_chain),dtype=np.int64)
     acc_fraction = a_yes/(a_no+a_yes)
 
     #printing info about initial parameters
@@ -230,15 +225,19 @@ def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int
         print("j="+str(j))
         print(samples[j,0,:])
         #log_likelihood[j,0] = pta.get_lnlikelihood(samples[j,0,:])
-        log_likelihood[j,0] = FastLs[j].get_lnlikelihood(x0s[j])
+        log_likelihood[j,0] = FLIs[j].get_lnlikelihood(x0s[j])
         print("log_likelihood="+str(log_likelihood[j,0]))
         #print("log_prior="+str(pta.get_lnprior(samples[j,0,:])))
         print("log_prior="+str(FastPrior.get_lnprior(samples[j,0,:])))
 
     stop_iter = N
 
-    ext_update = List([False,]*n_chain)
-    sample_updates = List([np.copy(samples[j,0,:]) for j in range(n_chain)])
+    #ext_update = List([False,]*n_chain)
+    #sample_updates = List([np.copy(samples[j,0,:]) for j in range(n_chain)])
+
+    tf_init = perf_counter()
+    print('finished initialization steps in '+str(tf_init-ti)+'s')
+    ti_loop = perf_counter()
 
     ##############################################################################
     #
@@ -246,27 +245,27 @@ def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int
     #
     ##############################################################################
     for i in range(int(N/n_int_block)):
-        #print(i*n_int_block)
-        if savefile is not None and (i*n_int_block)%save_every_n==0 and i!=0:
+        if (i*n_int_block)%save_every_n==0 and i!=0:
             acc_fraction = a_yes/(a_no+a_yes)
             #np.savez(savefile, samples=samples[0,:i*n_int_block,:], par_names=par_names, acc_fraction=acc_fraction, log_likelihood=log_likelihood[:,:i*n_int_block])
-            if i*n_int_block>save_every_n:
-                print("Append to HDF5 file...")
-                with h5py.File(savefile, 'a') as f:
-                    f['samples_cold'].resize((f['samples_cold'].shape[0] + int((samples.shape[1] - 1)/thin)), axis=0)
-                    f['samples_cold'][-int((samples.shape[1]-1)/thin):] = np.copy(samples[0,:-1:thin,:])
-                    f['log_likelihood'].resize((f['log_likelihood'].shape[1] + int((log_likelihood.shape[1] - 1)/thin)), axis=1)
-                    f['log_likelihood'][:,-int((log_likelihood.shape[1]-1)/thin):] = np.copy(log_likelihood[:,:-1:thin])
-                    f['acc_fraction'][...] = np.copy(acc_fraction)
-                    f['fisher_diag'][...] = np.copy(fisher_diag)
-            else:
-                print("Create HDF5 file...")
-                with h5py.File(savefile, 'w') as f:
-                    f.create_dataset('samples_cold', data=samples[0,:-1:thin,:], compression="gzip", chunks=True, maxshape=(int(N/thin),samples.shape[2]))
-                    f.create_dataset('log_likelihood', data=log_likelihood[:,:-1:thin], compression="gzip", chunks=True, maxshape=(samples.shape[0],int(N/thin)))
-                    f.create_dataset('par_names', data=np.array(par_names, dtype='S'))
-                    f.create_dataset('acc_fraction', data=acc_fraction)
-                    f.create_dataset('fisher_diag', data=fisher_diag)
+            if savefile is not None:
+                if i*n_int_block>save_every_n:
+                    print("Append to HDF5 file...")
+                    with h5py.File(savefile, 'a') as f:
+                        f['samples_cold'].resize((f['samples_cold'].shape[0] + int((samples.shape[1] - 1)/thin)), axis=0)
+                        f['samples_cold'][-int((samples.shape[1]-1)/thin):] = np.copy(samples[0,:-1:thin,:])
+                        f['log_likelihood'].resize((f['log_likelihood'].shape[1] + int((log_likelihood.shape[1] - 1)/thin)), axis=1)
+                        f['log_likelihood'][:,-int((log_likelihood.shape[1]-1)/thin):] = np.copy(log_likelihood[:,:-1:thin])
+                        f['acc_fraction'][...] = np.copy(acc_fraction)
+                        f['fisher_diag'][...] = np.copy(fisher_diag)
+                else:
+                    print("Create HDF5 file...")
+                    with h5py.File(savefile, 'w') as f:
+                        f.create_dataset('samples_cold', data=samples[0,:-1:thin,:], compression="gzip", chunks=True, maxshape=(int(N/thin),samples.shape[2]))
+                        f.create_dataset('log_likelihood', data=log_likelihood[:,:-1:thin], compression="gzip", chunks=True, maxshape=(samples.shape[0],int(N/thin)))
+                        f.create_dataset('par_names', data=np.array(par_names, dtype='S'))
+                        f.create_dataset('acc_fraction', data=acc_fraction)
+                        f.create_dataset('fisher_diag', data=fisher_diag)
             #clear out log_likelihood and samples arrays
             samples_now = samples[:,-1,:]
             log_likelihood_now = log_likelihood[:,-1]
@@ -275,37 +274,45 @@ def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int
             samples[:,0,:] = np.copy(samples_now)
             log_likelihood[:,0] = np.copy(log_likelihood_now)
         if (i*n_int_block)%n_update_fisher==0 and i!=0:
-            print("Updating Fihser diagonals")
+            print("Updating Fisher diagonals")
             for j in range(n_chain):
-                fisher_diag[j,:] = get_fihser_diagonal(pta, Ts[j], samples[j,(i*n_int_block)%save_every_n,:], par_names, par_names_cw_ext, x0s[j], FLIs[j])
+                fisher_diag[j,:] = get_fisher_diagonal(Ts[j], samples[j,(i*n_int_block)%save_every_n,:], par_names, par_names_cw_ext, x0s[j], FLIs[j])
         if i%n_status_update==0:
             acc_fraction = a_yes/(a_no+a_yes)
             print('Progress: {0:2.2f}% '.format(i*n_int_block/N*100) +
                       'Acceptance fraction #columns: chain number; rows: proposal type (PT, cos_gwtheta, cos_inc, gwphi, fgw, h, mc, phase0, psi, p_phases, p_dists):')
+            t_itr = perf_counter()
+            print('at t= '+str(t_itr-ti_loop)+'s')
             print(acc_fraction)
-            print("New log_L=", str(CWFastLikelihoodNumba.get_lnlikelihood_helper(x0s[0],FLIs[0].resres,FLIs[0].logdet,FLIs[0].pos,FLIs[0].pdist,FLIs[0].NN,FLIs[0].MM_chol)))
-            print("Old log_L=", str(pta.get_lnlikelihood(samples[0,(i*n_int_block)%save_every_n,:])))
+            print("New log_L=", str(FLIs[0].get_lnlikelihood(x0s[0])))#,FLIs[0].resres,FLIs[0].logdet,FLIs[0].pos,FLIs[0].pdist,FLIs[0].NN,FLIs[0].MMs)))
+            #print("Old log_L=", str(pta.get_lnlikelihood(samples[0,(i*n_int_block)%save_every_n,:])))
         #update extrinsic parameters sometimes
         if i%n_extrinsic_step==0 and i!=0:
-            do_intrinsic_update(n_chain, psrs, pta, samples, i*n_int_block, Ts, a_yes, a_no, x0s, FastLs, FLIs, FastPrior, par_names, par_names_cw, par_names_cw_ext, par_names_cw_int, log_likelihood, n_int_block, save_every_n, fisher_diag)
-            do_extrinsic_block(n_chain, samples, i*n_int_block+1, Ts, a_yes, a_no, x0s, FLIs, FPI, par_names, par_names_cw, par_names_cw_ext, log_likelihood, n_int_block-1, save_every_n, fisher_diag)
-            #do_extrinsic_block(n_chain, pta, samples, i*n_int_block+1, Ts, a_yes, a_no, x0s, FastLs, FLIs, FPI, par_names, par_names_cw, par_names_cw_ext, log_likelihood, n_int_block-1, save_every_n)
-            do_pt_swap(n_chain, pta, samples, (i+1)*n_int_block-1, Ts, a_yes, a_no, x0s, FastLs, FLIs, FPI, par_names, par_names_cw, par_names_cw_ext, log_likelihood, n_int_block, save_every_n)
+            do_intrinsic_update(n_chain, pta, samples, i*n_int_block, Ts, a_yes, a_no, x0s, FLIs, FastPrior, par_names, par_names_cw_int, log_likelihood, save_every_n, fisher_diag)
+            a_yes_counts_loc,a_no_counts_loc = do_extrinsic_block(n_chain, samples, i*n_int_block+1, Ts, x0s, FLIs, FPI, len(par_names), len(par_names_cw_ext), log_likelihood, n_int_block-1, save_every_n, fisher_diag)
+            a_yes += summarize_a_ext(a_yes_counts_loc,par_inds_cw_p_phase_ext)
+            a_no += summarize_a_ext(a_no_counts_loc,par_inds_cw_p_phase_ext)
+            do_pt_swap(n_chain, samples, (i+1)*n_int_block-1, Ts, a_yes, a_no, x0s, FLIs, log_likelihood, save_every_n)
         else:
-            do_extrinsic_block(n_chain, samples, i*n_int_block, Ts, a_yes, a_no, x0s, FLIs, FPI, par_names, par_names_cw, par_names_cw_ext, log_likelihood, n_int_block, save_every_n, fisher_diag)
-            #do_extrinsic_block(n_chain, pta, samples, i*n_int_block, Ts, a_yes, a_no, x0s, FastLs, FLIs, FPI, par_names, par_names_cw, par_names_cw_ext, log_likelihood, n_int_block, save_every_n)
-            do_pt_swap(n_chain, pta, samples, (i+1)*n_int_block-1, Ts, a_yes, a_no, x0s, FastLs, FLIs, FPI, par_names, par_names_cw, par_names_cw_ext, log_likelihood, n_int_block, save_every_n)
+            a_yes_counts_loc,a_no_counts_loc = do_extrinsic_block(n_chain, samples, i*n_int_block, Ts, x0s, FLIs, FPI, len(par_names), len(par_names_cw_ext), log_likelihood, n_int_block, save_every_n, fisher_diag)
+            a_yes += summarize_a_ext(a_yes_counts_loc,par_inds_cw_p_phase_ext)
+            a_no += summarize_a_ext(a_no_counts_loc,par_inds_cw_p_phase_ext)
+            do_pt_swap(n_chain, samples, (i+1)*n_int_block-1, Ts, a_yes, a_no, x0s, FLIs, log_likelihood, save_every_n)
 
     acc_fraction = a_yes/(a_no+a_yes)
     print("Append to HDF5 file...")
-    with h5py.File(savefile, 'a') as f:
-        f['samples_cold'].resize((f['samples_cold'].shape[0] + int((samples.shape[1] - 1)/thin)), axis=0)
-        f['samples_cold'][-int((samples.shape[1]-1)/thin):] = np.copy(samples[0,:-1:thin,:])
-        f['log_likelihood'].resize((f['log_likelihood'].shape[1] + int((log_likelihood.shape[1] - 1)/thin)), axis=1)
-        f['log_likelihood'][:,-int((log_likelihood.shape[1]-1)/thin):] = np.copy(log_likelihood[:,:-1:thin])
-        f['acc_fraction'][...] = np.copy(acc_fraction)
-        f['fisher_diag'][...] = np.copy(fisher_diag)
-    #return samples, par_names, acc_fraction, pta, log_likelihood
+    if savefile is not None:
+        with h5py.File(savefile, 'a') as f:
+            f['samples_cold'].resize((f['samples_cold'].shape[0] + int((samples.shape[1] - 1)/thin)), axis=0)
+            f['samples_cold'][-int((samples.shape[1]-1)/thin):] = np.copy(samples[0,:-1:thin,:])
+            f['log_likelihood'].resize((f['log_likelihood'].shape[1] + int((log_likelihood.shape[1] - 1)/thin)), axis=1)
+            f['log_likelihood'][:,-int((log_likelihood.shape[1]-1)/thin):] = np.copy(log_likelihood[:,:-1:thin])
+            f['acc_fraction'][...] = np.copy(acc_fraction)
+            f['fisher_diag'][...] = np.copy(fisher_diag)
+        #return samples, par_names, acc_fraction, pta, log_likelihood
+    tf = perf_counter()
+    print('whole function time ='+str(tf-ti)+'s')
+    print('loop time ='+str(tf-ti_loop)+'s')
     return pta
 
 ################################################################################
@@ -313,37 +320,33 @@ def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int
 #UPDATE INTRINSIC PARAMETERS AND RECALCULATE FILTERS
 #
 ################################################################################
-def do_intrinsic_update(n_chain, psrs, pta, samples, i, Ts, a_yes, a_no, x0s, FastLs, FLIs, FPI, par_names, par_names_cw, par_names_cw_ext, par_names_cw_int, log_likelihood, n_int_block, save_every_n, fisher_diag):
+def do_intrinsic_update(n_chain, pta, samples, i, Ts, a_yes, a_no, x0s, FLIs, FPI, par_names, par_names_cw_int, log_likelihood, save_every_n, fisher_diag):
     #print("EXT")
-    #print(i)
     for j in range(n_chain):
+        #save MMs and NN so we can revert them if the chain is rejected
+        MMs_save = FLIs[j].MMs.copy()
+        NN_save = FLIs[j].NN.copy()
         jump_select = np.random.randint(len(par_names_cw_int))
         jump = np.zeros(len(par_names))
-        jump[par_names.index(par_names_cw_int[jump_select])] = fisher_diag[j, par_names.index(par_names_cw_int[jump_select])] #0.1
-        
+        jump_idx = par_names.index(par_names_cw_int[jump_select])
+        jump[jump_idx] = fisher_diag[j, jump_idx] #0.1
+
         samples_current = np.copy(samples[j,i%save_every_n,:])
 
+        #print('jump select',jump_select,par_names_cw_int[jump_select])
         new_point = np.copy(samples[j,i%save_every_n,:]) + jump*np.random.normal()
+        #TODO check wrapping is working right
+        if jump_idx == x0s[j].idx_cos_gwtheta or jump_idx == x0s[j].idx_gwphi:
+            new_point[x0s[j].idx_cos_gwtheta],new_point[x0s[j].idx_gwphi] = reflect_cosines(new_point[x0s[j].idx_cos_gwtheta],new_point[x0s[j].idx_gwphi],np.pi,2*np.pi)
 
-        x0s[j] = CWFastLikelihoodNumba.CWInfo(len(pta.pulsars),
-                                              np.array([new_point[par_names.index(par)] for par in par_names if "_cw0_p_phase" in par]),
-                                              np.array([new_point[par_names.index(par)] for par in par_names if "_cw0_p_dist" in par]),
-                                              new_point[par_names.index("0_cos_gwtheta")],
-                                              new_point[par_names.index("0_cos_inc")],
-                                              new_point[par_names.index("0_gwphi")],
-                                              new_point[par_names.index("0_log10_fgw")],
-                                              new_point[par_names.index("0_log10_h")],
-                                              new_point[par_names.index("0_log10_mc")],
-                                              new_point[par_names.index("0_phase0")],
-                                              new_point[par_names.index("0_psi")])
+        x0s[j].update_params(new_point)
 
         if "_cw0_p_dist" in par_names_cw_int[jump_select]:
-            #print("psr diatance update for " + par_names_cw_int[jump_select][:-11])
-            FastLs[j].update_pulsar_distance(x0s[j], pta.pulsars.index(par_names_cw_int[jump_select][:-11]))
+            FLIs[j].update_pulsar_distance(x0s[j], pta.pulsars.index(par_names_cw_int[jump_select][:-11]))
             acc_idx = 10
         else:
             #print("sky location, frequency, or chirp mass update")
-            FastLs[j].update_intrinsic_params(x0s[j])
+            FLIs[j].update_intrinsic_params(x0s[j])
             if par_names_cw_int[jump_select]=="0_cos_gwtheta":
                 acc_idx = 1
             elif par_names_cw_int[jump_select]=="0_gwphi":
@@ -353,106 +356,102 @@ def do_intrinsic_update(n_chain, psrs, pta, samples, i, Ts, a_yes, a_no, x0s, Fa
             elif par_names_cw_int[jump_select]=="0_log10_mc":
                 acc_idx = 6
 
-        #update FLIs too
-        FLIs[j] = FastLikeInfo(FastLs[j].resres,FastLs[j].logdet,FastLs[j].pos,FastLs[j].pdist,FastLs[j].NN,FastLs[j].MM_chol)
+        #check the maximum toa is not such that the source has already merged, and if so automatically reject the proposal
+        w0 = np.pi * 10.0**x0s[j].log10_fgw
+        mc = 10.0**x0s[j].log10_mc * const.Tsun
 
-        log_L = CWFastLikelihoodNumba.get_lnlikelihood_helper(x0s[j],FLIs[j].resres,FLIs[j].logdet,FLIs[j].pos,FLIs[j].pdist,FLIs[j].NN,FLIs[j].MM_chol)
-        log_acc_ratio = log_L/Ts[j]
-        log_acc_ratio += CWFastPrior.get_lnprior_helper(new_point, FPI.uniform_par_ids, FPI.uniform_lows, FPI.uniform_highs,
-                                                                   FPI.normal_par_ids, FPI.normal_mus, FPI.normal_sigs)
-        log_acc_ratio += -log_likelihood[j,i%save_every_n]/Ts[j]
-        log_acc_ratio += -CWFastPrior.get_lnprior_helper(samples_current, FPI.uniform_par_ids, FPI.uniform_lows, FPI.uniform_highs,
-                                                                    FPI.normal_par_ids, FPI.normal_mus, FPI.normal_sigs)
+        if (1. - 256./5. * mc * const.Tsun**(5./3.) * w0**(8./3.) * (FLIs[j].max_toa - cm.tref)) < 0:
+            log_acc_ratio = -1.
+            acc_decide = 0.
+        else:
 
-        #print(pta.get_lnprior(new_point))
-        #print(FastPrior.get_lnprior(new_point))
+            #update FLIs too
+            log_L = FLIs[j].get_lnlikelihood(x0s[j])
+            log_acc_ratio = log_L/Ts[j]
+            log_acc_ratio += CWFastPrior.get_lnprior_helper(new_point, FPI.uniform_par_ids, FPI.uniform_lows, FPI.uniform_highs,
+                                                                       FPI.normal_par_ids, FPI.normal_mus, FPI.normal_sigs)
+            log_acc_ratio += -log_likelihood[j,i%save_every_n]/Ts[j]
+            log_acc_ratio += -CWFastPrior.get_lnprior_helper(samples_current, FPI.uniform_par_ids, FPI.uniform_lows, FPI.uniform_highs,
+                                                                        FPI.normal_par_ids, FPI.normal_mus, FPI.normal_sigs)
 
-        acc_ratio = np.exp(log_acc_ratio)
-        #if j==0: print(acc_ratio)
-        #if np.random.uniform()<=acc_ratio:
-        acc_decide = uniform(0.0, 1.0, 1)
-        if acc_decide<=acc_ratio:
-            #if j==0: print("yeah")
+            acc_decide = np.log(uniform(0.0, 1.0, 1))
+            #print(pta.get_lnprior(new_point))
+            #print(FastPrior.get_lnprior(new_point))
+
+        if acc_decide<=log_acc_ratio:
+            x0s[j].update_params(new_point)
+
             samples[j,i%save_every_n+1,:] = np.copy(new_point)
+
             log_likelihood[j,i%save_every_n+1] = log_L
             a_yes[acc_idx,j]+=1
         else:
-            #if j==0: print("ohh")
-            samples[j,i%save_every_n+1,:] = np.copy(samples[j,i%save_every_n,:])
-            log_likelihood[j,i%save_every_n+1] = log_likelihood[j,i%save_every_n]
+            samples[j,(i+1)%save_every_n,:] = np.copy(samples_current)#np.copy(samples[j,i%save_every_n,:])
+
+            log_likelihood[j,(i+1)%save_every_n] = log_likelihood[j,i%save_every_n]
+
             a_no[acc_idx,j]+=1
-            #set back FastL stuuf to old sample
-            x0s[j] = CWFastLikelihoodNumba.CWInfo(len(pta.pulsars),
-                                              np.array([samples_current[par_names.index(par)] for par in par_names if "_cw0_p_phase" in par]),
-                                              np.array([samples_current[par_names.index(par)] for par in par_names if "_cw0_p_dist" in par]),
-                                              samples_current[par_names.index("0_cos_gwtheta")],
-                                              samples_current[par_names.index("0_cos_inc")],
-                                              samples_current[par_names.index("0_gwphi")],
-                                              samples_current[par_names.index("0_log10_fgw")],
-                                              samples_current[par_names.index("0_log10_h")],
-                                              samples_current[par_names.index("0_log10_mc")],
-                                              samples_current[par_names.index("0_phase0")],
-                                              samples_current[par_names.index("0_psi")])
+            x0s[j].update_params(samples_current)
 
             if "_cw0_p_dist" in par_names_cw_int[jump_select]:
-                #print("psr diatance update for " + par_names_cw_int[jump_select][:-11])
-                FastLs[j].update_pulsar_distance(x0s[j], pta.pulsars.index(par_names_cw_int[jump_select][:-11]))
+                #revert the changes to FastLs
+                FLIs[j].MMs = MMs_save
+                FLIs[j].NN = NN_save
             else:
+                #revert the changes to FastLs
+                FLIs[j].MMs = MMs_save
+                FLIs[j].NN = NN_save
+                #revert the safety tracking parameters that were altered by update_intrinsic
+                FLIs[j].cos_gwtheta = x0s[j].cos_gwtheta
+                FLIs[j].gwphi = x0s[j].gwphi
+                FLIs[j].log10_fgw = x0s[j].log10_fgw
+                FLIs[j].log10_mc = x0s[j].log10_mc#
                 #print("sky location, frequency, or chirp mass update")
-                FastLs[j].update_intrinsic_params(x0s[j])
 
-            #update FLIs too
-            FLIs[j] = FastLikeInfo(FastLs[j].resres,FastLs[j].logdet,FastLs[j].pos,FastLs[j].pdist,FastLs[j].NN,FastLs[j].MM_chol)
+def summarize_a_ext(a_counts,par_inds_cw_p_phase_ext):
+    """helper to sumarize the acceptance rate counts of different jumps"""
+    n_chain = a_counts.shape[1]
+    a_res = np.zeros((11,n_chain),dtype=np.int64)
+    for j in range(0,n_chain):
+        for idx in par_inds_cw_p_phase_ext:
+            a_res[9,j] += a_counts[idx,j]
+        a_res[2,j] += a_counts[1,j]
+        a_res[5,j] += a_counts[4,j]
+        a_res[7,j] += a_counts[6,j]
+        a_res[8,j] += a_counts[7,j]
+    return a_res
+
 
 ################################################################################
 #
 #REGULAR MCMC JUMP ROUTINE (JUMPING ALONG EIGENDIRECTIONS)
 #
 ################################################################################
-#def do_intrinsic_block(n_chain, pta, samples, i, Ts, a_yes, a_no, x0s, FastLs, FLIs, FPI, par_names, par_names_cw, par_names_cw_ext, log_likelihood, n_int_block, save_every_n):
-@njit(parallel=False)
-def do_extrinsic_block(n_chain, samples, i, Ts, a_yes, a_no, x0s, FLIs, FPI, par_names, par_names_cw, par_names_cw_ext, log_likelihood, n_int_block, save_every_n, fisher_diag):
+#@njit(parallel=True)
+def do_extrinsic_block(n_chain, samples, i, Ts, x0s, FLIs, FPI, n_par_tot, n_par_ext, log_likelihood, n_int_block, save_every_n, fisher_diag):
     #print("FISHER")
-    #print(i)
     #print("-"*100)
-    for j in prange(0,n_chain):
-        for k in range(n_int_block-1):
-            #if j==0: print(i+k)
+    a_yes_counts = np.zeros((n_par_tot,n_chain),dtype=np.int64)
+    a_no_counts = np.zeros((n_par_tot,n_chain),dtype=np.int64)
+
+    for k in range(n_int_block-1):
+        for j in prange(0,n_chain):
             samples_current = np.copy(samples[j,(i+k)%save_every_n,:])
 
-            jump_select = np.random.randint(len(par_names_cw_ext))
-            jump = np.zeros(len(par_names))
-            jump[par_names.index(par_names_cw_ext[jump_select])] = fisher_diag[j, par_names.index(par_names_cw_ext[jump_select])] #0.5
+            jump_select = np.random.randint(n_par_ext)
+            jump = np.zeros(n_par_tot)
+            jump_idx = x0s[j].idx_cw_ext[jump_select]
+            jump[jump_idx] = fisher_diag[j, jump_idx]*np.random.normal() #0.5
 
-            new_point = samples_current + jump*np.random.normal()
+            new_point = samples_current + jump#*np.random.normal()
 
-            if "_cw0_p_phase" in par_names_cw_ext[jump_select]:
-                acc_idx = 9
-            elif par_names_cw_ext[jump_select]=="0_cos_inc":
-                acc_idx = 2
-            elif par_names_cw_ext[jump_select]=="0_log10_h":
-                acc_idx = 5
-            elif par_names_cw_ext[jump_select]=="0_phase0":
-                acc_idx = 7
-            elif par_names_cw_ext[jump_select]=="0_psi":
-                acc_idx = 8
+            if jump_idx == x0s[j].idx_cos_inc or jump_idx == x0s[j].idx_psi:
+                #TODO check these are the right parameters to be shifting
+                new_point[x0s[j].idx_cos_inc],new_point[x0s[j].idx_psi] = reflect_cosines(new_point[x0s[j].idx_cos_inc],new_point[x0s[j].idx_psi],np.pi/2,np.pi)
 
-            #if j==0: print(samples_current)
+            x0s[j].update_params(new_point)
 
-            #new_point = samples_current + jump*np.random.normal()
-
-            #if j==0: print(new_point)
-
-            x0s[j].cw_p_phases = np.array([new_point[par_names.index(par)] for par in par_names if "_cw0_p_phase" in par])
-            x0s[j].cos_inc = new_point[par_names.index("0_cos_inc")]
-            x0s[j].log10_h = new_point[par_names.index("0_log10_h")]
-            x0s[j].phase0 = new_point[par_names.index("0_phase0")]
-            x0s[j].psi = new_point[par_names.index("0_psi")]
-
-            log_L = CWFastLikelihoodNumba.get_lnlikelihood_helper(x0s[j],FLIs[j].resres,FLIs[j].logdet,FLIs[j].pos,FLIs[j].pdist,FLIs[j].NN,FLIs[j].MM_chol)
-            #if j==0 and (i+k)%500==0:
-            #    print("New log_L=", str(log_L))
-            #    print("Old log_L=", str(pta.get_lnlikelihood(new_point)))
+            log_L = FLIs[j].get_lnlikelihood(x0s[j])#FLIs[j].resres,FLIs[j].logdet,FLIs[j].pos,FLIs[j].pdist,FLIs[j].NN,FLIs[j].MMs)
             log_acc_ratio = log_L/Ts[j]
             log_acc_ratio += CWFastPrior.get_lnprior_helper(new_point, FPI.uniform_par_ids, FPI.uniform_lows, FPI.uniform_highs,
                                                                        FPI.normal_par_ids, FPI.normal_mus, FPI.normal_sigs)
@@ -460,28 +459,22 @@ def do_extrinsic_block(n_chain, samples, i, Ts, a_yes, a_no, x0s, FLIs, FPI, par
             log_acc_ratio += -CWFastPrior.get_lnprior_helper(samples_current, FPI.uniform_par_ids, FPI.uniform_lows, FPI.uniform_highs,
                                                                               FPI.normal_par_ids, FPI.normal_mus, FPI.normal_sigs)
 
-            #print(pta.get_lnprior(new_point))
-            #print(FastPrior.get_lnprior(new_point))
-
-            acc_ratio = np.exp(log_acc_ratio)
-            #if j==0: print(acc_ratio)
-            #if np.random.uniform()<=acc_ratio:
-            acc_decide = uniform(0.0, 1.0, 1)
-            if acc_decide<=acc_ratio:
+            acc_decide = np.log(uniform(0.0, 1.0, 1))
+            if acc_decide<=log_acc_ratio:
                 #if j==0: print("yeah")
-                samples[j,(i+k)%save_every_n+1,:] = np.copy(new_point)
+                samples[j,(i+k)%save_every_n+1,:] = new_point
                 log_likelihood[j,(i+k)%save_every_n+1] = log_L
-                a_yes[acc_idx,j]+=1
+                a_yes_counts[jump_idx,j] += 1
+
             else:
                 #if j==0: print("ohh")
-                samples[j,(i+k)%save_every_n+1,:] = np.copy(samples[j,(i+k)%save_every_n,:])
-                x0s[j].cw_p_phases = np.array([samples_current[par_names.index(par)] for par in par_names if "_cw0_p_phase" in par])
-                x0s[j].cos_inc = samples_current[par_names.index("0_cos_inc")]
-                x0s[j].log10_h = samples_current[par_names.index("0_log10_h")]
-                x0s[j].phase0 = samples_current[par_names.index("0_phase0")]
-                x0s[j].psi = samples_current[par_names.index("0_psi")]
+                samples[j,(i+k)%save_every_n+1,:] = samples[j,(i+k)%save_every_n,:]
+
+                x0s[j].update_params(samples_current)
                 log_likelihood[j,(i+k)%save_every_n+1] = log_likelihood[j,(i+k)%save_every_n]
-                a_no[acc_idx,j]+=1
+
+                a_no_counts[jump_idx,j] += 1
+    return a_yes_counts,a_no_counts
 
 
 ################################################################################
@@ -489,18 +482,16 @@ def do_extrinsic_block(n_chain, samples, i, Ts, a_yes, a_no, x0s, FLIs, FPI, par
 #PARALLEL TEMPERING SWAP JUMP ROUTINE
 #
 ################################################################################
-def do_pt_swap(n_chain, pta, samples, i, Ts, a_yes, a_no, x0s, FastLs, FLIs, FPI, par_names, par_names_cw, par_names_cw_ext, log_likelihood, n_int_block, save_every_n):
+@njit()
+def do_pt_swap(n_chain, samples, i, Ts, a_yes, a_no, x0s, FLIs, log_likelihood, save_every_n):
     #print("PT")
 
     iii = i%save_every_n
     #print("PT")
-    #print(i+n_int_block-1)
-    #print(save_every_n)
-    #print(iii)
 
     #set up map to help keep track of swaps
     swap_map = list(range(n_chain))
-  
+
     #get log_Ls from all the chains
     log_Ls = []
     for j in range(n_chain):
@@ -509,33 +500,93 @@ def do_pt_swap(n_chain, pta, samples, i, Ts, a_yes, a_no, x0s, FastLs, FLIs, FPI
     #loop through and propose a swap at each chain (starting from hottest chain and going down in T) and keep track of results in swap_map
     #for swap_chain in reversed(range(n_chain-1)):
     for swap_chain in range(n_chain-2, -1, -1): #same as reversed(range(n_chain-1)) but supported in numba
+        assert swap_map[swap_chain] == swap_chain
         log_acc_ratio = -log_Ls[swap_map[swap_chain]] / Ts[swap_chain]
         log_acc_ratio += -log_Ls[swap_map[swap_chain+1]] / Ts[swap_chain+1]
         log_acc_ratio += log_Ls[swap_map[swap_chain+1]] / Ts[swap_chain]
         log_acc_ratio += log_Ls[swap_map[swap_chain]] / Ts[swap_chain+1]
 
-        acc_ratio = np.exp(log_acc_ratio)
-        acc_decide = uniform(0.0, 1.0, 1)
-        if acc_decide<=acc_ratio:# and do_PT:
+        acc_decide = np.log(uniform(0.0, 1.0, 1))
+        if acc_decide<=log_acc_ratio:# and do_PT:
             swap_map[swap_chain], swap_map[swap_chain+1] = swap_map[swap_chain+1], swap_map[swap_chain]
             a_yes[0,swap_chain]+=1
         else:
             a_no[0,swap_chain]+=1
 
     #loop through the chains and record the new samples and log_Ls
-    FastLs_new = []
     FLIs_new = []
     x0s_new = []
     for j in range(n_chain):
         samples[j,iii+1,:] = np.copy(samples[swap_map[j],iii,:])
         log_likelihood[j,iii+1] = log_likelihood[swap_map[j],iii]
-        FastLs_new.append(FastLs[swap_map[j]])
         FLIs_new.append(FLIs[swap_map[j]])
         x0s_new.append(x0s[swap_map[j]])
 
-    FastLs[:] = FastLs_new
     FLIs[:] = List(FLIs_new)
     x0s[:] = List(x0s_new)
+
+def do_pt_swap_alt(n_chain, samples, i, Ts, a_yes, a_no, x0s, FLIs, log_likelihood, save_every_n):
+    """modification to swap routine that is easier to adapt to arbitrary swap proposals"""
+    #print("PT")
+
+    iii = i%save_every_n
+    #print("PT")
+
+    #set up map to help keep track of swaps
+    #swap_map = list(range(n_chain))
+
+    #get log_Ls from all the chains
+    #log_Ls = []
+    #for j in range(n_chain):
+    #    log_Ls.append(log_likelihood[j,iii])
+    log_Ls = log_likelihood[:,iii].copy()
+    samples_cur = samples[:,iii,:].copy()
+
+    #loop through and propose a swap at each chain (starting from hottest chain and going down in T) and keep track of results in swap_map
+    #for swap_chain in reversed(range(n_chain-1)):
+    for swap_chain in range(n_chain-2, -1, -1): #same as reversed(range(n_chain-1)) but supported in numba
+        log_acc_ratio = -log_Ls[swap_chain] / Ts[swap_chain]
+        log_acc_ratio += -log_Ls[swap_chain+1] / Ts[swap_chain+1]
+        log_acc_ratio += log_Ls[swap_chain+1] / Ts[swap_chain]
+        log_acc_ratio += log_Ls[swap_chain] / Ts[swap_chain+1]
+
+        acc_decide = np.log(uniform(0.0, 1.0, 1))
+        if acc_decide<=log_acc_ratio:# and do_PT:
+            #swap_map[swap_chain], swap_map[swap_chain+1] = swap_map[swap_chain+1], swap_map[swap_chain]
+            a_yes[0,swap_chain]+=1
+        else:
+            a_no[0,swap_chain]+=1
+
+        log_L_temp = log_Ls[swap_chain+1]
+        log_Ls[swap_chain+1] = log_Ls[swap_chain]
+        log_Ls[swap_chain] = log_L_temp
+
+        x0_temp = x0s[swap_chain+1]
+        x0s[swap_chain+1] = x0s[swap_chain]
+        x0s[swap_chain] = x0_temp
+
+        FLI_temp = FLIs[swap_chain+1]
+        FLIs[swap_chain+1] = FLIs[swap_chain]
+        FLIs[swap_chain] = FLI_temp
+
+        sample_temp = samples_cur[swap_chain+1,:].copy()
+        samples_cur[swap_chain+1,:] = samples_cur[swap_chain,:]
+        samples_cur[swap_chain,:] = sample_temp
+
+
+    #loop through the chains and record the new samples and log_Ls
+    samples[:,iii+1,:] = samples_cur
+
+#    FLIs_new = []
+#    x0s_new = []
+#    for j in range(n_chain):
+#        samples[j,iii+1,:] = np.copy(samples[swap_map[j],iii,:])
+#        log_likelihood[j,iii+1] = log_likelihood[swap_map[j],iii]
+#        FLIs_new.append(FLIs[swap_map[j]])
+#        x0s_new.append(x0s[swap_map[j]])
+#
+#    FLIs[:] = FLIs_new
+#    x0s[:] = List(x0s_new)
 
 
 ################################################################################
@@ -543,7 +594,7 @@ def do_pt_swap(n_chain, pta, samples, i, Ts, a_yes, a_no, x0s, FastLs, FLIs, FPI
 #DRAW FROM PRIOR JUMP
 #
 ################################################################################
-def do_draw_from_prior(n_chain, pta, samples, i, Ts, a_yes, a_no, x0s, FastLs, FastPrior, par_names, par_names_cw, par_names_cw_ext, log_likelihood):
+def do_draw_from_prior(n_chain, pta, samples, i, Ts, a_yes, a_no, x0s, FLIs, FastPrior, par_names, par_names_cw_ext, log_likelihood):
     #print("FISHER")
     for j in range(n_chain):
         samples_current = np.copy(samples[j,i,:])
@@ -552,36 +603,21 @@ def do_draw_from_prior(n_chain, pta, samples, i, Ts, a_yes, a_no, x0s, FastLs, F
         jump_select = np.random.randint(len(par_names_cw_ext))
         new_point[par_names.index(par_names_cw_ext[jump_select])] = pta.params[par_names.index(par_names_cw_ext[jump_select])].sample()
 
-        x0s[j].cw_p_phases = np.array([new_point[par_names.index(par)] for par in par_names if "_cw0_p_phase" in par])
-        x0s[j].cos_inc = new_point[par_names.index("0_cos_inc")]
-        x0s[j].log10_h = new_point[par_names.index("0_log10_h")]
-        x0s[j].phase0 = new_point[par_names.index("0_phase0")]
-        x0s[j].psi = new_point[par_names.index("0_psi")]
+        x0s[j].update_params(new_point)
 
-        #print(log_L)
-        log_L = FastLs[j].get_lnlikelihood(x0s[j])
-        #print(log_L)
+        log_L = FLIs[j].get_lnlikelihood(x0s[j])
         log_acc_ratio = log_L/Ts[j]
         log_acc_ratio += FastPrior.get_lnprior(new_point)
         log_acc_ratio += -log_likelihood[j,i]/Ts[j]
         log_acc_ratio += -FastPrior.get_lnprior(samples_current)
 
-        #print(pta.get_lnprior(new_point))
-        #print(FastPrior.get_lnprior(new_point))
-
-        acc_ratio = np.exp(log_acc_ratio)
-        #print(acc_ratio)
-        if np.random.uniform()<=acc_ratio:
+        if np.log(np.random.uniform())<=log_acc_ratio:
             samples[j,i+1,:] = np.copy(new_point)
             log_likelihood[j,i+1] = log_L
             a_yes[1,j]+=1
         else:
             samples[j,i+1,:] = samples[j,i,:]
-            x0s[j].cw_p_phases = np.array([samples_current[par_names.index(par)] for par in par_names if "_cw0_p_phase" in par])
-            x0s[j].cos_inc = samples_current[par_names.index("0_cos_inc")]
-            x0s[j].log10_h = samples_current[par_names.index("0_log10_h")]
-            x0s[j].phase0 = samples_current[par_names.index("0_phase0")]
-            x0s[j].psi = samples_current[par_names.index("0_psi")]
+            x0s[j].update_params(samples_current)
             log_likelihood[j,i+1] = log_likelihood[j,i]
             a_no[1,j]+=1
 
@@ -591,13 +627,20 @@ def do_draw_from_prior(n_chain, pta, samples, i, Ts, a_yes, a_no, x0s, FastLs, F
 #CALCULATE FISHER DIAGONAL
 #
 ################################################################################
-def get_fihser_diagonal(pta, T_chain, samples_current, par_names, par_names_cw_ext, x0, FLI, epsilon=1e-2):
+def get_fisher_diagonal(T_chain, samples_current, par_names, par_names_cw_ext, x0, FLI_loc, epsilon=1e-2):
     dim = len(par_names)
     fisher_diag = np.zeros(dim)
-    
-    #current location
-    nn = CWFastLikelihoodNumba.get_lnlikelihood_helper(x0,FLI.resres,FLI.logdet,FLI.pos,FLI.pdist,FLI.NN,FLI.MM_chol)
-    #print(nn)
+
+    MMs_orig = FLI_loc.MMs.copy()
+    NN_orig = FLI_loc.NN.copy()
+
+    nn = FLI_loc.get_lnlikelihood(x0)#,FLI_loc.resres,FLI_loc.logdet,FLI_loc.pos,FLI_loc.pdist,FLI_loc.NN,FLI_loc.MMs)
+
+
+    #future locations
+    mms = np.zeros(dim)
+    pps = np.zeros(dim)
+    dist_count = 0
 
     #calculate diagonal elements
     for i in range(dim):
@@ -608,42 +651,74 @@ def get_fihser_diagonal(pta, T_chain, samples_current, par_names, par_names_cw_e
 
         if par_names[i] in par_names_cw_ext:
             #use fast likelihood
-            x0.cw_p_phases = np.array([paramsPP[par_names.index(par)] for par in par_names if "_cw0_p_phase" in par])
-            x0.cos_inc = paramsPP[par_names.index("0_cos_inc")]
-            x0.log10_h = paramsPP[par_names.index("0_log10_h")]
-            x0.phase0 = paramsPP[par_names.index("0_phase0")]
-            x0.psi = paramsPP[par_names.index("0_psi")]
-            
-            pp = CWFastLikelihoodNumba.get_lnlikelihood_helper(x0,FLI.resres,FLI.logdet,FLI.pos,FLI.pdist,FLI.NN,FLI.MM_chol)
+            x0.update_params(paramsPP)
 
-            x0.cw_p_phases = np.array([paramsMM[par_names.index(par)] for par in par_names if "_cw0_p_phase" in par])
-            x0.cos_inc = paramsMM[par_names.index("0_cos_inc")]
-            x0.log10_h = paramsMM[par_names.index("0_log10_h")]
-            x0.phase0 = paramsMM[par_names.index("0_phase0")]
-            x0.psi = paramsMM[par_names.index("0_psi")]
+            #pps[i] = CWFastLikelihoodNumba.get_lnlikelihood_helper(x0,FLI_loc.resres,FLI_loc.logdet,FLI_loc.pos,FLI_loc.pdist,FLI_loc.NN,FLI_loc.MMs)
+            pps[i] = FLI_loc.get_lnlikelihood(x0)#FLI_loc.resres,FLI_loc.logdet,FLI_loc.pos,FLI_loc.pdist,FLI_loc.NN,FLI_loc.MMs)
 
-            mm = CWFastLikelihoodNumba.get_lnlikelihood_helper(x0,FLI.resres,FLI.logdet,FLI.pos,FLI.pdist,FLI.NN,FLI.MM_chol)
+            x0.update_params(paramsMM)
 
-            x0.cw_p_phases = np.array([samples_current[par_names.index(par)] for par in par_names if "_cw0_p_phase" in par])
-            x0.cos_inc = samples_current[par_names.index("0_cos_inc")]
-            x0.log10_h = samples_current[par_names.index("0_log10_h")]
-            x0.phase0 = samples_current[par_names.index("0_phase0")]
-            x0.psi = samples_current[par_names.index("0_psi")]
+            #mms[i] = CWFastLikelihoodNumba.get_lnlikelihood_helper(x0,FLI_loc.resres,FLI_loc.logdet,FLI_loc.pos,FLI_loc.pdist,FLI_loc.NN,FLI_loc.MMs)
+            mms[i] = FLI_loc.get_lnlikelihood(x0)#FLI_loc.resres,FLI_loc.logdet,FLI_loc.pos,FLI_loc.pdist,FLI_loc.NN,FLI_loc.MMs)
+
+            #revert changes
+            x0.update_params(samples_current)
+
+        elif "_cw0_p_dist" in par_names[i]:
+            x0.update_params(paramsPP)
+
+            FLI_loc.update_pulsar_distance(x0, dist_count)
+            pps[i] = FLI_loc.get_lnlikelihood(x0)#,FLI_loc.resres,FLI_loc.logdet,FLI_loc.pos,FLI_loc.pdist,FLI_loc.NN,FLI_loc.MMs)
+
+            x0.update_params(paramsMM)
+
+            FLI_loc.update_pulsar_distance(x0, dist_count)
+            mms[i] = FLI_loc.get_lnlikelihood(x0)#,FLI_loc.resres,FLI_loc.logdet,FLI_loc.pos,FLI_loc.pdist,FLI_loc.NN,FLI_loc.MMs)
+
+            #revert changes
+            x0.update_params(samples_current)
+
+            FLI_loc.MMs[dist_count] = MMs_orig[dist_count]
+            FLI_loc.NN[dist_count] = NN_orig[dist_count]
+            #TODO remove
+            FLI_loc.cos_gwtheta = x0.cos_gwtheta
+            FLI_loc.gwphi = x0.gwphi
+            FLI_loc.log10_fgw = x0.log10_fgw
+            FLI_loc.log10_mc = x0.log10_mc#
+
+            dist_count += 1
+
         else:
-            pp = pta.get_lnlikelihood(paramsPP)
-            mm = pta.get_lnlikelihood(paramsMM)
+            #must be one of the intrinsic parameters
+            x0.update_params(paramsPP)
 
-        #print(par_names[i])
-        #print(pp)
-        #print(mm)
-        #calculate diagonal elements of the Hessian from a central finite element scheme
-        #note the minus sign compared to the regular Hessian
-        fisher_diag[i] = -(pp - 2.0*nn + mm)/(4.0*epsilon*epsilon)
-        
+            FLI_loc.update_intrinsic_params(x0)
+            pps[i] = FLI_loc.get_lnlikelihood(x0)#FLI_loc.resres,FLI_loc.logdet,FLI_loc.pos,FLI_loc.pdist,FLI_loc.NN,FLI_loc.MMs)
+
+            x0.update_params(paramsMM)
+
+            FLI_loc.update_intrinsic_params(x0)
+            mms[i] = FLI_loc.get_lnlikelihood(x0)#,FLI_loc.resres,FLI_loc.logdet,FLI_loc.pos,FLI_loc.pdist,FLI_loc.NN,FLI_loc.MMs)
+
+            #revert changes
+            x0.update_params(samples_current)
+
+            FLI_loc.MMs[:] = MMs_orig
+            FLI_loc.NN[:] = NN_orig
+
+            FLI_loc.cos_gwtheta = x0.cos_gwtheta
+            FLI_loc.gwphi = x0.gwphi
+            FLI_loc.log10_fgw = x0.log10_fgw
+            FLI_loc.log10_mc = x0.log10_mc#
+
+    #calculate diagonal elements of the Hessian from a central finite element scheme
+    #note the minus sign compared to the regular Hessian
+    fisher_diag = -(pps - 2.0*nn + mms)/(4.0*epsilon*epsilon)
+
     #correct for the given temperature of the chain
     fisher_diag = fisher_diag/T_chain
 
-    #filer out nans and negative values - set them to 1.0 which will result in 
+    #filer out nans and negative values - set them to 1.0 which will result in
     Fisher_diag = np.where(np.isfinite(fisher_diag), fisher_diag, 1.0)
     FISHER_diag = np.where(fisher_diag>0.0, Fisher_diag, 1.0)
 
@@ -652,20 +727,6 @@ def get_fihser_diagonal(pta, T_chain, samples_current, par_names, par_names_cw_e
     W = np.where(FISHER_diag>eig_limit, FISHER_diag, eig_limit)
 
     return 1/np.sqrt(W)
-
-
-@jitclass([('resres',nb.float64),('logdet',nb.float64),('pos',nb.float64[:,:]),\
-           ('pdist',nb.float64[:,:]),('NN',nb.float64[:,:]),('MM_chol',nb.float64[:,:,:])])
-class FastLikeInfo:
-    """simple jitclass to store the various elements of fast likelihood calculation in a way that can be accessed quickly from a numba environment"""
-    def __init__(self,resres,logdet,pos,pdist,NN,MM_chol):
-        self.resres = resres
-        self.logdet = logdet
-        self.pos = pos
-        self.pdist = pdist
-        self.NN = NN
-        self.MM_chol = MM_chol
-
 
 @jitclass([('uniform_par_ids',nb.int64[:]),('uniform_lows',nb.float64[:]),('uniform_highs',nb.float64[:]),\
            ('normal_par_ids',nb.int64[:]),('normal_mus',nb.float64[:]),('normal_sigs',nb.float64[:])])
@@ -678,3 +739,21 @@ class FastPriorInfo:
         self.normal_par_ids = normal_par_ids
         self.normal_mus = normal_mus
         self.normal_sigs = normal_sigs
+
+#TODO use this in all cosine proposals
+@njit()
+def reflect_cosines(cos_in,angle_in,rotfac=np.pi,modfac=2*np.pi):
+    """helper to reflect cosines of coordinates around poles  to get them between -1 and 1,
+        which requires also rotating the signal by rotfac each time, then mod the angle by modfac"""
+    if cos_in < -1.:
+        cos_in = -1.+(-(cos_in+1.))%4
+        angle_in += rotfac
+        #if this reflects even number of times, params_in[1] after is guaranteed to be between -1 and -3, so one more correction attempt will suffice
+    if cos_in > 1.:
+        cos_in = 1.-(cos_in-1.)%4
+        angle_in += rotfac
+    if cos_in < -1.:
+        cos_in = -1.+(-(cos_in+1.))%4
+        angle_in += rotfac
+    angle_in = angle_in%modfac
+    return cos_in,angle_in
