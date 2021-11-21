@@ -45,7 +45,7 @@ noisefile = 'data/channelized_12p5yr_v3_full_noisedict_gp_ecorr.json'
 
 #savefile = 'results/quickCW_test_A2e-15_M5e9_f2e-8_evolve_no_gwb_no_rn_no_ecorr_no_equad_v1.npz'
 #savefile = 'results/quickCW_test_A1e-15_M5e9_f2e-8_evolve_no_gwb_no_rn_no_ecorr_no_equad_v1.npz'
-savefile = 'results/quickCW_test_A1e-15_M5e9_f2e-8_evolve_no_gwb_no_rn_no_ecorr_no_equad_v1.h5'
+savefile = None#'results/quickCW_test_A1e-15_M5e9_f2e-8_evolve_no_gwb_no_rn_no_ecorr_no_equad_v1.h5'
 
 pta = QuickCW.QuickCW(N, T_max, n_chain, psrs,
                       n_status_update=100, n_int_block=100, n_extrinsic_step=10, save_every_n=100,
