@@ -759,6 +759,10 @@ def get_fisher_diagonal(T_chain, samples_current, par_names, par_names_cw_ext, x
                 #calculate diagonal elements of the Hessian from a central finite element scheme
                 #note the minus sign compared to the regular Hessian
                 fisher_diag[i] = -(pps[i] - 2*nn_loc + mms[i])/(4*epsilon*epsilon)
+
+                if np.isnan(fisher_diag[i]) or fisher_diag[i] <= 0. :
+                    fisher_diag[i] = 1/cm.sigma_cw0_p_phase_default**2
+
                 phase_count += 1
 
         elif par_names[i] in par_names_cw_ext:
@@ -826,6 +830,8 @@ def get_fisher_diagonal(T_chain, samples_current, par_names, par_names_cw_ext, x
                 #calculate diagonal elements of the Hessian from a central finite element scheme
                 #note the minus sign compared to the regular Hessian
                 fisher_diag[i] = -(pps[i] - 2*nn_loc + mms[i])/(4*epsilon*epsilon)
+                if np.isnan(fisher_diag[i]) or fisher_diag[i] <= 0. :
+                    fisher_diag[i] = 1/cm.sigma_cw0_p_dist_default**2
 
         else:
             epsilon = cm.eps[par_names[i]]

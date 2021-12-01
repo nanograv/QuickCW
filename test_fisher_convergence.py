@@ -519,7 +519,7 @@ if __name__ == '__main__':
     #    print('time for updating all distances together alt%.5e s'%((tf_dist4-ti_dist4)/n_run4))
 
     ti_dist2 = perf_counter()
-    n_run2 = 10000
+    n_run2 = 100
     for mm in range(n_run2):
         FLIs[j].update_intrinsic_params(x0s[j]) #TODO validate assumption on psr index ranges
     tf_dist2 = perf_counter()
@@ -527,7 +527,7 @@ if __name__ == '__main__':
         print('time for updating all distances instrinsic %.5e s'%((tf_dist2-ti_dist2)/n_run2))
 
     ti_dist0 = perf_counter()
-    n_run0 = 10000
+    n_run0 = 100
     for mm in range(n_run0):
         FLIs[j].update_pulsar_distances(x0s[j], np.arange(0,x0s[j].Npsr)) #TODO validate assumption on psr index ranges
     tf_dist0 = perf_counter()
@@ -544,7 +544,31 @@ if __name__ == '__main__':
     if n_run0>0:
         print('time for updating all distances separately %.5e s'%((tf_dist1-ti_dist1)/n_run1))
 
+    n_fs = 101 
+    MMs_mat = np.zeros((n_fs,45,4,4))
+    NNs_mat = np.zeros((n_fs,45,4))
+    #log10fs_try = x0s[j].log10_fgw+np.linspace(-0.5,0.5,n_fs)
+    dists_try = x0s[j].cw_p_dists[0]+np.linspace(-0.5,0.5,n_fs)
+    for itrf in range(0,n_fs):
+        #x0s[j].log10_fgw = log10fs_try[itrf]
+        x0s[j].cw_p_dists[0] = dists_try[itrf]
+        #FLIs[j].update_intrinsic_params(x0s[j])
+        FLIs[j].update_pulsar_distance(x0s[j],0)
+        MMs_mat[itrf] = FLIs[j].MMs.copy()
+        NNs_mat[itrf] = FLIs[j].NN.copy()
 
+    import matplotlib.pyplot as plt
+    plt.semilogy(dists_try,np.abs(MMs_mat[:,0,0,0]))
+    plt.semilogy(dists_try,np.abs(MMs_mat[:,0,1,1]))
+    plt.semilogy(dists_try,np.abs(MMs_mat[:,0,2,2]))
+    plt.semilogy(dists_try,np.abs(MMs_mat[:,0,3,3]))
+    plt.show()
+
+plt.semilogy(dists_try,np.abs(NNs_mat[:,0,0]))
+plt.semilogy(dists_try,np.abs(NNs_mat[:,0,1]))
+plt.semilogy(dists_try,np.abs(NNs_mat[:,0,2]))
+plt.semilogy(dists_try,np.abs(NNs_mat[:,0,3]))
+plt.show()
     import sys
     sys.exit()
 
