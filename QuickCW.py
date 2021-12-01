@@ -282,7 +282,8 @@ def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int
                       'Acceptance fraction #columns: chain number; rows: proposal type (PT, cos_gwtheta, cos_inc, gwphi, fgw, h, mc, phase0, psi, p_phases, p_dists):')
             t_itr = perf_counter()
             print('at t= '+str(t_itr-ti_loop)+'s')
-            print(acc_fraction)
+            print(acc_fraction[:,0])
+            print(acc_fraction[:,-1])
             print("New log_L=", str(FLIs[0].get_lnlikelihood(x0s[0])))#,FLIs[0].resres,FLIs[0].logdet,FLIs[0].pos,FLIs[0].pdist,FLIs[0].NN,FLIs[0].MMs)))
             #print("Old log_L=", str(pta.get_lnlikelihood(samples[0,(i*n_int_block)%save_every_n,:])))
         #update extrinsic parameters sometimes
@@ -328,22 +329,34 @@ def do_intrinsic_update(n_chain, pta, samples, i, Ts, a_yes, a_no, x0s, FLIs, FP
         jump_select = np.random.randint(len(par_names_cw_int))
         jump = np.zeros(len(par_names))
         jump_idx = par_names.index(par_names_cw_int[jump_select])
-        jump[jump_idx] = fisher_diag[j, jump_idx] #0.1
+        if jump_idx in x0s[j].idx_dists:
+            #print('b1')
+            fisher_diag_loc = fisher_diag[j][x0s[j].idx_dists]
+            jump[x0s[j].idx_dists] = fisher_diag_loc*np.random.normal(0.,1.,x0s[j].Npsr)
+            #for itrp in range(0,cm.n_phase_jumps):
+            #    idx_psr = x0s[j].idx_phases[np.random.randint(x0s[j].Npsr)]
+            #    jump[idx_psr] += fisher_diag[j,idx_psr]*np.random.normal()
+        else:
+            jump[jump_idx] = fisher_diag[j, jump_idx]*np.random.normal() #0.1
 
         samples_current = np.copy(samples[j,i%save_every_n,:])
 
         #print('jump select',jump_select,par_names_cw_int[jump_select])
-        new_point = np.copy(samples[j,i%save_every_n,:]) + jump*np.random.normal()
+        new_point = np.copy(samples[j,i%save_every_n,:]) + jump
         #TODO check wrapping is working right
         if jump_idx == x0s[j].idx_cos_gwtheta or jump_idx == x0s[j].idx_gwphi:
             new_point[x0s[j].idx_cos_gwtheta],new_point[x0s[j].idx_gwphi] = reflect_cosines(new_point[x0s[j].idx_cos_gwtheta],new_point[x0s[j].idx_gwphi],np.pi,2*np.pi)
 
-        x0s[j].update_params(new_point)
 
         if "_cw0_p_dist" in par_names_cw_int[jump_select]:
-            FLIs[j].update_pulsar_distance(x0s[j], pta.pulsars.index(par_names_cw_int[jump_select][:-11]))
+            #take the absolute value of distance proposals to prevent negative values from crashing things
+            new_point[jump_idx] = new_point[jump_idx]
+            x0s[j].update_params(new_point) 
+            #FLIs[j].update_pulsar_distance(x0s[j], pta.pulsars.index(par_names_cw_int[jump_select][:-11]))
+            FLIs[j].update_pulsar_distances(x0s[j], np.arange(0,x0s[j].Npsr)) #TODO validate assumption on psr index ranges
             acc_idx = 10
         else:
+            x0s[j].update_params(new_point)
             #print("sky location, frequency, or chirp mass update")
             FLIs[j].update_intrinsic_params(x0s[j])
             if par_names_cw_int[jump_select]=="0_cos_gwtheta":
@@ -354,6 +367,8 @@ def do_intrinsic_update(n_chain, pta, samples, i, Ts, a_yes, a_no, x0s, FLIs, FP
                 acc_idx = 4
             elif par_names_cw_int[jump_select]=="0_log10_mc":
                 acc_idx = 6
+            else:
+                acc_idx = 10
 
         #check the maximum toa is not such that the source has already merged, and if so automatically reject the proposal
         w0 = np.pi * 10.0**x0s[j].log10_fgw
@@ -374,8 +389,6 @@ def do_intrinsic_update(n_chain, pta, samples, i, Ts, a_yes, a_no, x0s, FLIs, FP
                                                                         FPI.normal_par_ids, FPI.normal_mus, FPI.normal_sigs)
 
             acc_decide = np.log(uniform(0.0, 1.0, 1))
-            #print(pta.get_lnprior(new_point))
-            #print(FastPrior.get_lnprior(new_point))
 
         if acc_decide<=log_acc_ratio:
             x0s[j].update_params(new_point)
@@ -430,17 +443,28 @@ def summarize_a_ext(a_counts,par_inds_cw_p_phase_ext):
 def do_extrinsic_block(n_chain, samples, i, Ts, x0s, FLIs, FPI, n_par_tot, n_par_ext, log_likelihood, n_int_block, save_every_n, fisher_diag):
     #print("FISHER")
     #print("-"*100)
+
     a_yes_counts = np.zeros((n_par_tot,n_chain),dtype=np.int64)
     a_no_counts = np.zeros((n_par_tot,n_chain),dtype=np.int64)
 
     for k in range(n_int_block-1):
         for j in prange(0,n_chain):
+            gwtheta_old = x0s[j].cos_gwtheta
             samples_current = np.copy(samples[j,(i+k)%save_every_n,:])
 
             jump_select = np.random.randint(n_par_ext)
             jump = np.zeros(n_par_tot)
             jump_idx = x0s[j].idx_cw_ext[jump_select]
-            jump[jump_idx] = fisher_diag[j, jump_idx]*np.random.normal() #0.5
+            #print(k,j,x0s[j].cos_gwtheta,samples[j,i%save_every_n,x0s[j].idx_cos_gwtheta])
+            if jump_idx in x0s[j].idx_phases:
+                #print('b1')
+                fisher_diag_loc = fisher_diag[j][x0s[j].idx_phases]
+                jump[x0s[j].idx_phases] = fisher_diag_loc*np.random.normal(0.,1.,x0s[j].Npsr)
+                #for itrp in range(0,cm.n_phase_jumps):
+                #    idx_psr = x0s[j].idx_phases[np.random.randint(x0s[j].Npsr)]
+                #    jump[idx_psr] += fisher_diag[j,idx_psr]*np.random.normal()
+            else:
+                jump[jump_idx] = fisher_diag[j, jump_idx]*np.random.normal() #0.5
 
             new_point = samples_current + jump#*np.random.normal()
 
@@ -464,7 +488,6 @@ def do_extrinsic_block(n_chain, samples, i, Ts, x0s, FLIs, FPI, n_par_tot, n_par
                 samples[j,(i+k)%save_every_n+1,:] = new_point
                 log_likelihood[j,(i+k)%save_every_n+1] = log_L
                 a_yes_counts[jump_idx,j] += 1
-
             else:
                 #if j==0: print("ohh")
                 samples[j,(i+k)%save_every_n+1,:] = samples[j,(i+k)%save_every_n,:]
@@ -473,6 +496,7 @@ def do_extrinsic_block(n_chain, samples, i, Ts, x0s, FLIs, FPI, n_par_tot, n_par
                 log_likelihood[j,(i+k)%save_every_n+1] = log_likelihood[j,(i+k)%save_every_n]
 
                 a_no_counts[jump_idx,j] += 1
+
     return a_yes_counts,a_no_counts
 
 
@@ -626,12 +650,17 @@ def do_draw_from_prior(n_chain, pta, samples, i, Ts, a_yes, a_no, x0s, FLIs, Fas
 #CALCULATE FISHER DIAGONAL
 #
 ################################################################################
-def get_fisher_diagonal(T_chain, samples_current, par_names, par_names_cw_ext, x0, FLI_loc, epsilon=1e-2):
+def get_fisher_diagonal(T_chain, samples_current, par_names, par_names_cw_ext, x0, FLI_loc):
     dim = len(par_names)
     fisher_diag = np.zeros(dim)
 
     MMs_orig = FLI_loc.MMs.copy()
     NN_orig = FLI_loc.NN.copy()
+    logdet_orig = FLI_loc.logdet
+    resres_orig = FLI_loc.resres
+
+    FLI_loc.logdet = 0.
+    FLI_loc.resres = 0.
 
     nn = FLI_loc.get_lnlikelihood(x0)#,FLI_loc.resres,FLI_loc.logdet,FLI_loc.pos,FLI_loc.pdist,FLI_loc.NN,FLI_loc.MMs)
 
@@ -640,15 +669,61 @@ def get_fisher_diagonal(T_chain, samples_current, par_names, par_names_cw_ext, x
     mms = np.zeros(dim)
     pps = np.zeros(dim)
     dist_count = 0
+    phase_count = 0
 
     #calculate diagonal elements
     for i in range(dim):
         paramsPP = np.copy(samples_current)
         paramsMM = np.copy(samples_current)
-        paramsPP[i] += 2*epsilon
-        paramsMM[i] -= 2*epsilon
 
-        if par_names[i] in par_names_cw_ext:
+        if '_cw0_p_phase' in par_names[i]:
+            if cm.use_default_cw0_p_sigma:
+                fisher_diag[i] = 1/cm.sigma_cw0_p_phase_default**2
+            else:
+                epsilon = cm.eps['cw0_p_phase']
+
+                paramsPP[i] += 2*epsilon
+                paramsMM[i] -= 2*epsilon
+
+                #zero out elements that don't change for maximum accuracy in derivative
+                FLI_loc.MMs[:phase_count,:,:] = 0.
+                FLI_loc.MMs[phase_count,:2,:2] = 0.
+                FLI_loc.MMs[phase_count+1:,:,:] = 0.
+
+                FLI_loc.NN[:phase_count,:] = 0.
+                FLI_loc.NN[phase_count,:2] = 0.
+                FLI_loc.NN[phase_count+1:,:] = 0.
+                
+                nn_loc = FLI_loc.get_lnlikelihood(x0)#,FLI_loc.resres,FLI_loc.logdet,FLI_loc.pos,FLI_loc.pdist,FLI_loc.NN,FLI_loc.MMs)
+
+                #use fast likelihood
+                x0.update_params(paramsPP)
+
+                #pps[i] = CWFastLikelihoodNumba.get_lnlikelihood_helper(x0,FLI_loc.resres,FLI_loc.logdet,FLI_loc.pos,FLI_loc.pdist,FLI_loc.NN,FLI_loc.MMs)
+                pps[i] = FLI_loc.get_lnlikelihood(x0)#FLI_loc.resres,FLI_loc.logdet,FLI_loc.pos,FLI_loc.pdist,FLI_loc.NN,FLI_loc.MMs)
+
+                x0.update_params(paramsMM)
+
+                #mms[i] = CWFastLikelihoodNumba.get_lnlikelihood_helper(x0,FLI_loc.resres,FLI_loc.logdet,FLI_loc.pos,FLI_loc.pdist,FLI_loc.NN,FLI_loc.MMs)
+                mms[i] = FLI_loc.get_lnlikelihood(x0)#FLI_loc.resres,FLI_loc.logdet,FLI_loc.pos,FLI_loc.pdist,FLI_loc.NN,FLI_loc.MMs)
+
+                #revert changes
+                x0.update_params(samples_current)
+
+                FLI_loc.MMs[:] = MMs_orig
+                FLI_loc.NN[:] = NN_orig
+
+                #calculate diagonal elements of the Hessian from a central finite element scheme
+                #note the minus sign compared to the regular Hessian
+                fisher_diag[i] = -(pps[i] - 2*nn_loc + mms[i])/(4*epsilon*epsilon)
+                phase_count += 1
+
+        elif par_names[i] in par_names_cw_ext:
+            epsilon = cm.eps[par_names[i]]
+
+            paramsPP[i] += 2*epsilon
+            paramsMM[i] -= 2*epsilon
+
             #use fast likelihood
             x0.update_params(paramsPP)
 
@@ -663,31 +738,58 @@ def get_fisher_diagonal(T_chain, samples_current, par_names, par_names_cw_ext, x
             #revert changes
             x0.update_params(samples_current)
 
+            #calculate diagonal elements of the Hessian from a central finite element scheme
+            #note the minus sign compared to the regular Hessian
+            fisher_diag[i] = -(pps[i] - 2*nn + mms[i])/(4*epsilon*epsilon)
+
         elif "_cw0_p_dist" in par_names[i]:
-            x0.update_params(paramsPP)
+            if cm.use_default_cw0_p_sigma:
+                fisher_diag[i] = 1/cm.sigma_cw0_p_dist_default**2
+            else:
+                epsilon = cm.eps['cw0_p_dist']
 
-            FLI_loc.update_pulsar_distance(x0, dist_count)
-            pps[i] = FLI_loc.get_lnlikelihood(x0)#,FLI_loc.resres,FLI_loc.logdet,FLI_loc.pos,FLI_loc.pdist,FLI_loc.NN,FLI_loc.MMs)
+                paramsPP[i] += 2*epsilon
+                paramsMM[i] -= 2*epsilon
 
-            x0.update_params(paramsMM)
+                #zero out elements that don't change for maximum accuracy in derivative
+                FLI_loc.MMs[:dist_count,:,:] = 0.
+                FLI_loc.MMs[dist_count,:2,:2] = 0.
+                FLI_loc.MMs[dist_count+1:,:,:] = 0.
 
-            FLI_loc.update_pulsar_distance(x0, dist_count)
-            mms[i] = FLI_loc.get_lnlikelihood(x0)#,FLI_loc.resres,FLI_loc.logdet,FLI_loc.pos,FLI_loc.pdist,FLI_loc.NN,FLI_loc.MMs)
+                FLI_loc.NN[:dist_count,:] = 0.
+                FLI_loc.NN[dist_count,:2] = 0.
+                FLI_loc.NN[dist_count+1:,:] = 0.
+                
+                nn_loc = FLI_loc.get_lnlikelihood(x0)#,FLI_loc.resres,FLI_loc.logdet,FLI_loc.pos,FLI_loc.pdist,FLI_loc.NN,FLI_loc.MMs)
 
-            #revert changes
-            x0.update_params(samples_current)
+                x0.update_params(paramsPP)
 
-            FLI_loc.MMs[dist_count] = MMs_orig[dist_count]
-            FLI_loc.NN[dist_count] = NN_orig[dist_count]
-            #TODO remove
-            FLI_loc.cos_gwtheta = x0.cos_gwtheta
-            FLI_loc.gwphi = x0.gwphi
-            FLI_loc.log10_fgw = x0.log10_fgw
-            FLI_loc.log10_mc = x0.log10_mc#
+                FLI_loc.update_pulsar_distance(x0, dist_count)
+                pps[i] = FLI_loc.get_lnlikelihood(x0)#,FLI_loc.resres,FLI_loc.logdet,FLI_loc.pos,FLI_loc.pdist,FLI_loc.NN,FLI_loc.MMs)
 
-            dist_count += 1
+                x0.update_params(paramsMM)
+
+                FLI_loc.update_pulsar_distance(x0, dist_count)
+                mms[i] = FLI_loc.get_lnlikelihood(x0)#,FLI_loc.resres,FLI_loc.logdet,FLI_loc.pos,FLI_loc.pdist,FLI_loc.NN,FLI_loc.MMs)
+
+                #revert changes
+                x0.update_params(samples_current)
+
+                FLI_loc.MMs[:] = MMs_orig
+                FLI_loc.NN[:] = NN_orig
+
+                dist_count += 1
+
+                #calculate diagonal elements of the Hessian from a central finite element scheme
+                #note the minus sign compared to the regular Hessian
+                fisher_diag[i] = -(pps[i] - 2*nn_loc + mms[i])/(4*epsilon*epsilon)
 
         else:
+            epsilon = cm.eps[par_names[i]]
+
+            paramsPP[i] += 2*epsilon
+            paramsMM[i] -= 2*epsilon
+
             #must be one of the intrinsic parameters
             x0.update_params(paramsPP)
 
@@ -710,22 +812,33 @@ def get_fisher_diagonal(T_chain, samples_current, par_names, par_names_cw_ext, x
             FLI_loc.log10_fgw = x0.log10_fgw
             FLI_loc.log10_mc = x0.log10_mc#
 
-    #calculate diagonal elements of the Hessian from a central finite element scheme
-    #note the minus sign compared to the regular Hessian
-    fisher_diag = -(pps - 2.0*nn + mms)/(4.0*epsilon*epsilon)
+            #calculate diagonal elements of the Hessian from a central finite element scheme
+            #note the minus sign compared to the regular Hessian
+            fisher_diag[i] = -(pps[i] - 2*nn + mms[i])/(4*epsilon*epsilon)
+
+    FLI_loc.resres = resres_orig
+    FLI_loc.logdet = logdet_orig
+
+    assert FLI_loc.cos_gwtheta == x0.cos_gwtheta
+    assert FLI_loc.gwphi == x0.gwphi
+    assert FLI_loc.log10_fgw == x0.log10_fgw
+    assert FLI_loc.log10_mc == x0.log10_mc#
+
 
     #correct for the given temperature of the chain
     fisher_diag = fisher_diag/T_chain
 
     #filer out nans and negative values - set them to 1.0 which will result in
-    Fisher_diag = np.where(np.isfinite(fisher_diag), fisher_diag, 1.0)
-    FISHER_diag = np.where(fisher_diag>0.0, Fisher_diag, 1.0)
+    fisher_diag[(~np.isfinite(fisher_diag))|(fisher_diag<0.)] = 1.
+    #Fisher_diag = np.where(np.isfinite(fisher_diag), fisher_diag, 1.0)
+    #FISHER_diag = np.where(fisher_diag>0.0, Fisher_diag, 1.0)
 
     #filter values smaller than 4 and set those to 4 -- Neil's trick -- effectively not allow jump Gaussian stds larger than 0.5=1/sqrt(4)
     eig_limit = 4.0
-    W = np.where(FISHER_diag>eig_limit, FISHER_diag, eig_limit)
+    #W = np.where(FISHER_diag>eig_limit, FISHER_diag, eig_limit)
+    fisher_diag[fisher_diag<eig_limit] = eig_limit
 
-    return 1/np.sqrt(W)
+    return 1/np.sqrt(fisher_diag)
 
 @jitclass([('uniform_par_ids',nb.int64[:]),('uniform_lows',nb.float64[:]),('uniform_highs',nb.float64[:]),\
            ('normal_par_ids',nb.int64[:]),('normal_mus',nb.float64[:]),('normal_sigs',nb.float64[:])])
