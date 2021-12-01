@@ -45,7 +45,7 @@ def get_FastLikeInfo(psrs, pta, params, x0):
     #invchol_Sigma_Ts = List()
     invchol_Sigma_TNs = List()#List([invchol_Sigma_Ts[i]/Nvecs[i] for i in range(self.Npsr)])
     Nrs = List()
-    iNvecs = List()
+    isqrNvecs = List()
     #unify types outside numba to avoid slowing down compilation
     #also add more components to logdet
 
@@ -60,9 +60,9 @@ def get_FastLikeInfo(psrs, pta, params, x0):
         chol_Sigma = np.linalg.cholesky(TNTs[i]+(np.diag(phiinv_loc) if phiinv_loc.ndim == 1 else phiinv_loc))
         #invchol_Sigma_Ts.append(solve_triangular(chol_Sigma,Ts[i].T,lower_a=True,trans_a=False))
         invchol_Sigma_T_loc = solve_triangular(chol_Sigma,Ts[i].T,lower_a=True,trans_a=False)
-        iNvecs.append(1/Nvecs[i])
-        Nrs.append(residuals[i]/Nvecs[i])
-        invchol_Sigma_TNs.append(np.ascontiguousarray(invchol_Sigma_T_loc/Nvecs[i]))
+        isqrNvecs.append(1/np.sqrt(Nvecs[i]))
+        Nrs.append(residuals[i]/np.sqrt(Nvecs[i]))
+        invchol_Sigma_TNs.append(np.ascontiguousarray(invchol_Sigma_T_loc/np.sqrt(Nvecs[i])))
 
         #find the latest arriving signal to prohibit signals that have already merged
         max_toa = max(max_toa,np.max(toas[i]))
@@ -72,7 +72,7 @@ def get_FastLikeInfo(psrs, pta, params, x0):
 
     resres = get_resres(x0,Nvecs,residuals,invchol_Sigma_TNs)
 
-    return FastLikeInfo(resres,logdet,pos,pdist,toas,invchol_Sigma_TNs,Nvecs,Nrs,max_toa,x0,Npsr,iNvecs,residuals)
+    return FastLikeInfo(resres,logdet,pos,pdist,toas,invchol_Sigma_TNs,Nvecs,Nrs,max_toa,x0,Npsr,isqrNvecs,residuals)
 
 
 @jitclass([('Npsr',nb.int64),('cw_p_dists',nb.float64[:]),('cw_p_phases',nb.float64[:]),('cos_gwtheta',nb.float64),\
@@ -272,13 +272,13 @@ def get_resres(x0,Nvecs,residuals,invchol_Sigma_TNs):
 
     resres = 0.
     for ii in range(x0.Npsr):
-        Nr = residuals[ii]/Nvecs[ii]
+        Nr = residuals[ii]/np.sqrt(Nvecs[ii])
 
-        rNr = np.dot(residuals[ii], Nr)
+        rNr = np.dot(Nr, Nr)
 
         #get the solution to Lx=a for N, note this uses my own numba compatible lapack wrapper but is basically the same as scipy
         invCholSigmaTN = invchol_Sigma_TNs[ii]
-        SigmaTNrProd = np.dot(invCholSigmaTN,residuals[ii])
+        SigmaTNrProd = np.dot(invCholSigmaTN,Nr)
 
         dotSigmaTNr = np.dot(SigmaTNrProd.T,SigmaTNrProd)
 
@@ -286,469 +286,8 @@ def get_resres(x0,Nvecs,residuals,invchol_Sigma_TNs):
 
     return resres
 
-#@njit(fastmath=True)
-#def update_MM_NN_new_psr_dists_alt(x0,iNvecs,Nrs,pos,pdist,toas, psr_idxs, NN, MMs,SigmaTNrProds,invchol_Sigma_TNs):
-#    '''Calculate inner products N=(res|S), M=(S|S) for pulsar with changed distance'''
-#
-#    w0 = np.pi * 10.0**x0.log10_fgw
-#    mc = 10.0**x0.log10_mc * const.Tsun
-#    gwtheta = np.arccos(x0.cos_gwtheta)
-#
-#    MM = np.zeros((4,4))#np.copy(MMs[ii, :, :])
-#    
-#    for psr_idx in psr_idxs:
-#        #select pulsar we want to update filters for
-#        ii = psr_idx
-#
-#
-#        #set up filters
-#        toas_loc = toas[ii] - cm.tref
-#
-#        sin_gwtheta = np.sin(gwtheta)
-#        cos_gwtheta = np.cos(gwtheta)
-#        sin_gwphi = np.sin(x0.gwphi)
-#        cos_gwphi = np.cos(x0.gwphi)
-#
-#        #NOTE factored out the common w0 into factor of w0**(-5/3) in phase, cancels in ratios
-#        #also replace omega with 1/omega**(1/3), which is the quantity we actually need
-#        omega13 = (1. - 256./5. * mc**(5./3.) * w0**(8./3.) * toas_loc)**(1/8)
-#        phase = 1/32/mc**(5/3) * w0**(-5/3) * (1. - omega13**5)
-#
-#        omhat = np.array([-sin_gwtheta * cos_gwphi, -sin_gwtheta * sin_gwphi, -cos_gwtheta])
-#        cosMu = -np.dot(omhat, pos[ii])
-#
-#
-#        p_dist = (pdist[ii,0] + pdist[ii,1]*x0.cw_p_dists[ii])*(const.kpc/const.c)
-#
-#        tp = toas_loc - p_dist*(1-cosMu)
-#        omega_p13 = (1. - 256./5. * mc**(5/3) * w0**(8/3) * tp)**(1/8)
-#        omega_p013 =(1. + 256./5. * mc**(5/3) * w0**(8/3) * p_dist*(1-cosMu))**(1/8)
-#
-#        phase_p = 1/32*mc**(-5/3) * w0**(-5/3) * (omega_p013**5 - omega_p13**5)
-#
-#        #get the sin and cosine parts
-#        PT_sin = np.sin(2*phase_p) * (1/omega_p013)*omega_p13
-#        PT_cos = np.cos(2*phase_p) * (1/omega_p013)*omega_p13
-#
-#        ET_sin = np.sin(2*phase) * omega13
-#        ET_cos = np.cos(2*phase) * omega13
-#
-#        #divide the signals by N
-#
-#        Nr = Nrs[ii]#residuals[ii]/Nvecs[ii]
-#        Nps = PT_sin*iNvecs[ii]
-#        Npc = PT_cos*iNvecs[ii]
-#
-#        #get the solution to Lx=a for N, note this uses my own numba compatible lapack wrapper but is basically the same as scipy
-#        #invCholSigmaT = invchol_Sigma_Ts[ii]
-#        invCholSigmaTN = invchol_Sigma_TNs[ii]
-#        SigmaTNrProd = SigmaTNrProds[ii]
-#
-#        SigmaTNesProd = np.dot(invCholSigmaTN,ET_sin)
-#        SigmaTNecProd = np.dot(invCholSigmaTN,ET_cos)
-#        SigmaTNpsProd = np.dot(invCholSigmaTN,PT_sin)
-#        SigmaTNpcProd = np.dot(invCholSigmaTN,PT_cos)
-#
-#        dotSigmaTNpsr = np.dot(SigmaTNpsProd,SigmaTNrProd)
-#        dotSigmaTNpcr = np.dot(SigmaTNpcProd,SigmaTNrProd)
-#
-#        dotSigmaTNps = np.dot(SigmaTNpsProd,SigmaTNpsProd)
-#        dotSigmaTNpc = np.dot(SigmaTNpcProd,SigmaTNpcProd)
-#
-#        dotSigmaTNpses = np.dot(SigmaTNpsProd,SigmaTNesProd)
-#        dotSigmaTNpces = np.dot(SigmaTNpcProd,SigmaTNesProd)
-#        dotSigmaTNpsec = np.dot(SigmaTNpsProd,SigmaTNecProd)
-#        dotSigmaTNpcec = np.dot(SigmaTNpcProd,SigmaTNecProd)
-#        dotSigmaTNpcps = np.dot(SigmaTNpcProd,SigmaTNpsProd)
-#
-#        #get the results. Note this could be done slightly more efficiently
-#        #by shifting a 1/sqrt(N) to the right hand side, but it doesn't really make much difference
-#        psNr = np.dot(Nr,PT_sin)
-#        pcNr = np.dot(Nr,PT_cos)
-#
-#        psNps = np.dot(Nps, PT_sin)
-#        pcNpc = np.dot(Npc, PT_cos)
-#
-#
-#        psNes = np.dot(Nps, ET_sin)
-#        pcNes = np.dot(Npc, ET_sin)
-#        psNec = np.dot(Nps, ET_cos)
-#        pcNec = np.dot(Npc, ET_cos)
-#        pcNps = np.dot(Npc, PT_sin)
-#
-#        #get NN
-#        NN[ii,2] = psNr - dotSigmaTNpsr
-#        NN[ii,3] = pcNr - dotSigmaTNpcr
-#
-#        #get MM
-#        #diagonal
-#        MM[0,0] = MMs[ii,0,0]
-#        MM[1,1] = MMs[ii,1,1]
-#
-#        MM[2,2] = psNps - dotSigmaTNps
-#        MM[3,3] = pcNpc - dotSigmaTNpc
-#        #lower triangle
-#        MM[1,0] = MMs[ii,1,0]
-#        MM[2,0] = psNes - dotSigmaTNpses
-#        MM[3,0] = pcNes - dotSigmaTNpces
-#        MM[2,1] = psNec - dotSigmaTNpsec
-#        MM[3,1] = pcNec - dotSigmaTNpcec
-#        MM[3,2] = pcNps - dotSigmaTNpcps
-#        #upper triangle
-#        MM[0,1] = MMs[ii,0,1]
-#        MM[0,2] = MM[2,0]
-#        MM[0,3] = MM[3,0]
-#        MM[1,2] = MM[2,1]
-#        MM[1,3] = MM[3,1]
-#        MM[2,3] = MM[3,2]
-#
-#        MMs[ii,:,:] = MM
-#
-#@njit(fastmath=True,parallel=True)
-#def update_MM_NN_new_psr_dists(x0,iNvecs,Nrs,pos,pdist,toas, psr_idxs, NN, MMs, SigmaTNrProds,invchol_Sigma_TNs):
-#    '''Calculate inner products N=(res|S), M=(S|S) for pulsar with changed distance'''
-#
-#    w0 = np.pi * 10.0**x0.log10_fgw
-#    mc = 10.0**x0.log10_mc * const.Tsun
-#    gwtheta = np.arccos(x0.cos_gwtheta)
-#
-#    sin_gwtheta = np.sin(gwtheta)
-#    cos_gwtheta = np.cos(gwtheta)
-#    sin_gwphi = np.sin(x0.gwphi)
-#    cos_gwphi = np.cos(x0.gwphi)
-#
-#    omhat = np.array([-sin_gwtheta * cos_gwphi, -sin_gwtheta * sin_gwphi, -cos_gwtheta])
-#
-#    MM = np.zeros((4,4))#np.copy(MMs[ii, :, :])
-#    
-#    for psr_idx in psr_idxs:
-#        #select pulsar we want to update filters for
-#        ii = psr_idx
-#
-#        cosMu = -np.dot(omhat, pos[ii])
-#
-#        p_dist = (pdist[ii,0] + pdist[ii,1]*x0.cw_p_dists[ii])*(const.kpc/const.c)
-#        omega_p013 = np.sqrt(np.sqrt(np.sqrt((1. + 256./5. * mc**(5/3) * w0**(8/3) * p_dist*(1-cosMu)))))
-#
-#        #get the solution to Lx=a for N, note this uses my own numba compatible lapack wrapper but is basically the same as scipy
-#        invCholSigmaTN = invchol_Sigma_TNs[ii]
-#        SigmaTNrProd = SigmaTNrProds[ii]
-#
-#        #SigmaTNesProd = np.zeros(invCholSigmaTN.shape[0])
-#        #SigmaTNecProd = np.zeros(invCholSigmaTN.shape[0])
-#        #SigmaTNpsProd = np.zeros(invCholSigmaTN.shape[0])
-#        #SigmaTNpcProd = np.zeros(invCholSigmaTN.shape[0])
-#
-#        ET_sin  = np.zeros(invCholSigmaTN.shape[1])
-#        ET_cos  = np.zeros(invCholSigmaTN.shape[1])
-#
-#        PT_sin  = np.zeros(invCholSigmaTN.shape[1])
-#        PT_cos  = np.zeros(invCholSigmaTN.shape[1])
-#
-#        Nr_loc = Nrs[ii]
-#        iNvec = iNvecs[ii]
-#
-#        psNr = 0.
-#        pcNr = 0.
-#
-#        psNps = 0.
-#        pcNpc = 0.
-#
-#        psNes = 0.
-#        pcNes = 0.
-#        psNec = 0.
-#        pcNec = 0.
-#        pcNps = 0.
-#
-#
-#        for itrk in prange(invCholSigmaTN.shape[1]):
-#            #set up filters
-#            toa_loc = toas[ii][itrk] - cm.tref
-#            #NOTE factored out the common w0 into factor of w0**(-5/3) in phase, cancels in ratios
-#            #also replace omega with 1/omega**(1/3), which is the quantity we actually need
-#            omega13 = np.sqrt(np.sqrt(np.sqrt((1. - 256./5. * mc**(5./3.) * w0**(8./3.) * toa_loc))))
-#            phase = 1/32/mc**(5/3) * w0**(-5/3) * (1. - omega13**5)
-#
-#            tp = toa_loc - p_dist*(1-cosMu)
-#            omega_p13 = np.sqrt(np.sqrt(np.sqrt((1./omega_p013**8 - 256./5. * mc**(5/3) * w0**(8/3)/omega_p013**8 * tp))))
-#
-#            phase_p = 1/32*mc**(-5/3) * w0**(-5/3) * omega_p013**5 * (1. - omega_p13**5)
-#
-#            #get the sin and cosine parts
-#            PT_sin[itrk] = np.sin(2*phase_p) * omega_p13
-#            PT_cos[itrk] = np.cos(2*phase_p) * omega_p13
-#
-#            ET_sin[itrk] = np.sin(2*phase) * omega13
-#            ET_cos[itrk] = np.cos(2*phase) * omega13
-#
-#            #get the results. Note this could be done slightly more efficiently
-#            #by shifting a 1/sqrt(N) to the right hand side, but it doesn't really make much difference
-#            Nr = Nr_loc[itrk]#residuals[ii]/Nvecs[ii]
-#
-#            #divide the signals by N
-#            Nps = PT_sin[itrk]*iNvec[itrk]
-#            Npc = PT_cos[itrk]*iNvec[itrk]
-#
-#            psNr += Nr*PT_sin[itrk]
-#            pcNr += Nr*PT_cos[itrk]
-#
-#            psNps += Nps*PT_sin[itrk]
-#            pcNpc += Npc*PT_cos[itrk]
-#
-#            psNes += Nps*ET_sin[itrk]
-#            pcNes += Npc*ET_sin[itrk]
-#            psNec += Nps*ET_cos[itrk]
-#            pcNec += Npc*ET_cos[itrk]
-#            pcNps += Npc*PT_sin[itrk]
-#
-#        dotSigmaTNpsr = 0.
-#        dotSigmaTNpcr = 0.
-#
-#        dotSigmaTNps = 0.
-#        dotSigmaTNpc = 0.
-#
-#        dotSigmaTNpses = 0.
-#        dotSigmaTNpces = 0. 
-#        dotSigmaTNpsec = 0.
-#        dotSigmaTNpcec = 0.
-#        dotSigmaTNpcps = 0.
-#
-#    #        for itrj in prange(invCholSigmaTN.shape[0]):
-#    #            SigmaTNesProd[itrj] += invCholSigmaTN[itrj,itrk]*ET_sin[itrk]
-#    #            SigmaTNecProd[itrj] += invCholSigmaTN[itrj,itrk]*ET_cos[itrk]
-#    #            SigmaTNpsProd[itrj] += invCholSigmaTN[itrj,itrk]*PT_sin[itrk]
-#    #            SigmaTNpcProd[itrj] += invCholSigmaTN[itrj,itrk]*PT_cos[itrk]
-#        for itrj in prange(invCholSigmaTN.shape[0]):
-#            SigmaTNesProd = 0.
-#            SigmaTNecProd = 0.
-#            SigmaTNpsProd = 0.
-#            SigmaTNpcProd = 0.
-#            for itrk in prange(invCholSigmaTN.shape[1]):
-#                SigmaTNesProd += invCholSigmaTN[itrj,itrk]*ET_sin[itrk]
-#                SigmaTNecProd += invCholSigmaTN[itrj,itrk]*ET_cos[itrk]
-#                SigmaTNpsProd += invCholSigmaTN[itrj,itrk]*PT_sin[itrk]
-#                SigmaTNpcProd += invCholSigmaTN[itrj,itrk]*PT_cos[itrk]
-#
-#            #dotSigmaTNesr = np.dot(SigmaTNesProd,SigmaTNrProd) #remove#
-#            #dotSigmaTNecr = np.dot(SigmaTNecProd,SigmaTNrProd) #remove#
-#            dotSigmaTNpsr += SigmaTNpsProd*SigmaTNrProd[itrj]
-#            dotSigmaTNpcr += SigmaTNpcProd*SigmaTNrProd[itrj]
-#
-#            #dotSigmaTNes = np.dot(SigmaTNesProd.T,SigmaTNesProd) #remove#
-#            #dotSigmaTNec = np.dot(SigmaTNecProd.T,SigmaTNecProd) #remove#
-#            dotSigmaTNps += SigmaTNpsProd*SigmaTNpsProd
-#            dotSigmaTNpc += SigmaTNpcProd*SigmaTNpcProd
-#
-#            #dotSigmaTNeces = np.dot(SigmaTNecProd.T,SigmaTNesProd) #remove#
-#            dotSigmaTNpses += SigmaTNpsProd*SigmaTNesProd
-#            dotSigmaTNpces += SigmaTNpcProd*SigmaTNesProd
-#            dotSigmaTNpsec += SigmaTNpsProd*SigmaTNecProd
-#            dotSigmaTNpcec += SigmaTNpcProd*SigmaTNecProd
-#            dotSigmaTNpcps += SigmaTNpcProd*SigmaTNpsProd
-#
-#        
-##        SigmaTNesProd = np.dot(invCholSigmaTN,ET_sin)
-##        SigmaTNecProd = np.dot(invCholSigmaTN,ET_cos)
-##        SigmaTNpsProd = np.dot(invCholSigmaTN,PT_sin)
-##        SigmaTNpcProd = np.dot(invCholSigmaTN,PT_cos)
-##
-##        #dotSigmaTNesr = np.dot(SigmaTNesProd,SigmaTNrProd) #remove#
-##        #dotSigmaTNecr = np.dot(SigmaTNecProd,SigmaTNrProd) #remove#
-##        dotSigmaTNpsr = np.dot(SigmaTNpsProd,SigmaTNrProd)
-##        dotSigmaTNpcr = np.dot(SigmaTNpcProd,SigmaTNrProd)
-##
-##        #dotSigmaTNes = np.dot(SigmaTNesProd,SigmaTNesProd) #remove#
-##        #dotSigmaTNec = np.dot(SigmaTNecProd,SigmaTNecProd) #remove#
-##        dotSigmaTNps = np.dot(SigmaTNpsProd,SigmaTNpsProd)
-##        dotSigmaTNpc = np.dot(SigmaTNpcProd,SigmaTNpcProd)
-##
-##        #dotSigmaTNeces = np.dot(SigmaTNecProd,SigmaTNesProd) #remove#
-##        dotSigmaTNpses = np.dot(SigmaTNpsProd,SigmaTNesProd)
-##        dotSigmaTNpces = np.dot(SigmaTNpcProd,SigmaTNesProd)
-##        dotSigmaTNpsec = np.dot(SigmaTNpsProd,SigmaTNecProd)
-##        dotSigmaTNpcec = np.dot(SigmaTNpcProd,SigmaTNecProd)
-##        dotSigmaTNpcps = np.dot(SigmaTNpcProd,SigmaTNpsProd)
-#
-#        #for itrj in prange(invCholSigmaTN.shape[0]):
-#        #    dotSigmaTNpsr += SigmaTNpsProd[itrj]*SigmaTNrProd[itrj]
-#        #    dotSigmaTNpcr += SigmaTNpcProd[itrj]*SigmaTNrProd[itrj]
-#
-#        #    dotSigmaTNps += SigmaTNpsProd[itrj]*SigmaTNpsProd[itrj]
-#        #    dotSigmaTNpc += SigmaTNpcProd[itrj]*SigmaTNpcProd[itrj]
-#
-#        #    dotSigmaTNpses += SigmaTNpsProd[itrj]*SigmaTNesProd[itrj]
-#        #    dotSigmaTNpces += SigmaTNpcProd[itrj]*SigmaTNesProd[itrj]
-#        #    dotSigmaTNpsec += SigmaTNpsProd[itrj]*SigmaTNecProd[itrj]
-#        #    dotSigmaTNpcec += SigmaTNpcProd[itrj]*SigmaTNecProd[itrj]
-#        #    dotSigmaTNpcps += SigmaTNpcProd[itrj]*SigmaTNpsProd[itrj]
-#        
-#        NN[ii,2] = psNr - dotSigmaTNpsr
-#        NN[ii,3] = pcNr - dotSigmaTNpcr
-#
-#        #get MM
-#        #diagonal
-#        MM[0,0] = MMs[ii,0,0]
-#        MM[1,1] = MMs[ii,1,1]
-#
-#        MM[2,2] = psNps - dotSigmaTNps
-#        MM[3,3] = pcNpc - dotSigmaTNpc
-#        #lower triangle
-#        MM[1,0] = MMs[ii,1,0]
-#        MM[2,0] = psNes - dotSigmaTNpses
-#        MM[3,0] = pcNes - dotSigmaTNpces
-#        MM[2,1] = psNec - dotSigmaTNpsec
-#        MM[3,1] = pcNec - dotSigmaTNpcec
-#        MM[3,2] = pcNps - dotSigmaTNpcps
-#        #upper triangle
-#        MM[0,1] = MMs[ii,0,1]
-#        MM[0,2] = MM[2,0]
-#        MM[0,3] = MM[3,0]
-#        MM[1,2] = MM[2,1]
-#        MM[1,3] = MM[3,1]
-#        MM[2,3] = MM[3,2]
-#
-#        MMs[ii,:,:] = MM
-#
-#@njit(fastmath=True)
-#def update_MM_NN_new_psr_dist(x0,iNvecs,Nrs,pos,pdist,toas, psr_idx, NN, MMs, invchol_Sigma_TNs,SigmaTNrProds):
-#    '''Calculate inner products N=(res|S), M=(S|S) for pulsar with changed distance'''
-#
-#    w0 = np.pi * 10.0**x0.log10_fgw
-#    mc = 10.0**x0.log10_mc * const.Tsun
-#    gwtheta = np.arccos(x0.cos_gwtheta)
-#
-#    #select pulsar we want to update filters for
-#    ii = psr_idx
-#
-#    MM = np.zeros((4,4))#np.copy(MMs[ii, :, :])
-#
-#    #set up filters
-#    toas_loc = toas[ii] - cm.tref
-#    #omega = w0 * (1. - 256./5. * mc**(5./3.) * w0**(8./3.) * toas_loc)**(-3./8.)
-#    #phase = 1/32/mc**(5/3) * (w0**(-5/3) - omega**(-5/3))
-#
-#    sin_gwtheta = np.sin(gwtheta)
-#    cos_gwtheta = np.cos(gwtheta)
-#    sin_gwphi = np.sin(x0.gwphi)
-#    cos_gwphi = np.cos(x0.gwphi)
-#
-#    #NOTE factored out the common w0 into factor of w0**(-5/3) in phase, cancels in ratios
-#    #also replace omega with 1/omega**(1/3), which is the quantity we actually need
-#    omega13 = (1. - 256./5. * mc**(5./3.) * w0**(8./3.) * toas_loc)**(1/8)
-#    phase = 1/32/mc**(5/3) * w0**(-5/3) * (1. - omega13**5)
-#
-#    omhat = np.array([-sin_gwtheta * cos_gwphi, -sin_gwtheta * sin_gwphi, -cos_gwtheta])
-#    cosMu = -np.dot(omhat, pos[ii])
-#
-#
-#    p_dist = (pdist[ii,0] + pdist[ii,1]*x0.cw_p_dists[ii])*(const.kpc/const.c)
-#
-#    tp = toas_loc - p_dist*(1-cosMu)
-#    omega_p13 = (1. - 256./5. * mc**(5/3) * w0**(8/3) * tp)**(1/8)
-#    omega_p013 =(1. + 256./5. * mc**(5/3) * w0**(8/3) * p_dist*(1-cosMu))**(1/8)
-#
-#    phase_p = 1/32*mc**(-5/3) * w0**(-5/3) * (omega_p013**5 - omega_p13**5)
-#
-#    #get the sin and cosine parts
-#    PT_sin = np.sin(2*phase_p) * (1/omega_p013)*omega_p13
-#    PT_cos = np.cos(2*phase_p) * (1/omega_p013)*omega_p13
-#
-#    ET_sin = np.sin(2*phase) * omega13
-#    ET_cos = np.cos(2*phase) * omega13
-#
-#    #divide the signals by N
-#
-#    Nr = Nrs[ii]#residuals[ii]/Nvecs[ii]
-#    Nes = ET_sin*iNvecs[ii]
-#    Nec = ET_cos*iNvecs[ii]
-#    Nps = PT_sin*iNvecs[ii]
-#    Npc = PT_cos*iNvecs[ii]
-#
-#    #get the solution to Lx=a for N, note this uses my own numba compatible lapack wrapper but is basically the same as scipy
-#    #invCholSigmaT = invchol_Sigma_Ts[ii]
-#    invCholSigmaTN = invchol_Sigma_TNs[ii]
-#    #SigmaTNrProd = np.dot(invCholSigmaT,Nr)
-#    SigmaTNrProd = SigmaTNrProds[ii]
-#
-#    SigmaTNesProd = np.dot(invCholSigmaTN,ET_sin)
-#    SigmaTNecProd = np.dot(invCholSigmaTN,ET_cos)
-#    SigmaTNpsProd = np.dot(invCholSigmaTN,PT_sin)
-#    SigmaTNpcProd = np.dot(invCholSigmaTN,PT_cos)
-#
-#    #dotSigmaTNesr = np.dot(SigmaTNesProd,SigmaTNrProd) #remove#
-#    #dotSigmaTNecr = np.dot(SigmaTNecProd,SigmaTNrProd) #remove#
-#    dotSigmaTNpsr = np.dot(SigmaTNpsProd,SigmaTNrProd)
-#    dotSigmaTNpcr = np.dot(SigmaTNpcProd,SigmaTNrProd)
-#
-#    #dotSigmaTNes = np.dot(SigmaTNesProd.T,SigmaTNesProd) #remove#
-#    #dotSigmaTNec = np.dot(SigmaTNecProd.T,SigmaTNecProd) #remove#
-#    dotSigmaTNps = np.dot(SigmaTNpsProd.T,SigmaTNpsProd)
-#    dotSigmaTNpc = np.dot(SigmaTNpcProd.T,SigmaTNpcProd)
-#
-#    #dotSigmaTNeces = np.dot(SigmaTNecProd.T,SigmaTNesProd) #remove#
-#    dotSigmaTNpses = np.dot(SigmaTNpsProd.T,SigmaTNesProd)
-#    dotSigmaTNpces = np.dot(SigmaTNpcProd.T,SigmaTNesProd)
-#    dotSigmaTNpsec = np.dot(SigmaTNpsProd.T,SigmaTNecProd)
-#    dotSigmaTNpcec = np.dot(SigmaTNpcProd.T,SigmaTNecProd)
-#    dotSigmaTNpcps = np.dot(SigmaTNpcProd.T,SigmaTNpsProd)
-#
-#    #get the results. Note this could be done slightly more efficiently
-#    #by shifting a 1/sqrt(N) to the right hand side, but it doesn't really make much difference
-#    #esNr = np.dot(ET_sin,Nr) #remove#
-#    #ecNr = np.dot(ET_cos,Nr) #remove#
-#    psNr = np.dot(Nr,PT_sin)
-#    pcNr = np.dot(Nr,PT_cos)
-#
-#    #esNes = np.dot(ET_sin, Nes) #remove#
-#    #ecNec = np.dot(ET_cos, Nec) #remove#
-#    psNps = np.dot(Nps,PT_sin)
-#    pcNpc = np.dot(Npc,PT_cos)
-#
-#    #ecNes = np.dot(ET_cos, Nes) #remove#
-#
-#    psNes = np.dot(Nps, ET_sin)
-#    pcNes = np.dot(Npc, ET_sin)
-#    psNec = np.dot(Nps, ET_cos)
-#    pcNec = np.dot(Npc, ET_cos)
-#    pcNps = np.dot(Npc, PT_sin)
-#
-#    #get NN
-#
-#    #NN[ii,0] = esNr - dotSigmaTNesr #remove#
-#    #NN[ii,1] = ecNr - dotSigmaTNecr #remove#
-#    NN[ii,2] = psNr - dotSigmaTNpsr
-#    NN[ii,3] = pcNr - dotSigmaTNpcr
-#
-#    #get MM
-#    #diagonal
-#    #MM[0,0] = esNes - dotSigmaTNes #remove#
-#    #MM[1,1] = ecNec - dotSigmaTNec #remove#
-#    MM[0,0] = MMs[ii,0,0]
-#    MM[1,1] = MMs[ii,1,1]
-#
-#    MM[2,2] = psNps - dotSigmaTNps
-#    MM[3,3] = pcNpc - dotSigmaTNpc
-#    #lower triangle
-#    #MM[1,0] = ecNes - dotSigmaTNeces  #remove#
-#    MM[1,0] = MMs[ii,1,0]
-#    MM[2,0] = psNes - dotSigmaTNpses
-#    MM[3,0] = pcNes - dotSigmaTNpces
-#    MM[2,1] = psNec - dotSigmaTNpsec
-#    MM[3,1] = pcNec - dotSigmaTNpcec
-#    MM[3,2] = pcNps - dotSigmaTNpcps
-#    #upper triangle
-#    #MM[0,1] = MM[1,0] #remove#
-#    MM[0,1] = MMs[ii,0,1]
-#    MM[0,2] = MM[2,0]
-#    MM[0,3] = MM[3,0]
-#    MM[1,2] = MM[2,1]
-#    MM[1,3] = MM[3,1]
-#    MM[2,3] = MM[3,2]
-#
-#    MMs[ii,:,:] = MM
-
 @njit(fastmath=True,parallel=True)
-def update_intrinsic_params(x0,iNvecs,Nrs,pos,pdist,toas,NN,MMs,SigmaTNrProds,invchol_Sigma_TNs,idxs,dist_only=True):
+def update_intrinsic_params(x0,isqNvecs,Nrs,pos,pdist,toas,NN,MMs,SigmaTNrProds,invchol_Sigma_TNs,idxs,dist_only=True):
     '''Calculate inner products N=(res|S), M=(S|S)'''
 
     w0 = np.pi * 10.0**x0.log10_fgw
@@ -777,7 +316,7 @@ def update_intrinsic_params(x0,iNvecs,Nrs,pos,pdist,toas,NN,MMs,SigmaTNrProds,in
 
         #divide the signals by N
         Nr = Nrs[ii]#residuals[ii]/Nvecs[ii]
-        iNvec = iNvecs[ii]
+        isqNvec = isqNvecs[ii]
         toas_in = toas[ii]
 
         esNr = 0.
@@ -807,11 +346,13 @@ def update_intrinsic_params(x0,iNvecs,Nrs,pos,pdist,toas,NN,MMs,SigmaTNrProds,in
         PT_sin  = np.zeros(invCholSigmaTN.shape[1])
         PT_cos  = np.zeros(invCholSigmaTN.shape[1])
 
+        #break out this loop instead of using numpy syntax so we don't have to store omegas and phases ever
         for itrk in prange(invCholSigmaTN.shape[1]):
             #set up filters
             toas_loc = toas_in[itrk] - cm.tref
             #NOTE factored out the common w0 into factor of w0**(-5/3) in phase, cancels in ratios
             #also replace omega with 1/omega**(1/3), which is the quantity we actually need
+            #if sqrt is a native cpu function 3 sqrts will probably be faster than taking the eigth root
             omega13 = np.sqrt(np.sqrt(np.sqrt((1. - 256./5. * mc**(5./3.) * w0**(8./3.) * toas_loc))))
             phase = 1/32/mc**(5/3) * w0**(-5/3) * (1. - omega13**5)
 
@@ -820,37 +361,39 @@ def update_intrinsic_params(x0,iNvecs,Nrs,pos,pdist,toas,NN,MMs,SigmaTNrProds,in
 
             phase_p = 1/32*mc**(-5/3) * w0**(-5/3) * omega_p013**5 * (1. - omega_p13**5)
 
-            PT_sin[itrk] = np.sin(2*phase_p) * omega_p13
-            PT_cos[itrk] = np.cos(2*phase_p) * omega_p13
+            PT_amp = isqNvec[itrk] * omega_p13
+            ET_amp = isqNvec[itrk] * omega13
 
-            ET_sin[itrk] = np.sin(2*phase) * omega13
-            ET_cos[itrk] = np.cos(2*phase) * omega13
+            PT_sin[itrk] = PT_amp * np.sin(2*phase_p)
+            PT_cos[itrk] = PT_amp * np.cos(2*phase_p)
 
-            Nps = iNvec[itrk]*PT_sin[itrk]
-            Npc = iNvec[itrk]*PT_cos[itrk]
+
+            ET_sin[itrk] = ET_amp * np.sin(2*phase)
+            ET_cos[itrk] = ET_amp * np.cos(2*phase)
 
             #get the results
 
             psNr += Nr[itrk]*PT_sin[itrk]
             pcNr += Nr[itrk]*PT_cos[itrk]
 
-            psNps += Nps*PT_sin[itrk]
-            pcNpc += Npc*PT_cos[itrk]
+            psNps += PT_sin[itrk]*PT_sin[itrk]
+            pcNpc += PT_cos[itrk]*PT_cos[itrk]
 
-            psNes += Nps*ET_sin[itrk]
-            pcNes += Npc*ET_sin[itrk]
-            psNec += Nps*ET_cos[itrk]
-            pcNec += Npc*ET_cos[itrk]
-            pcNps += Npc*PT_sin[itrk]
+            psNes += PT_sin[itrk]*ET_sin[itrk]
+            pcNes += PT_cos[itrk]*ET_sin[itrk]
+            psNec += PT_sin[itrk]*ET_cos[itrk]
+            pcNec += PT_cos[itrk]*ET_cos[itrk]
+            pcNps += PT_cos[itrk]*PT_sin[itrk]
             
-            if not dist_only:
-                Nes = iNvec[itrk]*ET_sin[itrk]
-                Nec = iNvec[itrk]*ET_cos[itrk]
-                esNr += Nr[itrk]*ET_sin[itrk]
-                ecNr += Nr[itrk]*ET_cos[itrk]
-                esNes += Nes*ET_sin[itrk]
-                ecNec += Nec*ET_cos[itrk]
-                ecNes += Nec*ET_sin[itrk]
+            #these segments aren't the time limiting factor so we don't see any real speedup from skipping them
+            #if not dist_only:
+            #Nes = iNvec[itrk]*ET_sin[itrk]
+            #Nec = iNvec[itrk]*ET_cos[itrk]
+            esNr += Nr[itrk]*ET_sin[itrk]
+            ecNr += Nr[itrk]*ET_cos[itrk]
+            esNes += ET_sin[itrk]*ET_sin[itrk]
+            ecNec += ET_cos[itrk]*ET_cos[itrk]
+            ecNes += ET_cos[itrk]*ET_sin[itrk]
 
         dotSigmaTNesr = 0.
         dotSigmaTNecr = 0.
@@ -869,11 +412,14 @@ def update_intrinsic_params(x0,iNvecs,Nrs,pos,pdist,toas,NN,MMs,SigmaTNrProds,in
         dotSigmaTNpcec = 0.
         dotSigmaTNpcps = 0.
 
+        #although we could do this in the upper loop without saving ET_sin/ET_cos arrays etc,
+        #in my testing it was faster to do it in the transposed order as long as invCholSigmaTN is C contiguous
         for itrj in prange(invCholSigmaTN.shape[0]):
             SigmaTNesProd = 0.
             SigmaTNecProd = 0.
             SigmaTNpsProd = 0.
             SigmaTNpcProd = 0.
+            #this loop is currently the limiting factor
             for itrk in prange(invCholSigmaTN.shape[1]):
                 SigmaTNpsProd += invCholSigmaTN[itrj,itrk]*PT_sin[itrk]
                 SigmaTNpcProd += invCholSigmaTN[itrj,itrk]*PT_cos[itrk]
@@ -892,12 +438,12 @@ def update_intrinsic_params(x0,iNvecs,Nrs,pos,pdist,toas,NN,MMs,SigmaTNrProds,in
             dotSigmaTNpcec += SigmaTNpcProd*SigmaTNecProd
             dotSigmaTNpcps += SigmaTNpcProd*SigmaTNpsProd
 
-            if not dist_only:
-                dotSigmaTNesr += SigmaTNesProd*SigmaTNrProd[itrj]
-                dotSigmaTNecr += SigmaTNecProd*SigmaTNrProd[itrj]
-                dotSigmaTNes += SigmaTNesProd*SigmaTNesProd
-                dotSigmaTNec += SigmaTNecProd*SigmaTNecProd
-                dotSigmaTNeces += SigmaTNecProd*SigmaTNesProd
+            #if not dist_only:
+            dotSigmaTNesr += SigmaTNesProd*SigmaTNrProd[itrj]
+            dotSigmaTNecr += SigmaTNecProd*SigmaTNrProd[itrj]
+            dotSigmaTNes += SigmaTNesProd*SigmaTNesProd
+            dotSigmaTNec += SigmaTNecProd*SigmaTNecProd
+            dotSigmaTNeces += SigmaTNecProd*SigmaTNesProd
 
         #get NN
         NN[ii,2] = psNr - dotSigmaTNpsr
@@ -920,16 +466,16 @@ def update_intrinsic_params(x0,iNvecs,Nrs,pos,pdist,toas,NN,MMs,SigmaTNrProds,in
         MM[1,3] = MM[3,1]
         MM[2,3] = MM[3,2]
 
-        if dist_only:
-            MM[0:2,0:2] = MMs[ii,0:2,0:2]
-        else:
-            NN[ii,0] = esNr - dotSigmaTNesr
-            NN[ii,1] = ecNr - dotSigmaTNecr
+        #if dist_only:
+        #    MM[0:2,0:2] = MMs[ii,0:2,0:2]
+        #else:
+        NN[ii,0] = esNr - dotSigmaTNesr
+        NN[ii,1] = ecNr - dotSigmaTNecr
 
-            MM[0,0] = esNes - dotSigmaTNes
-            MM[1,1] = ecNec - dotSigmaTNec
-            MM[1,0] = ecNes - dotSigmaTNeces
-            MM[0,1] = MM[1,0]
+        MM[0,0] = esNes - dotSigmaTNes
+        MM[1,1] = ecNec - dotSigmaTNec
+        MM[1,0] = ecNes - dotSigmaTNeces
+        MM[0,1] = MM[1,0]
 
         MMs[ii,:,:] = MM
 
@@ -938,10 +484,10 @@ def update_intrinsic_params(x0,iNvecs,Nrs,pos,pdist,toas,NN,MMs,SigmaTNrProds,in
         ('toas',nb.types.ListType(nb.types.float64[::1])),('invchol_Sigma_TNs',nb.types.ListType(nb.types.float64[:,::1])),\
         ('Nvecs',nb.types.ListType(nb.types.float64[::1])),('Nrs',nb.types.ListType(nb.types.float64[::1])),\
         ('cos_gwtheta',nb.float64),('gwphi',nb.float64),('log10_fgw',nb.float64),('log10_mc',nb.float64),('max_toa',nb.float64),\
-        ('SigmaTNrProds',nb.types.ListType(nb.types.float64[::1])),('Npsr',nb.int64),('iNvecs',nb.types.ListType(nb.types.float64[::1])),('residuals',nb.types.ListType(nb.types.float64[::1]))])
+        ('SigmaTNrProds',nb.types.ListType(nb.types.float64[::1])),('Npsr',nb.int64),('isqNvecs',nb.types.ListType(nb.types.float64[::1])),('residuals',nb.types.ListType(nb.types.float64[::1]))])
 class FastLikeInfo:
     """simple jitclass to store the various elements of fast likelihood calculation in a way that can be accessed quickly from a numba environment"""
-    def __init__(self,resres,logdet,pos,pdist,toas,invchol_Sigma_TNs,Nvecs,Nrs,max_toa,x0,Npsr,iNvecs,residuals):
+    def __init__(self,resres,logdet,pos,pdist,toas,invchol_Sigma_TNs,Nvecs,Nrs,max_toa,x0,Npsr,isqNvecs,residuals):
         self.resres = resres
         self.logdet = logdet
         self.pos = pos
@@ -952,13 +498,13 @@ class FastLikeInfo:
         self.invchol_Sigma_TNs = invchol_Sigma_TNs#List([invchol_Sigma_Ts[i]/Nvecs[i] for i in range(self.Npsr)])
 
         self.Nvecs = Nvecs
-        self.iNvecs = iNvecs
+        self.isqNvecs = isqNvecs
         self.Nrs = Nrs
         self.max_toa = max_toa
 
         self.Npsr = x0.Npsr
 
-        self.SigmaTNrProds = List([np.dot(self.invchol_Sigma_TNs[i],self.residuals[i]) for i in range(self.Npsr)])
+        self.SigmaTNrProds = List([np.dot(self.invchol_Sigma_TNs[i],self.Nrs[i]) for i in range(self.Npsr)])
 
         self.MMs = np.zeros((Npsr,4,4))
         self.NN = np.zeros((Npsr,4))
@@ -975,25 +521,25 @@ class FastLikeInfo:
 
     def update_pulsar_distance(self,x0,psr_idx):
         """recalculate MM and NN only for the affected pulsar if we only change a single pulsar distance"""
+        #this method is just a wrapper for the special case of only 1 pulsar but it won't force recompilation 
         assert self.cos_gwtheta == x0.cos_gwtheta
         assert self.gwphi == x0.gwphi
         assert self.log10_fgw == x0.log10_fgw
         assert self.log10_mc == x0.log10_mc
-        #update_MM_NN_new_psr_dist(x0,self.iNvecs,self.Nrs,self.pos,self.pdist,self.toas,psr_idx, self.NN, self.MMs, self.invchol_Sigma_TNs,self.SigmaTNrProds)
-        update_intrinsic_params(x0,self.iNvecs,self.Nrs,self.pos,self.pdist,self.toas, self.NN, self.MMs,self.SigmaTNrProds,self.invchol_Sigma_TNs,np.array([psr_idx]),dist_only=True)
+        update_intrinsic_params(x0,self.isqNvecs,self.Nrs,self.pos,self.pdist,self.toas, self.NN, self.MMs,self.SigmaTNrProds,self.invchol_Sigma_TNs,np.array([psr_idx]),dist_only=True)
 
     def update_pulsar_distances(self,x0,psr_idxs):
-        """recalculate MM and NN only for the affected pulsar if we only change a single pulsar distance"""
+        """recalculate MM and NN only for the affected pulsar if  change an arbitrary number of single pulsar distances"""
         assert self.cos_gwtheta == x0.cos_gwtheta
         assert self.gwphi == x0.gwphi
         assert self.log10_fgw == x0.log10_fgw
         assert self.log10_mc == x0.log10_mc
-        #update_MM_NN_new_psr_dists(x0,self.iNvecs,self.Nrs,self.pos,self.pdist,self.toas,psr_idxs, self.NN, self.MMs, self.SigmaTNrProds,self.invchol_Sigma_TNs)
-        update_intrinsic_params(x0,self.iNvecs,self.Nrs,self.pos,self.pdist,self.toas, self.NN, self.MMs,self.SigmaTNrProds,self.invchol_Sigma_TNs,psr_idxs,dist_only=True)
+        #leave dist_only in even though it is not currently respected in case it turns out to be faster later
+        update_intrinsic_params(x0,self.isqNvecs,self.Nrs,self.pos,self.pdist,self.toas, self.NN, self.MMs,self.SigmaTNrProds,self.invchol_Sigma_TNs,psr_idxs,dist_only=True)
 
     def update_intrinsic_params(self,x0):
         """Recalculate filters with updated intrinsic parameters - not quite the same as the setup, since a few things are already stored"""
-        update_intrinsic_params(x0,self.iNvecs,self.Nrs,self.pos,self.pdist,self.toas, self.NN, self.MMs,self.SigmaTNrProds,self.invchol_Sigma_TNs,np.arange(x0.Npsr),dist_only=False)
+        update_intrinsic_params(x0,self.isqNvecs,self.Nrs,self.pos,self.pdist,self.toas, self.NN, self.MMs,self.SigmaTNrProds,self.invchol_Sigma_TNs,np.arange(x0.Npsr),dist_only=False)
         #track the intrinsic parameters this was set at so we can throw in error if they are inconsistent with an input x0
         self.cos_gwtheta = x0.cos_gwtheta
         self.gwphi = x0.gwphi

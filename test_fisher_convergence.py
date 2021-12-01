@@ -518,8 +518,16 @@ if __name__ == '__main__':
     #if n_run4>0:
     #    print('time for updating all distances together alt%.5e s'%((tf_dist4-ti_dist4)/n_run4))
 
+    ti_dist2 = perf_counter()
+    n_run2 = 10000
+    for mm in range(n_run2):
+        FLIs[j].update_intrinsic_params(x0s[j]) #TODO validate assumption on psr index ranges
+    tf_dist2 = perf_counter()
+    if n_run2>0:
+        print('time for updating all distances instrinsic %.5e s'%((tf_dist2-ti_dist2)/n_run2))
+
     ti_dist0 = perf_counter()
-    n_run0 = 100
+    n_run0 = 10000
     for mm in range(n_run0):
         FLIs[j].update_pulsar_distances(x0s[j], np.arange(0,x0s[j].Npsr)) #TODO validate assumption on psr index ranges
     tf_dist0 = perf_counter()
@@ -536,13 +544,6 @@ if __name__ == '__main__':
     if n_run0>0:
         print('time for updating all distances separately %.5e s'%((tf_dist1-ti_dist1)/n_run1))
 
-    ti_dist2 = perf_counter()
-    n_run2 = 100
-    for mm in range(n_run2):
-        FLIs[j].update_intrinsic_params(x0s[j]) #TODO validate assumption on psr index ranges
-    tf_dist2 = perf_counter()
-    if n_run2>0:
-        print('time for updating all distances instrinsic %.5e s'%((tf_dist2-ti_dist2)/n_run2))
 
     import sys
     sys.exit()
