@@ -331,13 +331,17 @@ def do_intrinsic_update(n_chain, pta, samples, i, Ts, a_yes, a_no, x0s, FLIs, FP
         jump_idx = par_names.index(par_names_cw_int[jump_select])
         if jump_idx in x0s[j].idx_dists:
             #print('b1')
-            fisher_diag_loc = fisher_diag[j][x0s[j].idx_dists]
-            jump[x0s[j].idx_dists] = fisher_diag_loc*np.random.normal(0.,1.,x0s[j].Npsr)
-            #for itrp in range(0,cm.n_phase_jumps):
-            #    idx_psr = x0s[j].idx_phases[np.random.randint(x0s[j].Npsr)]
-            #    jump[idx_psr] += fisher_diag[j,idx_psr]*np.random.normal()
+            idx_choose = np.random.randint(0,x0s[j].Npsr,cm.n_dist_main)
+            idx_choose[0] = jump_idx
+            fisher_diag_loc = fisher_diag[j][idx_choose]
+            jump[idx_choose] = fisher_diag_loc*np.random.normal(0.,1.,np.n_dist_main)
         else:
             jump[jump_idx] = fisher_diag[j, jump_idx]*np.random.normal() #0.1
+
+            #add some extra distance jumps because they are free
+            idx_choose = np.random.randint(0,x0s[j].Npsr,cm.n_dist_extra)
+            fisher_diag_loc = fisher_diag[j][idx_choose]
+            jump[idx_choose] += fisher_diag_loc*np.random.normal(0.,1.,cm.n_dist_extra)
 
         samples_current = np.copy(samples[j,i%save_every_n,:])
 
@@ -353,7 +357,7 @@ def do_intrinsic_update(n_chain, pta, samples, i, Ts, a_yes, a_no, x0s, FLIs, FP
             new_point[jump_idx] = new_point[jump_idx]
             x0s[j].update_params(new_point) 
             #FLIs[j].update_pulsar_distance(x0s[j], pta.pulsars.index(par_names_cw_int[jump_select][:-11]))
-            FLIs[j].update_pulsar_distances(x0s[j], np.arange(0,x0s[j].Npsr)) #TODO validate assumption on psr index ranges
+            FLIs[j].update_pulsar_distances(x0s[j], idx_choose)
             acc_idx = 10
         else:
             x0s[j].update_params(new_point)

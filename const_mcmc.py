@@ -5,4 +5,9 @@ eps = {'0_cos_gwtheta':1.e-4,'0_cos_inc':1.e-4,'0_gwphi':1.e-4,'0_log10_fgw':1.e
 use_default_cw0_p_sigma = True
 sigma_cw0_p_phase_default = 0.05
 sigma_cw0_p_dist_default = 0.1
+
 n_phase_jumps = 8
+n_dist_extra = 4
+n_dist_main = 1
+
+
