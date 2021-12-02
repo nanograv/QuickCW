@@ -72,7 +72,7 @@ def get_FastLikeInfo(psrs, pta, params, x0):
 
     resres = get_resres(x0,Nvecs,residuals,invchol_Sigma_TNs)
 
-    return FastLikeInfo(resres,logdet,pos,pdist,toas,invchol_Sigma_TNs,Nvecs,Nrs,max_toa,x0,Npsr,isqrNvecs,residuals)
+    return FastLikeInfo(resres,logdet[()],pos,pdist,toas,invchol_Sigma_TNs,Nvecs,Nrs,max_toa,x0,Npsr,isqrNvecs,residuals)
 
 
 @jitclass([('Npsr',nb.int64),('cw_p_dists',nb.float64[:]),('cw_p_phases',nb.float64[:]),('cos_gwtheta',nb.float64),\
