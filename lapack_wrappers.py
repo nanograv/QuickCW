@@ -68,12 +68,13 @@ def solve_triangular(x,y,lower_a=True,trans_a=True,unitdiag=False):
     else:
         UPLO = np.array([ord('U')], np.int32)
 
+    #TODO why was this in place? added copy to mitigate, ensure nothing relied on that behavior
+    B = y.T.copy().T
+
     #cannot do this operation in place if y is not contiguous, though could copy
-    if not (A.flags.f_contiguous and y.flags.f_contiguous):
+    if not (A.flags.f_contiguous and B.flags.f_contiguous):
         raise ValueError('x must be contiguous and y must be fortran contiguous')
 
-    #TODO why was this in place? added copy to mitigate, ensure nothing relied on that behavior
-    B = y.copy()
 
     if unitdiag:
         DIAG = np.array([ord('U')], np.int32)
@@ -92,7 +93,7 @@ def solve_triangular(x,y,lower_a=True,trans_a=True,unitdiag=False):
     N = np.array(_N, np.int32)
     NRHS = np.array(_NB, np.int32)
     LDA = np.array(_N, np.int32)
-    LDB = np.array(_N, np.int32)
+    LDB = np.array(_LDB, np.int32) #changed from _N
 
     INFO = np.empty(1, dtype=np.int32)
 
@@ -111,5 +112,6 @@ def solve_triangular(x,y,lower_a=True,trans_a=True,unitdiag=False):
              B.ctypes,
              LDB.ctypes,
              INFO.ctypes)
+
     check_info(INFO)
     return B
