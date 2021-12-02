@@ -312,7 +312,7 @@ def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int
         do_extrinsic_block(n_chain, samples, itrb, Ts, x0s, FLIs, FPI, len(par_names), len(par_names_cw_ext), log_likelihood, n_int_block-2, fisher_diag,a_yes_counts,a_no_counts)
         #update intrinsic parameters once a block
         do_intrinsic_update(n_chain, pta, samples, itrb+n_int_block-2, Ts, a_yes_counts, a_no_counts, x0s, FLIs, FastPrior, par_names, par_names_cw_int, log_likelihood, fisher_diag)
-        do_pt_swap(n_chain, samples, itrb+n_int_block-1, Ts, a_yes_counts, a_no_counts, x0s, FLIs, log_likelihood)
+        do_pt_swap(n_chain, samples, itrb+n_int_block-1, Ts, a_yes_counts, a_no_counts, x0s, FLIs, log_likelihood,fisher_diag)
 
     a_yes = summarize_a_ext(a_yes_counts,par_inds_cw_p_phase_ext,par_inds_cw_p_dist_int) #columns: chain number; rows: proposal type (PT, cos_gwtheta, cos_inc, gwphi, fgw, h, mc, phase0, psi, p_phases, p_dists,full extrinsic)
     a_no = summarize_a_ext(a_no_counts,par_inds_cw_p_phase_ext,par_inds_cw_p_dist_int)
@@ -353,7 +353,7 @@ def do_intrinsic_update(n_chain, pta, samples, itrb, Ts, a_yes_counts, a_no_coun
             idx_choose_psr[0] = pta.pulsars.index(par_names_cw_int[jump_select][:-11])
             idx_choose = x0s[j].idx_dists[idx_choose_psr]
         else:
-            jump[jump_idx] = fisher_diag[j, jump_idx]*np.random.normal() #0.1
+            #jump[jump_idx] = fisher_diag[j, jump_idx]*np.random.normal() #0.1
 
             #add some extra jumps because they are free
             #idx_choose_psr = np.random.randint(0,x0s[j].Npsr,cm.n_dist_extra)
@@ -365,7 +365,7 @@ def do_intrinsic_update(n_chain, pta, samples, itrb, Ts, a_yes_counts, a_no_coun
             #idx_choose[1] = jump_idx2
             #idx_choose[2:] = idx_choose_psr
 
-        fisher_diag_loc = fisher_diag[j][idx_choose]
+        fisher_diag_loc = np.sqrt(Ts[j])*fisher_diag[j][idx_choose]
         jump[idx_choose] += fisher_diag_loc*np.random.normal(0.,1.,n_jump_loc)
 
         samples_current = np.copy(samples[j,itrb,:])
@@ -490,7 +490,7 @@ def do_extrinsic_block(n_chain, samples, itrb, Ts, x0s, FLIs, FPI, n_par_tot, n_
 
             jump = np.zeros(n_par_tot)
             jump_idx = x0s[j].idx_cw_ext
-            jump[jump_idx] = 2.38/np.sqrt(n_par_ext)*fisher_diag[j][jump_idx]*np.random.normal(0.,1.,n_par_ext)
+            jump[jump_idx] = 2.38/np.sqrt(n_par_ext)*np.sqrt(Ts[j])*fisher_diag[j][jump_idx]*np.random.normal(0.,1.,n_par_ext)
 
             #jump_select = np.random.randint(0,n_par_ext,cm.n_ext_directions)
             #jump[jump_idx] += fisher_diag[j][jump_idx]*np.random.normal(0.,1.,cm.n_ext_directions)
@@ -534,7 +534,7 @@ def do_extrinsic_block(n_chain, samples, itrb, Ts, x0s, FLIs, FPI, n_par_tot, n_
 
         #print(samples[0,itrb+k+1])
         #print(samples[0,itrb+k+2])
-        do_pt_swap(n_chain, samples, itrb+k+1, Ts, a_yes_counts, a_no_counts, x0s, FLIs, log_likelihood)
+        do_pt_swap(n_chain, samples, itrb+k+1, Ts, a_yes_counts, a_no_counts, x0s, FLIs, log_likelihood,fisher_diag)
         for j in range(0,n_chain):
             assert samples[j,itrb+k+2,x0s[j].idx_cos_gwtheta] == x0s[j].cos_gwtheta
             assert samples[j,itrb+k+2,x0s[j].idx_cos_gwtheta] == FLIs[j].cos_gwtheta
@@ -549,7 +549,7 @@ def do_extrinsic_block(n_chain, samples, itrb, Ts, x0s, FLIs, FPI, n_par_tot, n_
 #
 ################################################################################
 @njit()
-def do_pt_swap(n_chain, samples, itrb, Ts, a_yes_counts, a_no_counts, x0s, FLIs, log_likelihood):
+def do_pt_swap(n_chain, samples, itrb, Ts, a_yes_counts, a_no_counts, x0s, FLIs, log_likelihood,fisher_diag):
     #print("PT")
 
     #print("PT")
@@ -583,16 +583,19 @@ def do_pt_swap(n_chain, samples, itrb, Ts, a_yes_counts, a_no_counts, x0s, FLIs,
     #loop through the chains and record the new samples and log_Ls
     FLIs_new = []
     x0s_new = []
+    fisher_diag_new = np.zeros_like(fisher_diag)
     for j in range(n_chain):
-        samples[j,itrb+1,:] = np.copy(samples[swap_map[j],itrb,:])
+        samples[j,itrb+1,:] = samples[swap_map[j],itrb,:]
+        fisher_diag_new[j,:] = fisher_diag[swap_map[j],:]
         log_likelihood[j,itrb+1] = log_likelihood[swap_map[j],itrb]
         FLIs_new.append(FLIs[swap_map[j]])
         x0s_new.append(x0s[swap_map[j]])
 
+    fisher_diag[:] = fisher_diag_new
     FLIs[:] = List(FLIs_new)
     x0s[:] = List(x0s_new)
 
-def do_pt_swap_alt(n_chain, samples, itrb, Ts, a_yes, a_no, x0s, FLIs, log_likelihood):
+def do_pt_swap_alt(n_chain, samples, itrb, Ts, a_yes, a_no, x0s, FLIs, log_likelihood,fisher_diag):
     """modification to swap routine that is easier to adapt to arbitrary swap proposals"""
     #print("PT")
 
@@ -875,7 +878,7 @@ def get_fisher_diagonal(T_chain, samples_current, par_names, par_names_cw_ext, x
 
 
     #correct for the given temperature of the chain
-    fisher_diag = fisher_diag/T_chain
+    fisher_diag = fisher_diag#/T_chain
 
     #filer out nans and negative values - set them to 1.0 which will result in
     fisher_diag[(~np.isfinite(fisher_diag))|(fisher_diag<0.)] = 1.
