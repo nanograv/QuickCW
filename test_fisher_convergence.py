@@ -448,9 +448,6 @@ if __name__ == '__main__':
         FLIs.append(CWFastLikelihoodNumba.get_FastLikeInfo(psrs, pta, dict(zip(par_names, samples[j, 0, :])), x0s[j]))
 
     #calculate the diagonal elements of the fisher matrix
-    #fisher_diag = np.ones((n_chain, len(par_names)))
-    #for j in range(n_chain):
-    #    fisher_diag[j,:] = get_fisher_diagonal(Ts[j], samples[j,0,:], par_names, par_names_cw_ext, x0s[j], FLIs[j])
     #    print(fisher_diag[j,:])
 
 
@@ -510,6 +507,10 @@ if __name__ == '__main__':
     print('run3 advance time '+str(tf-t0))
     print(FLIs[j].get_lnlikelihood(x0s[j]))
 
+    fisher_diag = np.ones((n_chain, len(par_names)))
+    for j in range(n_chain):
+        fisher_diag[j,:] = get_fisher_diagonal(Ts[j], samples[j,0,:], par_names, par_names_cw_ext, x0s[j], FLIs[j])
+
     #ti_dist4 = perf_counter()
     #n_run4 = 100
     #for mm in range(n_run4):
@@ -544,31 +545,39 @@ if __name__ == '__main__':
     if n_run0>0:
         print('time for updating all distances separately %.5e s'%((tf_dist1-ti_dist1)/n_run1))
 
-    n_fs = 101 
+    n_fs = 201 
     MMs_mat = np.zeros((n_fs,45,4,4))
     NNs_mat = np.zeros((n_fs,45,4))
+    logLs_mat = np.zeros(n_fs)
     #log10fs_try = x0s[j].log10_fgw+np.linspace(-0.5,0.5,n_fs)
-    dists_try = x0s[j].cw_p_dists[0]+np.linspace(-0.5,0.5,n_fs)
+    idx_try = 27
+    dists_try = x0s[j].cw_p_dists[idx_try]+np.linspace(-1.,1.,n_fs)
     for itrf in range(0,n_fs):
         #x0s[j].log10_fgw = log10fs_try[itrf]
-        x0s[j].cw_p_dists[0] = dists_try[itrf]
+        x0s[j].cw_p_dists[idx_try] = dists_try[itrf]
         #FLIs[j].update_intrinsic_params(x0s[j])
-        FLIs[j].update_pulsar_distance(x0s[j],0)
+        FLIs[j].logdet = 0.
+        FLIs[j].resres = 0.
+        FLIs[j].update_pulsar_distance(x0s[j],idx_try)
         MMs_mat[itrf] = FLIs[j].MMs.copy()
         NNs_mat[itrf] = FLIs[j].NN.copy()
+        logLs_mat[itrf] = FLIs[j].get_lnlikelihood(x0s[j])
 
     import matplotlib.pyplot as plt
-    plt.semilogy(dists_try,np.abs(MMs_mat[:,0,0,0]))
-    plt.semilogy(dists_try,np.abs(MMs_mat[:,0,1,1]))
-    plt.semilogy(dists_try,np.abs(MMs_mat[:,0,2,2]))
-    plt.semilogy(dists_try,np.abs(MMs_mat[:,0,3,3]))
+    plt.semilogy(dists_try,np.abs(MMs_mat[:,idx_try,0,0]))
+    plt.semilogy(dists_try,np.abs(MMs_mat[:,idx_try,1,1]))
+    plt.semilogy(dists_try,np.abs(MMs_mat[:,idx_try,2,2]))
+    plt.semilogy(dists_try,np.abs(MMs_mat[:,idx_try,3,3]))
     plt.show()
 
-plt.semilogy(dists_try,np.abs(NNs_mat[:,0,0]))
-plt.semilogy(dists_try,np.abs(NNs_mat[:,0,1]))
-plt.semilogy(dists_try,np.abs(NNs_mat[:,0,2]))
-plt.semilogy(dists_try,np.abs(NNs_mat[:,0,3]))
-plt.show()
+    plt.semilogy(dists_try,np.abs(NNs_mat[:,idx_try,0]))
+    plt.semilogy(dists_try,np.abs(NNs_mat[:,idx_try,1]))
+    plt.semilogy(dists_try,np.abs(NNs_mat[:,idx_try,2]))
+    plt.semilogy(dists_try,np.abs(NNs_mat[:,idx_try,3]))
+    plt.show()
+
+    plt.plot(dists_try,logLs_mat)
+    plt.show()
     import sys
     sys.exit()
 

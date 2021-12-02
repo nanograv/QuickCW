@@ -223,7 +223,7 @@ def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int
     #calculate the diagonal elements of the fisher matrix
     fisher_diag = np.ones((n_chain, len(par_names)))
     for j in range(n_chain):
-        fisher_diag[j,:] = get_fisher_diagonal(Ts[j], samples[j,0,:], par_names, par_names_cw_ext, x0s[j], FLIs[j])
+        fisher_diag[j,:] = get_fisher_diagonal(Ts[j], samples[j,0,:], samples[j,0,:], par_names, par_names_cw_ext, x0s[j], FLIs[j])
         print(fisher_diag[j,:])
 
 
@@ -291,10 +291,6 @@ def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int
             log_likelihood = np.zeros((n_chain,save_every_n+1))
             samples[:,0,:] = np.copy(samples_now)
             log_likelihood[:,0] = np.copy(log_likelihood_now)
-        if itrn%n_update_fisher==0 and i!=0:
-            print("Updating Fisher diagonals")
-            for j in range(n_chain):
-                fisher_diag[j,:] = get_fisher_diagonal(Ts[j], samples[j,itrb,:], par_names, par_names_cw_ext, x0s[j], FLIs[j])
         if itrn%(N//n_status_update)==0:
             a_yes = summarize_a_ext(a_yes_counts,par_inds_cw_p_phase_ext,par_inds_cw_p_dist_int) #columns: chain number; rows: proposal type (PT, cos_gwtheta, cos_inc, gwphi, fgw, h, mc, phase0, psi, p_phases, p_dists,full extrinsic)
             a_no = summarize_a_ext(a_no_counts,par_inds_cw_p_phase_ext,par_inds_cw_p_dist_int)
@@ -313,6 +309,12 @@ def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int
         #update intrinsic parameters once a block
         do_intrinsic_update(n_chain, pta, samples, itrb+n_int_block-2, Ts, a_yes_counts, a_no_counts, x0s, FLIs, FastPrior, par_names, par_names_cw_int, log_likelihood, fisher_diag)
         do_pt_swap(n_chain, samples, itrb+n_int_block-1, Ts, a_yes_counts, a_no_counts, x0s, FLIs, log_likelihood,fisher_diag)
+
+        if itrn%n_update_fisher==0 and i!=0:
+            print("Updating Fisher diagonals")
+            for j in range(n_chain):
+                #compute fisher matrix at random recent points in the posterior
+                fisher_diag[j,:] = get_fisher_diagonal(Ts[j], samples[j,itrb+n_int_block], samples[0,np.random.randint(itrb+n_int_block+1),:], par_names, par_names_cw_ext, x0s[j], FLIs[j])
 
     a_yes = summarize_a_ext(a_yes_counts,par_inds_cw_p_phase_ext,par_inds_cw_p_dist_int) #columns: chain number; rows: proposal type (PT, cos_gwtheta, cos_inc, gwphi, fgw, h, mc, phase0, psi, p_phases, p_dists,full extrinsic)
     a_no = summarize_a_ext(a_no_counts,par_inds_cw_p_phase_ext,par_inds_cw_p_dist_int)
@@ -425,13 +427,13 @@ def do_intrinsic_update(n_chain, pta, samples, itrb, Ts, a_yes_counts, a_no_coun
             samples[j,itrb+1,:] = np.copy(new_point)
 
             log_likelihood[j,itrb+1] = log_L
-            a_yes_counts[idx_choose] += 1
+            a_yes_counts[idx_choose,j] += 1
         else:
             samples[j,itrb+1,:] = np.copy(samples_current)#np.copy(samples[j,i%save_every_n,:])
 
             log_likelihood[j,itrb+1] = log_likelihood[j,itrb]
 
-            a_no_counts[idx_choose] += 1
+            a_no_counts[idx_choose,j] += 1
 
             x0s[j].update_params(samples_current)
 
@@ -696,20 +698,24 @@ def do_draw_from_prior(n_chain, pta, samples, i, Ts, a_yes, a_no, x0s, FLIs, Fas
 #CALCULATE FISHER DIAGONAL
 #
 ################################################################################
-def get_fisher_diagonal(T_chain, samples_current, par_names, par_names_cw_ext, x0, FLI_loc):
+def get_fisher_diagonal(T_chain, samples_old, samples_fisher, par_names, par_names_cw_ext, x0, FLI_loc):
     dim = len(par_names)
     fisher_diag = np.zeros(dim)
 
+    logdet_old = FLI_loc.logdet
+    resres_old = FLI_loc.resres
+    MMs_old = FLI_loc.MMs.copy()
+    NN_old = FLI_loc.NN.copy()
+
+    x0.update_params(samples_fisher)
+    FLI_loc.update_intrinsic_params(x0)
     MMs_orig = FLI_loc.MMs.copy()
     NN_orig = FLI_loc.NN.copy()
-    logdet_orig = FLI_loc.logdet
-    resres_orig = FLI_loc.resres
 
     FLI_loc.logdet = 0.
     FLI_loc.resres = 0.
 
     nn = FLI_loc.get_lnlikelihood(x0)#,FLI_loc.resres,FLI_loc.logdet,FLI_loc.pos,FLI_loc.pdist,FLI_loc.NN,FLI_loc.MMs)
-
 
     #future locations
     mms = np.zeros(dim)
@@ -719,8 +725,8 @@ def get_fisher_diagonal(T_chain, samples_current, par_names, par_names_cw_ext, x
 
     #calculate diagonal elements
     for i in range(dim):
-        paramsPP = np.copy(samples_current)
-        paramsMM = np.copy(samples_current)
+        paramsPP = np.copy(samples_fisher)
+        paramsMM = np.copy(samples_fisher)
 
         if '_cw0_p_phase' in par_names[i]:
             if cm.use_default_cw0_p_sigma:
@@ -754,7 +760,7 @@ def get_fisher_diagonal(T_chain, samples_current, par_names, par_names_cw_ext, x
                 mms[i] = FLI_loc.get_lnlikelihood(x0)#FLI_loc.resres,FLI_loc.logdet,FLI_loc.pos,FLI_loc.pdist,FLI_loc.NN,FLI_loc.MMs)
 
                 #revert changes
-                x0.update_params(samples_current)
+                x0.update_params(samples_fisher)
 
                 FLI_loc.MMs[:] = MMs_orig
                 FLI_loc.NN[:] = NN_orig
@@ -786,7 +792,7 @@ def get_fisher_diagonal(T_chain, samples_current, par_names, par_names_cw_ext, x
             mms[i] = FLI_loc.get_lnlikelihood(x0)#FLI_loc.resres,FLI_loc.logdet,FLI_loc.pos,FLI_loc.pdist,FLI_loc.NN,FLI_loc.MMs)
 
             #revert changes
-            x0.update_params(samples_current)
+            x0.update_params(samples_fisher)
 
             #calculate diagonal elements of the Hessian from a central finite element scheme
             #note the minus sign compared to the regular Hessian
@@ -823,7 +829,7 @@ def get_fisher_diagonal(T_chain, samples_current, par_names, par_names_cw_ext, x
                 mms[i] = FLI_loc.get_lnlikelihood(x0)#,FLI_loc.resres,FLI_loc.logdet,FLI_loc.pos,FLI_loc.pdist,FLI_loc.NN,FLI_loc.MMs)
 
                 #revert changes
-                x0.update_params(samples_current)
+                x0.update_params(samples_fisher)
 
                 FLI_loc.MMs[:] = MMs_orig
                 FLI_loc.NN[:] = NN_orig
@@ -854,7 +860,7 @@ def get_fisher_diagonal(T_chain, samples_current, par_names, par_names_cw_ext, x
             mms[i] = FLI_loc.get_lnlikelihood(x0)#,FLI_loc.resres,FLI_loc.logdet,FLI_loc.pos,FLI_loc.pdist,FLI_loc.NN,FLI_loc.MMs)
 
             #revert changes
-            x0.update_params(samples_current)
+            x0.update_params(samples_fisher)
 
             FLI_loc.MMs[:] = MMs_orig
             FLI_loc.NN[:] = NN_orig
@@ -868,13 +874,18 @@ def get_fisher_diagonal(T_chain, samples_current, par_names, par_names_cw_ext, x
             #note the minus sign compared to the regular Hessian
             fisher_diag[i] = -(pps[i] - 2*nn + mms[i])/(4*epsilon*epsilon)
 
-    FLI_loc.resres = resres_orig
-    FLI_loc.logdet = logdet_orig
+    #revert everything to original point
+    x0.update_params(samples_old)
+    FLI_loc.resres = resres_old
+    FLI_loc.logdet = logdet_old
+    FLI_loc.MMs = MMs_old
+    FLI_loc.NN = NN_old
 
-    assert FLI_loc.cos_gwtheta == x0.cos_gwtheta
-    assert FLI_loc.gwphi == x0.gwphi
-    assert FLI_loc.log10_fgw == x0.log10_fgw
-    assert FLI_loc.log10_mc == x0.log10_mc#
+    #revert tracking safety parameters
+    FLI_loc.cos_gwtheta = x0.cos_gwtheta
+    FLI_loc.gwphi = x0.gwphi
+    FLI_loc.log10_fgw = x0.log10_fgw
+    FLI_loc.log10_mc = x0.log10_mc#
 
 
     #correct for the given temperature of the chain
