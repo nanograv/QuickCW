@@ -335,9 +335,6 @@ def update_intrinsic_params(x0,isqNvecs,Nrs,pos,pdist,toas,NN,MMs,SigmaTNrProds,
         pcNec = 0.
         pcNps = 0.
 
-
-
-
         #get the sin and cosine parts
         ET_sin  = np.zeros(invCholSigmaTN.shape[1])
         ET_cos  = np.zeros(invCholSigmaTN.shape[1])
@@ -464,28 +461,6 @@ def update_intrinsic_params(x0,isqNvecs,Nrs,pos,pdist,toas,NN,MMs,SigmaTNrProds,
         MM[1,2] = MM[2,1]
         MM[1,3] = MM[3,1]
         MM[2,3] = MM[3,2]
-        try:
-            eig_val, eig_vec = np.linalg.eigh(MM)
-            if np.min(eig_val)<0.0: #if there are negative eigenvalues in the matrix
-                eig_val_fix = np.where(eig_val>0.0, eig_val, 1.0) #make them 1.0 (which is smaller than the typical eigenvalue we see (1e10)
-                MM = np.dot(np.dot(eig_vec,np.diag(eig_val_fix)), eig_vec.T) #and reconstruct the matrix with the fixed eigenvalues
-            eigv_val, eigv_vec = np.linalg.eigh(MM)
-            if np.min(eigv_val)<10.0:
-                print(MM)
-                print(np.linalg.eigh(MM))
-                print(x0.log10_fgw)
-                print(x0.log10_mc)
-                print(x0.cos_gwtheta)
-                print(x0.gwphi)
-                print(x0.cw_p_dists)
-        except:
-            print("M matrix error")
-            print(MM)
-            print(x0.log10_fgw)
-            print(x0.log10_mc)
-            print(x0.cos_gwtheta)
-            print(x0.gwphi)
-            print(x0.cw_p_dists)
 
         #if dist_only:
         #    MM[0:2,0:2] = MMs[ii,0:2,0:2]
