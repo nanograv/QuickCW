@@ -108,7 +108,6 @@ class CWInfo:
     def update_params(self,params_in):
         self.cw_p_phases = params_in[self.idx_phases]
         self.cw_p_dists = params_in[self.idx_dists]
-
         self.cos_inc = params_in[self.idx_cos_inc]
         self.log10_h = params_in[self.idx_log10_h]
         self.phase0 = params_in[self.idx_phase0]
@@ -117,7 +116,6 @@ class CWInfo:
         self.gwphi = params_in[self.idx_gwphi]
         self.log10_fgw = params_in[self.idx_log10_fgw]
         self.log10_mc = params_in[self.idx_log10_mc]
-
 
 @njit()
 def get_lnlikelihood_helper(x0,resres,logdet,pos,pdist,NN,MMs):
@@ -286,6 +284,7 @@ def get_resres(x0,Nvecs,residuals,invchol_Sigma_TNs):
 
     return resres
 
+  
 @njit(fastmath=True,parallel=True)
 def update_intrinsic_params(x0,isqNvecs,Nrs,pos,pdist,toas,NN,MMs,SigmaTNrProds,invchol_Sigma_TNs,idxs,dist_only=True):
     '''Calculate inner products N=(res|S), M=(S|S)'''
@@ -465,6 +464,28 @@ def update_intrinsic_params(x0,isqNvecs,Nrs,pos,pdist,toas,NN,MMs,SigmaTNrProds,
         MM[1,2] = MM[2,1]
         MM[1,3] = MM[3,1]
         MM[2,3] = MM[3,2]
+        try:
+            eig_val, eig_vec = np.linalg.eigh(MM)
+            if np.min(eig_val)<0.0: #if there are negative eigenvalues in the matrix
+                eig_val_fix = np.where(eig_val>0.0, eig_val, 1.0) #make them 1.0 (which is smaller than the typical eigenvalue we see (1e10)
+                MM = np.dot(np.dot(eig_vec,np.diag(eig_val_fix)), eig_vec.T) #and reconstruct the matrix with the fixed eigenvalues
+            eigv_val, eigv_vec = np.linalg.eigh(MM)
+            if np.min(eigv_val)<10.0:
+                print(MM)
+                print(np.linalg.eigh(MM))
+                print(x0.log10_fgw)
+                print(x0.log10_mc)
+                print(x0.cos_gwtheta)
+                print(x0.gwphi)
+                print(x0.cw_p_dists)
+        except:
+            print("M matrix error")
+            print(MM)
+            print(x0.log10_fgw)
+            print(x0.log10_mc)
+            print(x0.cos_gwtheta)
+            print(x0.gwphi)
+            print(x0.cw_p_dists)
 
         #if dist_only:
         #    MM[0:2,0:2] = MMs[ii,0:2,0:2]
@@ -509,7 +530,6 @@ class FastLikeInfo:
         self.MMs = np.zeros((Npsr,4,4))
         self.NN = np.zeros((Npsr,4))
         self.update_intrinsic_params(x0)
-
 
     def get_lnlikelihood(self,x0):
         """wrapper to get the log likelihood"""
