@@ -469,6 +469,7 @@ def correct_extrinsic(sample,x0):
     #TODO check these are the right parameters to be shifting
     sample[x0.idx_cos_inc],sample[x0.idx_psi] = reflect_cosines(sample[x0.idx_cos_inc],sample[x0.idx_psi],np.pi/2,np.pi)
     sample[x0.idx_phase0] = sample[x0.idx_phase0]%(2*np.pi)
+    sample[x0.idx_phases] = sample[x0.idx_phases]%(2*np.pi)
     return sample
 
 @njit()
