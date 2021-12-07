@@ -131,8 +131,8 @@ def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int
 
     #s = ef + eq + ec + rn + crn + cw + tm
     #s = ef + eq + ec + rn + cw + tm
-    #s = ef + eq + ec + cw + tm
-    s = ef + cw + tm
+    s = ef + eq + ec + cw + tm
+    #s = ef + cw + tm
 
     models = [s(psr) for psr in psrs]
 
@@ -144,7 +144,7 @@ def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int
     #print(noisedict)
     pta.set_default_params(noisedict)
 
-    #print(pta.summary())
+    print(pta.summary())
     print(pta.params)
 
     FastPrior = CWFastPrior.FastPrior(pta)
@@ -304,7 +304,7 @@ def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int
             #print(acc_fraction[:,0])
             #print(acc_fraction[:,-1])
             print("New log_L=", str(FLIs[0].get_lnlikelihood(x0s[0])))#,FLIs[0].resres,FLIs[0].logdet,FLIs[0].pos,FLIs[0].pdist,FLIs[0].NN,FLIs[0].MMs)))
-            #print("Old log_L=", str(pta.get_lnlikelihood(samples[0,(i*n_int_block)%save_every_n,:])))
+            #print("Old log_L=", str(pta.get_lnlikelihood(samples[0,itrb,:])))
 
         #always do pt steps in extrinsic
         do_extrinsic_block(n_chain, samples, itrb, Ts, x0s, FLIs, FPI, len(par_names), len(par_names_cw_ext), log_likelihood, n_int_block-2, fisher_diag,a_yes_counts,a_no_counts)
