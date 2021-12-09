@@ -7,6 +7,8 @@ use_default_cw0_p_sigma = False
 sigma_cw0_p_phase_default = 0.1
 sigma_cw0_p_dist_default = 0.5
 
+use_default_noise_sigma = True
+sigma_noise_default = 0.1
 
 #jump parameters to control number of eigendirections
 
@@ -15,6 +17,8 @@ n_phase_extra = 16
 
 n_dist_extra = 4
 n_dist_main = 16
+
+n_noise_main = 10
 
 #indexes of summary variables
 idx_PT = -2
