@@ -46,7 +46,7 @@ functype = ctypes.CFUNCTYPE(None,
                             )
 dtrtrs_fn = functype(addr)
 @njit()
-def solve_triangular(x,y,lower_a=True,trans_a=True,unitdiag=False):
+def solve_triangular(x,y,lower_a=True,trans_a=True,unitdiag=False,overwrite_b=False):
     """solve x*B=y where x is a triangular matrix, note y must be fortran ordered and x must be either type of contiguous"""
     #if the input matrix is c contiguous but not fortran contiguous
     #transposing it will make it fortran contiguous with no copying
@@ -69,7 +69,10 @@ def solve_triangular(x,y,lower_a=True,trans_a=True,unitdiag=False):
         UPLO = np.array([ord('U')], np.int32)
 
     #TODO why was this in place? added copy to mitigate, ensure nothing relied on that behavior
-    B = y.T.copy().T
+    if overwrite_b:
+        B = y
+    else:
+        B = y.T.copy().T
 
     #cannot do this operation in place if y is not contiguous, though could copy
     if not (A.flags.f_contiguous and B.flags.f_contiguous):
