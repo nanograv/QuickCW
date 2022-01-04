@@ -52,7 +52,7 @@ import const_mcmc as cm
 #MAIN MCMC ENGINE
 #
 ################################################################################
-def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int_block=1000, save_every_n=10_000, thin=10, savefile=None, n_update_fisher=100_000):
+def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int_block=1000, save_every_n=10_000, thin=10, samples_precision=np.single, savefile=None, n_update_fisher=100_000):
     #freq = 1e-8
     #safety checks on input variables
     assert n_int_block%2==0 and n_int_block>=4 #need to have n_int block>=4 a multiple of 2
@@ -290,7 +290,7 @@ def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int
                 else:
                     print("Create HDF5 file...")
                     with h5py.File(savefile, 'w') as f:
-                        f.create_dataset('samples_cold', data=samples[0,:-1:thin,:], compression="gzip", chunks=True, maxshape=(int(N/thin),samples.shape[2]))
+                        f.create_dataset('samples_cold', data=samples[0,:-1:thin,:], dtype=samples_precision, compression="gzip", chunks=True, maxshape=(int(N/thin),samples.shape[2]))
                         f.create_dataset('log_likelihood', data=log_likelihood[:,:-1:thin], compression="gzip", chunks=True, maxshape=(samples.shape[0],int(N/thin)))
                         f.create_dataset('par_names', data=np.array(par_names, dtype='S'))
                         f.create_dataset('acc_fraction', data=acc_fraction)
