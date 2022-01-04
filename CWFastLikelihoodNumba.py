@@ -5,75 +5,132 @@ import numba as nb
 from numba import njit,prange
 from numba.experimental import jitclass
 from numba.typed import List
+import scipy.linalg
 
 from enterprise import constants as const
 from lapack_wrappers import solve_triangular
 
 import const_mcmc as cm
 
-def get_FastLikeInfo(psrs, pta, params, x0):
-    """
-    get Class for the fast CW likelihood.
-    :param pta: `enterprise` pta object.
-    :param params: Dictionary of noise parameters.
-    :param x0: CWInfo, which is partially redundant with params but better handled by numba
-    """
-    Npsr = x0.Npsr
+class FastLikeMaster:
+    """class to store pta things so they do not have to be recomputed when red noise is recomputed"""
+    def __init__(self,psrs,pta,params,x0):
+        """
+        get Class for generating the fast CW likelihood.
+        :param pta: `enterprise` pta object.
+        :param params: Dictionary of noise parameters.
+        :param x0: CWInfo, which is partially redundant with params but better handled by numba
+        """
+        self.Npsr = x0.Npsr
+        self.pta = pta
 
-    #put the positions into an array
-    pos = np.zeros((Npsr,3))
-    pdist = np.zeros((Npsr,2))
-    for i,psr in enumerate(psrs):
-        pos[i] = psr.pos
-        pdist[i] = psr.pdist
+        #put the positions into an array
+        self.pos = np.zeros((self.Npsr,3))
+        self.pdist = np.zeros((self.Npsr,2))
+        for i,psr in enumerate(psrs):
+            self.pos[i] = psr.pos
+            self.pdist[i] = psr.pdist
 
-    #get the N vects without putting them in a matrix
-    Nvecs = List(pta.get_ndiag(params))
-    
+        #get the N vects without putting them in a matrix
+        self.Nvecs = List(self.pta.get_ndiag(params))
 
-    #get the part of the determinant that can be computed right now
-    logdet = 0.0
-    for (l,m) in pta.get_rNr_logdet(params):
-        logdet += m
-    #self.logdet += np.sum([m for (l,m) in self.pta.get_rNr_logdet(self.params)])
 
-    #get the other pta results
-    TNTs = pta.get_TNT(params)
-    Ts = pta.get_basis()
-    pls_temp = pta.get_phiinv(params, logdet=True, method='partition')
+        #get the part of the determinant that can be computed right now
+        self.logdet = 0.0
+        for (l,m) in self.pta.get_rNr_logdet(params):
+            self.logdet += m
+        #self.logdet += np.sum([m for (l,m) in self.pta.get_rNr_logdet(self.params)])
 
-    #invchol_Sigma_Ts = List()
-    invchol_Sigma_TNs = List()#List([invchol_Sigma_Ts[i]/Nvecs[i] for i in range(self.Npsr)])
-    Nrs = List()
-    isqrNvecs = List()
-    #unify types outside numba to avoid slowing down compilation
-    #also add more components to logdet
+        #get the other pta results
+        self.TNTs = self.pta.get_TNT(params)
+        Ts = self.pta.get_basis()
 
-    #put toas and residuals into a numba typed List of arrays, which shouldn't require any actual copies
-    toas = List([psr.toas for psr in psrs])
-    residuals = List([psr.residuals for psr in psrs])
+        #invchol_Sigma_Ts = List()
+        self.Nrs = List()
+        self.isqrNvecs = List()
+        #unify types outside numba to avoid slowing down compilation
+        #also add more components to logdet
 
-    max_toa = np.max(toas[0])
+        #put toas and residuals into a numba typed List of arrays, which shouldn't require any actual copies
+        self.toas = List([psr.toas for psr in psrs])
+        self.residuals = List([psr.residuals for psr in psrs])
 
-    for i in range(Npsr):
-        phiinv_loc,logdetphi_loc = pls_temp[i]
-        chol_Sigma = np.linalg.cholesky(TNTs[i]+(np.diag(phiinv_loc) if phiinv_loc.ndim == 1 else phiinv_loc))
-        #invchol_Sigma_Ts.append(solve_triangular(chol_Sigma,Ts[i].T,lower_a=True,trans_a=False))
-        invchol_Sigma_T_loc = solve_triangular(chol_Sigma,Ts[i].T,lower_a=True,trans_a=False)
-        isqrNvecs.append(1/np.sqrt(Nvecs[i]))
-        Nrs.append(residuals[i]/np.sqrt(Nvecs[i]))
-        invchol_Sigma_TNs.append(np.ascontiguousarray(invchol_Sigma_T_loc/np.sqrt(Nvecs[i])))
+        self.resres_rNr = 0.
+        self.TNvs = List()
+        self.dotTNrs = List()
+        for i in range(self.Npsr):
+            self.isqrNvecs.append(1/np.sqrt(self.Nvecs[i]))
+            self.Nrs.append(self.residuals[i]/np.sqrt(self.Nvecs[i]))
+            self.resres_rNr += np.dot(self.Nrs[i], self.Nrs[i])
+            self.TNvs.append((Ts[i].T/np.sqrt(self.Nvecs[i])).copy().T) #store F contiguous version
+            self.dotTNrs.append(np.dot(self.Nrs[i],self.TNvs[i]))
 
-        #find the latest arriving signal to prohibit signals that have already merged
-        max_toa = max(max_toa,np.max(toas[i]))
+        #put the rnr part of resres onto logdet
+        self.logdet = self.resres_rNr+self.logdet
 
-        #add the necessary component to logdet
-        logdet += logdetphi_loc+np.sum(2 * np.log(np.diag(chol_Sigma)))
+        self.max_toa = np.max(self.toas[0])
+        for i in range(self.Npsr):
+            #find the latest arriving signal to prohibit signals that have already merged
+            self.max_toa = max(self.max_toa,np.max(self.toas[i]))
 
-    resres = get_resres(x0,Nvecs,residuals,invchol_Sigma_TNs)
+    def get_new_FastLike(self,x0,params):
+        chol_Sigmas = List()
+        for i in range(self.Npsr):
+            chol_Sigmas.append(np.identity((self.TNvs[i].shape[1])).T) #temporary but can't be 0 or else the initialization of FLI will crash
 
-    return FastLikeInfo(resres,logdet,pos,pdist,toas,invchol_Sigma_TNs,Nvecs,Nrs,max_toa,x0,Npsr,isqrNvecs,residuals)
+        FLI = FastLikeInfo(self.logdet,self.pos,self.pdist,self.toas,self.Nvecs,self.Nrs,self.max_toa,x0,self.Npsr,self.isqrNvecs,self.TNvs,self.dotTNrs,chol_Sigmas)
+        return self.recompute_FastLike(FLI,x0,params)
 
+    def recompute_FastLike(self,FLI,x0,params):
+        pls_temp = self.pta.get_phiinv(params, logdet=True, method='partition')
+
+        for i in range(self.Npsr):
+            phiinv_loc,logdetphi_loc = pls_temp[i]
+            if phiinv_loc.ndim == 1:
+                #Sigma_alt = self.TNTs[i]+np.diag(phiinv_loc)
+                #overwrite old chol_Sigma so can be done without allocating new array
+                Sigma = create_Sigma(phiinv_loc,self.TNTs[i],FLI.chol_Sigmas[i].T)
+                #assert np.allclose(Sigma,Sigma_alt)
+            else:
+                Sigma = self.TNTs[i]+phiinv_loc
+
+            #mutate inplace to avoid memory allocation overheads
+            chol_Sigma,lower = scipy.linalg.cho_factor(Sigma.T,lower=True,overwrite_a=True,check_finite=False)
+
+            logdet_Sigma_loc = logdet_Sigma_helper(chol_Sigma)#2 * np.sum(np.log(np.diag(chol_Sigma)))
+
+           #this should be mutated in place but assign it anyway to be safe
+            FLI.chol_Sigmas[i][:] = chol_Sigma
+
+            #add the necessary component to logdet
+            FLI.logdet_array[i] = logdetphi_loc+logdet_Sigma_loc
+
+
+        #set logdet
+        FLI.logdet = FLI.logdet_base+FLI.logdet_array.sum()
+        FLI.update_intrinsic_params(x0)
+
+        return FLI#FastLikeInfo(resres,logdet,self.pos,self.pdist,self.toas,invchol_Sigma_TNs,self.Nvecs,self.Nrs,self.max_toa,x0,self.Npsr,self.isqrNvecs,self.residuals)
+
+@njit(parallel=True,fastmath=True)
+def logdet_Sigma_helper(chol_Sigma):
+    """get logdet sigma from cholesky"""
+    res = 0.
+    for itrj in prange(0,chol_Sigma.shape[0]):
+        res += np.log(chol_Sigma[itrj,itrj]) 
+    return 2*res
+
+
+@njit(parallel=True,fastmath=True)
+def create_Sigma(phiinv_loc,TNT,Sigma):
+    """create just the upper triangle of the Sigma matrix with phiinv_loc added to the diagonal, lower triangle will be garbage"""
+    #Sigma = np.zeros((phiinv_loc.size,phiinv_loc.size))
+    for itrj1 in prange(0,phiinv_loc.size):
+        Sigma[itrj1,itrj1] = TNT[itrj1,itrj1]+phiinv_loc[itrj1]
+        for itrj2 in prange(itrj1+1,phiinv_loc.size):
+            Sigma[itrj1,itrj2] = TNT[itrj1,itrj2]
+    #for itrj1 in prange(0,phiinv_loc.size):
+    return Sigma
 
 @jitclass([('Npsr',nb.int64),('cw_p_dists',nb.float64[:]),('cw_p_phases',nb.float64[:]),('cos_gwtheta',nb.float64),\
         ('cos_inc',nb.float64),('gwphi',nb.float64),('log10_fgw',nb.float64),('log10_h',nb.float64),\
@@ -81,7 +138,7 @@ def get_FastLikeInfo(psrs, pta, params, x0):
         ('idx_phases',nb.int64[:]),('idx_dists',nb.int64[:]),('idx_rn_gammas',nb.int64[:]),('idx_rn_log10_As',nb.int64[:]),\
         ('idx_cos_gwtheta',nb.int64),('idx_cos_inc',nb.int64),\
         ('idx_gwphi',nb.int64),('idx_log10_fgw',nb.int64),('idx_log10_mc',nb.int64),('idx_log10_h',nb.int64),('idx_phase0',nb.int64),('idx_psi',nb.int64),
-        ('idx_cw_ext',nb.int64[:])])
+        ('idx_cw_ext',nb.int64[:]),('rn_gammas',nb.float64[:]),('rn_log10_As',nb.float64[:])])
 class CWInfo:
     """simple jitclass to store the various parmeters in a way that can be accessed quickly from a numba environment"""
     def __init__(self,Npsr,params_in,par_names,par_names_cw_ext):
@@ -120,6 +177,8 @@ class CWInfo:
         self.gwphi = params_in[self.idx_gwphi]
         self.log10_fgw = params_in[self.idx_log10_fgw]
         self.log10_mc = params_in[self.idx_log10_mc]
+        self.rn_gammas = params_in[self.idx_rn_gammas]
+        self.rn_log10_As = params_in[self.idx_rn_log10_As]
 
 @njit()
 def get_lnlikelihood_helper(x0,resres,logdet,pos,pdist,NN,MMs):
@@ -288,7 +347,232 @@ def get_resres(x0,Nvecs,residuals,invchol_Sigma_TNs):
 
     return resres
 
-  
+@njit(fastmath=True,parallel=True)
+def update_intrinsic_params2(x0,isqNvecs,Nrs,pos,pdist,toas,NN,MMs,TNvs,chol_Sigmas,idxs,resres_array,dotTNrs):
+    '''Calculate inner products N=(res|S), M=(S|S)'''
+
+    w0 = np.pi * 10.0**x0.log10_fgw
+    mc = 10.0**x0.log10_mc * const.Tsun
+    gwtheta = np.arccos(x0.cos_gwtheta)
+
+    sin_gwtheta = np.sin(gwtheta)
+    cos_gwtheta = np.cos(gwtheta)
+    sin_gwphi = np.sin(x0.gwphi)
+    cos_gwphi = np.cos(x0.gwphi)
+
+    omhat = np.array([-sin_gwtheta * cos_gwphi, -sin_gwtheta * sin_gwphi, -cos_gwtheta])
+
+
+
+    for ii in idxs:
+        MM = np.zeros((4, 4))
+
+        cosMu = -np.dot(omhat, pos[ii])
+
+        p_dist = (pdist[ii,0] + pdist[ii,1]*x0.cw_p_dists[ii])*(const.kpc/const.c)
+
+        omega_p013 = np.sqrt(np.sqrt(np.sqrt((1. + 256./5. * mc**(5/3) * w0**(8/3) * p_dist*(1-cosMu)))))
+
+        #get the solution to Lx=a for N, note this uses my own numba compatible lapack wrapper but is basically the same as scipy
+        #invCholSigmaTN = invchol_Sigma_TNs[ii]
+        #SigmaTNrProd = SigmaTNrProds[ii]
+
+        #divide the signals by N
+        Nr = Nrs[ii]#residuals[ii]/Nvecs[ii]
+        isqNvec = isqNvecs[ii]
+        toas_in = toas[ii]
+        TNv = TNvs[ii]
+        chol_Sigma = chol_Sigmas[ii]
+        dotTNr = dotTNrs[ii]
+        #resres_array[ii] = 0.
+        n1,n2 = TNv.shape
+
+        esNr = 0.
+        ecNr = 0.
+        psNr = 0.
+        pcNr = 0.
+
+        esNes = 0.
+        ecNec = 0.
+        psNps = 0.
+        pcNpc = 0.
+
+        ecNes = 0.
+        psNes = 0.
+        pcNes = 0.
+        psNec = 0.
+        pcNec = 0.
+        pcNps = 0.
+
+        #get the sin and cosine parts
+        ET_sin  = np.zeros(n1)
+        ET_cos  = np.zeros(n1)
+
+        PT_sin  = np.zeros(n1)
+        PT_cos  = np.zeros(n1)
+
+        #break out this loop instead of using numpy syntax so we don't have to store omegas and phases ever
+        for itrk in prange(n1):
+            #set up filters
+            toas_loc = toas_in[itrk] - cm.tref
+            #NOTE factored out the common w0 into factor of w0**(-5/3) in phase, cancels in ratios
+            #also replace omega with 1/omega**(1/3), which is the quantity we actually need
+            #if sqrt is a native cpu function 3 sqrts will probably be faster than taking the eigth root
+            omega13 = np.sqrt(np.sqrt(np.sqrt((1. - 256./5. * mc**(5./3.) * w0**(8./3.) * toas_loc))))
+            phase = 1/32/mc**(5/3) * w0**(-5/3) * (1. - omega13**5)
+
+            tp = toas_loc - p_dist*(1-cosMu)
+            omega_p13 = np.sqrt(np.sqrt(np.sqrt((1./omega_p013**8 - 256./5. * mc**(5/3) * w0**(8/3) / omega_p013**8 * tp))))
+
+            phase_p = 1/32*mc**(-5/3) * w0**(-5/3) * omega_p013**5 * (1. - omega_p13**5)
+
+            PT_amp = isqNvec[itrk] * omega_p13
+            ET_amp = isqNvec[itrk] * omega13
+
+            PT_sin[itrk] = PT_amp * np.sin(2*phase_p)
+            PT_cos[itrk] = PT_amp * np.cos(2*phase_p)
+
+
+            ET_sin[itrk] = ET_amp * np.sin(2*phase)
+            ET_cos[itrk] = ET_amp * np.cos(2*phase)
+
+            #get the results
+
+
+            psNps += PT_sin[itrk]*PT_sin[itrk]
+            pcNpc += PT_cos[itrk]*PT_cos[itrk]
+
+            psNes += PT_sin[itrk]*ET_sin[itrk]
+            pcNes += PT_cos[itrk]*ET_sin[itrk]
+            psNec += PT_sin[itrk]*ET_cos[itrk]
+            pcNec += PT_cos[itrk]*ET_cos[itrk]
+            pcNps += PT_cos[itrk]*PT_sin[itrk]
+
+            #these segments aren't the time limiting factor so we don't see any real speedup from skipping them
+            #if not dist_only:
+            #Nes = iNvec[itrk]*ET_sin[itrk]
+            #Nec = iNvec[itrk]*ET_cos[itrk]
+            esNes += ET_sin[itrk]*ET_sin[itrk]
+            ecNec += ET_cos[itrk]*ET_cos[itrk]
+            ecNes += ET_cos[itrk]*ET_sin[itrk]
+
+            psNr += Nr[itrk]*PT_sin[itrk]
+            pcNr += Nr[itrk]*PT_cos[itrk]
+            esNr += Nr[itrk]*ET_sin[itrk]
+            ecNr += Nr[itrk]*ET_cos[itrk]
+
+        dotSigmaTNrr  = 0.
+        dotSigmaTNesr = 0.
+        dotSigmaTNecr = 0.
+        dotSigmaTNpsr = 0.
+        dotSigmaTNpcr = 0.
+
+        dotSigmaTNes = 0.
+        dotSigmaTNec = 0.
+        dotSigmaTNps = 0.
+        dotSigmaTNpc = 0.
+
+        dotSigmaTNeces = 0.
+        dotSigmaTNpses = 0.
+        dotSigmaTNpces = 0.
+        dotSigmaTNpsec = 0.
+        dotSigmaTNpcec = 0.
+        dotSigmaTNpcps = 0.
+
+        dotTNes = np.zeros(n2)
+        dotTNec = np.zeros(n2)
+        dotTNps = np.zeros(n2)
+        dotTNpc = np.zeros(n2)
+        #dotTNr  = np.zeros(n2)
+
+        for itrj in prange(n2):
+            for itrk in prange(n1):
+                dotTNes[itrj] += TNv[itrk,itrj]*ET_sin[itrk]
+                dotTNec[itrj] += TNv[itrk,itrj]*ET_cos[itrk]
+                dotTNps[itrj] += TNv[itrk,itrj]*PT_sin[itrk]
+                dotTNpc[itrj] += TNv[itrk,itrj]*PT_cos[itrk]
+        #        dotTNr[itrj]  += TNv[itrk,itrj]*Nr[itrk]
+
+        #combine into a matrix to allow solve_triangular to work better
+        dotTN5 = np.zeros((5,n2)).T
+        dotTN5[:,0] = dotTNes
+        dotTN5[:,1] = dotTNec
+        dotTN5[:,2] = dotTNps
+        dotTN5[:,3] = dotTNpc
+        #dotTN5[:,4] = dotTNr
+        dotTN5[:,4] = dotTNr
+
+        SigmaTN5Prod = solve_triangular(chol_Sigma,dotTN5,lower_a=True,trans_a=False,overwrite_b=True)
+
+        #SigmaTNesProd = solve_triangular(chol_Sigma,dotTNes,lower_a=True,trans_a=False,overwrite_b=True)
+        #SigmaTNecProd = solve_triangular(chol_Sigma,dotTNec,lower_a=True,trans_a=False,overwrite_b=True)
+        #SigmaTNpsProd = solve_triangular(chol_Sigma,dotTNps,lower_a=True,trans_a=False,overwrite_b=True)
+        #SigmaTNpcProd = solve_triangular(chol_Sigma,dotTNpc,lower_a=True,trans_a=False,overwrite_b=True)
+        #SigmaTNrProd  = solve_triangular(chol_Sigma,dotTNr ,lower_a=True,trans_a=False,overwrite_b=True)
+
+        for itrj1 in prange(n2):
+            SigmaTNesProd = SigmaTN5Prod[itrj1,0]
+            SigmaTNecProd = SigmaTN5Prod[itrj1,1]
+            SigmaTNpsProd = SigmaTN5Prod[itrj1,2]
+            SigmaTNpcProd = SigmaTN5Prod[itrj1,3]
+            SigmaTNrProd  = SigmaTN5Prod[itrj1,4]
+
+            dotSigmaTNesr += SigmaTNesProd*SigmaTNrProd
+            dotSigmaTNecr += SigmaTNecProd*SigmaTNrProd
+            dotSigmaTNpsr += SigmaTNpsProd*SigmaTNrProd
+            dotSigmaTNpcr += SigmaTNpcProd*SigmaTNrProd
+            dotSigmaTNrr  += SigmaTNrProd*SigmaTNrProd
+
+            dotSigmaTNes += SigmaTNesProd*SigmaTNesProd
+            dotSigmaTNec += SigmaTNecProd*SigmaTNecProd
+            dotSigmaTNps += SigmaTNpsProd*SigmaTNpsProd
+            dotSigmaTNpc += SigmaTNpcProd*SigmaTNpcProd
+
+            dotSigmaTNeces += SigmaTNecProd*SigmaTNesProd
+            dotSigmaTNpses += SigmaTNpsProd*SigmaTNesProd
+            dotSigmaTNpces += SigmaTNpcProd*SigmaTNesProd
+            dotSigmaTNpsec += SigmaTNpsProd*SigmaTNecProd
+            dotSigmaTNpcec += SigmaTNpcProd*SigmaTNecProd
+            dotSigmaTNpcps += SigmaTNpcProd*SigmaTNpsProd
+
+        #get resres
+        resres_array[ii] = -dotSigmaTNrr
+
+        #get NN
+        NN[ii,2] = psNr - dotSigmaTNpsr
+        NN[ii,3] = pcNr - dotSigmaTNpcr
+
+        #get MM
+        #diagonal
+        MM[2,2] = psNps - dotSigmaTNps
+        MM[3,3] = pcNpc - dotSigmaTNpc
+        #lower triangle
+        MM[2,0] = psNes - dotSigmaTNpses
+        MM[3,0] = pcNes - dotSigmaTNpces
+        MM[2,1] = psNec - dotSigmaTNpsec
+        MM[3,1] = pcNec - dotSigmaTNpcec
+        MM[3,2] = pcNps - dotSigmaTNpcps
+        #upper triangle
+        MM[0,2] = MM[2,0]
+        MM[0,3] = MM[3,0]
+        MM[1,2] = MM[2,1]
+        MM[1,3] = MM[3,1]
+        MM[2,3] = MM[3,2]
+
+        #if dist_only:
+        #    MM[0:2,0:2] = MMs[ii,0:2,0:2]
+        #else:
+        NN[ii,0] = esNr - dotSigmaTNesr
+        NN[ii,1] = ecNr - dotSigmaTNecr
+
+        MM[0,0] = esNes - dotSigmaTNes
+        MM[1,1] = ecNec - dotSigmaTNec
+        MM[1,0] = ecNes - dotSigmaTNeces
+        MM[0,1] = MM[1,0]
+
+        MMs[ii,:,:] = MM
+
+
 @njit(fastmath=True,parallel=True)
 def update_intrinsic_params(x0,isqNvecs,Nrs,pos,pdist,toas,NN,MMs,SigmaTNrProds,invchol_Sigma_TNs,idxs,dist_only=True):
     '''Calculate inner products N=(res|S), M=(S|S)'''
@@ -384,7 +668,7 @@ def update_intrinsic_params(x0,isqNvecs,Nrs,pos,pdist,toas,NN,MMs,SigmaTNrProds,
             psNec += PT_sin[itrk]*ET_cos[itrk]
             pcNec += PT_cos[itrk]*ET_cos[itrk]
             pcNps += PT_cos[itrk]*PT_sin[itrk]
-            
+
             #these segments aren't the time limiting factor so we don't see any real speedup from skipping them
             #if not dist_only:
             #Nes = iNvec[itrk]*ET_sin[itrk]
@@ -407,7 +691,7 @@ def update_intrinsic_params(x0,isqNvecs,Nrs,pos,pdist,toas,NN,MMs,SigmaTNrProds,
 
         dotSigmaTNeces = 0.
         dotSigmaTNpses = 0.
-        dotSigmaTNpces = 0. 
+        dotSigmaTNpces = 0.
         dotSigmaTNpsec = 0.
         dotSigmaTNpcec = 0.
         dotSigmaTNpcps = 0.
@@ -481,22 +765,27 @@ def update_intrinsic_params(x0,isqNvecs,Nrs,pos,pdist,toas,NN,MMs,SigmaTNrProds,
 
 @jitclass([('resres',nb.float64),('logdet',nb.float64),('pos',nb.float64[:,::1]),\
         ('pdist',nb.float64[:,::1]),('NN',nb.float64[:,::1]),('MMs',nb.float64[:,:,::1]),\
-        ('toas',nb.types.ListType(nb.types.float64[::1])),('invchol_Sigma_TNs',nb.types.ListType(nb.types.float64[:,::1])),\
+        ('toas',nb.types.ListType(nb.types.float64[::1])),('chol_Sigmas',nb.types.ListType(nb.types.float64[::1,:])),\
         ('Nvecs',nb.types.ListType(nb.types.float64[::1])),('Nrs',nb.types.ListType(nb.types.float64[::1])),\
         ('cos_gwtheta',nb.float64),('gwphi',nb.float64),('log10_fgw',nb.float64),('log10_mc',nb.float64),('max_toa',nb.float64),\
-        ('SigmaTNrProds',nb.types.ListType(nb.types.float64[::1])),('Npsr',nb.int64),('isqNvecs',nb.types.ListType(nb.types.float64[::1])),('residuals',nb.types.ListType(nb.types.float64[::1]))])
+        ('Npsr',nb.int64),('isqNvecs',nb.types.ListType(nb.types.float64[::1])),('TNvs',nb.types.ListType(nb.types.float64[::1,:])),\
+        ('resres_array',nb.float64[:]),('logdet_array',nb.float64[:]),('logdet_base',nb.float64),\
+        ('rn_gammas',nb.float64[:]),('rn_log10_As',nb.float64[:]),('dotTNrs',nb.types.ListType(nb.types.float64[::1]))])
 class FastLikeInfo:
     """simple jitclass to store the various elements of fast likelihood calculation in a way that can be accessed quickly from a numba environment"""
-    def __init__(self,resres,logdet,pos,pdist,toas,invchol_Sigma_TNs,Nvecs,Nrs,max_toa,x0,Npsr,isqNvecs,residuals):
-        self.resres = resres
-        self.logdet = logdet
+    def __init__(self,logdet_base,pos,pdist,toas,Nvecs,Nrs,max_toa,x0,Npsr,isqNvecs,TNvs,dotTNrs,chol_Sigmas):
+        self.resres = 0. #compute internally
+        self.resres_array = np.zeros(Npsr)
+        self.logdet_array = np.zeros(Npsr)
+        self.logdet_base = logdet_base
+        self.logdet = self.logdet_base+np.sum(self.logdet_array)
         self.pos = pos
         self.pdist = pdist
         self.toas = toas
-        self.residuals = residuals
         #self.invchol_Sigma_Ts = invchol_Sigma_Ts
-        self.invchol_Sigma_TNs = invchol_Sigma_TNs#List([invchol_Sigma_Ts[i]/Nvecs[i] for i in range(self.Npsr)])
+        #self.invchol_Sigma_TNs = invchol_Sigma_TNs#List([invchol_Sigma_Ts[i]/Nvecs[i] for i in range(self.Npsr)])
 
+        self.dotTNrs = dotTNrs
         self.Nvecs = Nvecs
         self.isqNvecs = isqNvecs
         self.Nrs = Nrs
@@ -504,7 +793,10 @@ class FastLikeInfo:
 
         self.Npsr = x0.Npsr
 
-        self.SigmaTNrProds = List([np.dot(self.invchol_Sigma_TNs[i],self.Nrs[i]) for i in range(self.Npsr)])
+        self.TNvs = TNvs
+        self.chol_Sigmas = chol_Sigmas
+
+        #self.SigmaTNrProds = List([np.dot(self.invchol_Sigma_TNs[i],self.Nrs[i]) for i in range(self.Npsr)])
 
         self.MMs = np.zeros((Npsr,4,4))
         self.NN = np.zeros((Npsr,4))
@@ -516,16 +808,23 @@ class FastLikeInfo:
         assert self.gwphi == x0.gwphi
         assert self.log10_fgw == x0.log10_fgw
         assert self.log10_mc == x0.log10_mc
+
         return get_lnlikelihood_helper(x0,self.resres,self.logdet,self.pos,self.pdist,self.NN,self.MMs)
 
     def update_pulsar_distance(self,x0,psr_idx):
         """recalculate MM and NN only for the affected pulsar if we only change a single pulsar distance"""
-        #this method is just a wrapper for the special case of only 1 pulsar but it won't force recompilation 
+        #this method is just a wrapper for the special case of only 1 pulsar but it won't force recompilation
         assert self.cos_gwtheta == x0.cos_gwtheta
         assert self.gwphi == x0.gwphi
         assert self.log10_fgw == x0.log10_fgw
         assert self.log10_mc == x0.log10_mc
-        update_intrinsic_params(x0,self.isqNvecs,self.Nrs,self.pos,self.pdist,self.toas, self.NN, self.MMs,self.SigmaTNrProds,self.invchol_Sigma_TNs,np.array([psr_idx]),dist_only=True)
+        assert np.all(self.rn_gammas==x0.rn_gammas)
+        assert np.all(self.rn_log10_As==x0.rn_log10_As)
+        resres_old = self.resres_array.copy()
+        update_intrinsic_params2(x0,self.isqNvecs,self.Nrs,self.pos,self.pdist,self.toas, self.NN, self.MMs,self.TNvs,self.chol_Sigmas,np.array([psr_idx]),self.resres_array,self.dotTNrs)
+        #protect from incorrectly overwriting
+        self.resres_array[:] = resres_old
+        #assert np.all(resres_old==self.resres_array)
 
     def update_pulsar_distances(self,x0,psr_idxs):
         """recalculate MM and NN only for the affected pulsar if  change an arbitrary number of single pulsar distances"""
@@ -533,75 +832,108 @@ class FastLikeInfo:
         assert self.gwphi == x0.gwphi
         assert self.log10_fgw == x0.log10_fgw
         assert self.log10_mc == x0.log10_mc
+        assert np.all(self.rn_gammas==x0.rn_gammas)
+        assert np.all(self.rn_log10_As==x0.rn_log10_As)
         #leave dist_only in even though it is not currently respected in case it turns out to be faster later
-        update_intrinsic_params(x0,self.isqNvecs,self.Nrs,self.pos,self.pdist,self.toas, self.NN, self.MMs,self.SigmaTNrProds,self.invchol_Sigma_TNs,psr_idxs,dist_only=True)
+        resres_temp = self.resres_array.copy()
+        resres_old = self.resres_array.copy()
+        update_intrinsic_params2(x0,self.isqNvecs,self.Nrs,self.pos,self.pdist,self.toas, self.NN, self.MMs,self.TNvs,self.chol_Sigmas,psr_idxs,self.resres_array,self.dotTNrs)
+        #protect from incorrectly overwriting
+        self.resres_array[:] = resres_old
+        #if not np.all(resres_temp==resres_old):
+        #    print(resres_temp)
+        #    print(resres_old)
+        #    print(np.allclose(resres_temp,resres_old))
+        #    print(resres_temp==resres_old)
+        #    print(psr_idxs)
+        #    print(resres_temp[psr_idxs])
+        #    print(resres_old[psr_idxs])
+        #    self.update_intrinsic_params(x0)
+        #    print(self.resres_array[psr_idxs])
+        #    assert np.all(resres_old==self.resres_array)
+        #    assert np.all(resres_temp==self.resres_array)
+        #assert np.all(resres_temp==self.resres_array)
+
+
+    #def update_intrinsic_params(self,x0):
+    #    """Recalculate filters with updated intrinsic parameters - not quite the same as the setup, since a few things are already stored"""
+    #    update_intrinsic_params(x0,self.isqNvecs,self.Nrs,self.pos,self.pdist,self.toas, self.NN, self.MMs,self.SigmaTNrProds,self.invchol_Sigma_TNs,np.arange(x0.Npsr),dist_only=False)
+    #    #track the intrinsic parameters this was set at so we can throw in error if they are inconsistent with an input x0
+    #    self.cos_gwtheta = x0.cos_gwtheta
+    #    self.gwphi = x0.gwphi
+    #    self.log10_fgw = x0.log10_fgw
+    #    self.log10_mc = x0.log10_mc
 
     def update_intrinsic_params(self,x0):
         """Recalculate filters with updated intrinsic parameters - not quite the same as the setup, since a few things are already stored"""
-        update_intrinsic_params(x0,self.isqNvecs,self.Nrs,self.pos,self.pdist,self.toas, self.NN, self.MMs,self.SigmaTNrProds,self.invchol_Sigma_TNs,np.arange(x0.Npsr),dist_only=False)
+        #TODO ensure complete consistency with handling of resres
+        update_intrinsic_params2(x0,self.isqNvecs,self.Nrs,self.pos,self.pdist,self.toas, self.NN, self.MMs,self.TNvs,self.chol_Sigmas,np.arange(x0.Npsr),self.resres_array,self.dotTNrs)
+        self.resres = self.resres_array.sum()
         #track the intrinsic parameters this was set at so we can throw in error if they are inconsistent with an input x0
+        self.rn_gammas = x0.rn_gammas.copy()
+        self.rn_log10_As = x0.rn_log10_As.copy()
         self.cos_gwtheta = x0.cos_gwtheta
         self.gwphi = x0.gwphi
         self.log10_fgw = x0.log10_fgw
         self.log10_mc = x0.log10_mc
 
 
-def update_FLI_rn(FLI,x0,psr_idxs,psrs,pta,par_names,new_point):
-    """recalculate MM and NN only for the affected pulsar if we only change a single pulsar distance"""
-    #this method is just a wrapper for the special case of only 1 pulsar but it won't force recompilation 
-    assert FLI.cos_gwtheta == x0.cos_gwtheta
-    assert FLI.gwphi == x0.gwphi
-    assert FLI.log10_fgw == x0.log10_fgw
-    assert FLI.log10_mc == x0.log10_mc
+#def update_FLI_rn(flm,FLI,x0,psr_idxs,psrs,pta,par_names,new_point):
+#    """recalculate MM and NN only for the affected pulsar if we only change a single pulsar distance"""
+#    assert FLI.cos_gwtheta == x0.cos_gwtheta
+#    assert FLI.gwphi == x0.gwphi
+#    assert FLI.log10_fgw == x0.log10_fgw
+#    assert FLI.log10_mc == x0.log10_mc
+#
+#    params = dict(zip(par_names, new_point))
+#    flm.recompute_FastLike(FLI,x0,dict(zip(par_names, new_point)))
+#
+#    #get the N vects without putting them in a matrix
+#    FLI.Nvecs = List(pta.get_ndiag(params))
+#
+#    #get the part of the determinant that can be computed right now
+#    FLI.logdet = 0.0
+#    for (l,m) in pta.get_rNr_logdet(params):
+#        FLI.logdet += m
+#    #self.logdet += np.sum([m for (l,m) in self.pta.get_rNr_logdet(self.params)])
+#
+#    #get the other pta results
+#    TNTs = pta.get_TNT(params)
+#    Ts = pta.get_basis()
+#    pls_temp = pta.get_phiinv(params, logdet=True, method='partition')
+#
+#    #invchol_Sigma_Ts = List()
+#    FLI.invchol_Sigma_TNs = List.empty_list(nb.types.float64[:,::1])#List()#List([invchol_Sigma_Ts[i]/Nvecs[i] for i in range(self.Npsr)])
+#    FLI.Nrs = List.empty_list(nb.types.float64[::1])#List()
+#    FLI.isqNvecs = List.empty_list(nb.types.float64[::1])#List()
+#    #unify types outside numba to avoid slowing down compilation
+#    #also add more components to logdet
+#
+#    #put toas and residuals into a numba typed List of arrays, which shouldn't require any actual copies
+#    FLI.toas = List([psr.toas for psr in psrs])
+#    FLI.residuals = List([psr.residuals for psr in psrs])
+#
+#    FLI.max_toa = np.max(FLI.toas[0])
 
-    params = dict(zip(par_names, new_point))
-
-    #get the N vects without putting them in a matrix
-    FLI.Nvecs = List(pta.get_ndiag(params))
-
-    #get the part of the determinant that can be computed right now
-    FLI.logdet = 0.0
-    for (l,m) in pta.get_rNr_logdet(params):
-        FLI.logdet += m
-    #self.logdet += np.sum([m for (l,m) in self.pta.get_rNr_logdet(self.params)])
-
-    #get the other pta results
-    TNTs = pta.get_TNT(params)
-    Ts = pta.get_basis()
-    pls_temp = pta.get_phiinv(params, logdet=True, method='partition')
-
-    #invchol_Sigma_Ts = List()
-    FLI.invchol_Sigma_TNs = List.empty_list(nb.types.float64[:,::1])#List()#List([invchol_Sigma_Ts[i]/Nvecs[i] for i in range(self.Npsr)])
-    FLI.Nrs = List.empty_list(nb.types.float64[::1])#List()
-    FLI.isqNvecs = List.empty_list(nb.types.float64[::1])#List()
-    #unify types outside numba to avoid slowing down compilation
-    #also add more components to logdet
-
-    #put toas and residuals into a numba typed List of arrays, which shouldn't require any actual copies
-    FLI.toas = List([psr.toas for psr in psrs])
-    FLI.residuals = List([psr.residuals for psr in psrs])
-
-    FLI.max_toa = np.max(FLI.toas[0])
-
-    for i in range(FLI.Npsr):
-        phiinv_loc,logdetphi_loc = pls_temp[i]
-        chol_Sigma = np.linalg.cholesky(TNTs[i]+(np.diag(phiinv_loc) if phiinv_loc.ndim == 1 else phiinv_loc))
-        #invchol_Sigma_Ts.append(solve_triangular(chol_Sigma,Ts[i].T,lower_a=True,trans_a=False))
-        invchol_Sigma_T_loc = solve_triangular(chol_Sigma,Ts[i].T,lower_a=True,trans_a=False)
-        FLI.isqNvecs.append(1/np.sqrt(FLI.Nvecs[i]))
-        FLI.Nrs.append(FLI.residuals[i]/np.sqrt(FLI.Nvecs[i]))
-        FLI.invchol_Sigma_TNs.append(np.ascontiguousarray(invchol_Sigma_T_loc/np.sqrt(FLI.Nvecs[i])))
-
-        #find the latest arriving signal to prohibit signals that have already merged
-        FLI.max_toa = max(FLI.max_toa,np.max(FLI.toas[i]))
-
-        #add the necessary component to logdet
-        FLI.logdet += logdetphi_loc+np.sum(2 * np.log(np.diag(chol_Sigma)))
-
-    FLI.resres = get_resres(x0,FLI.Nvecs,FLI.residuals,FLI.invchol_Sigma_TNs)
-
-    FLI.SigmaTNrProds = List([np.dot(FLI.invchol_Sigma_TNs[i],FLI.Nrs[i]) for i in range(FLI.Npsr)])
-
-    update_intrinsic_params(x0,FLI.isqNvecs,FLI.Nrs,FLI.pos,FLI.pdist,FLI.toas,FLI.NN,FLI.MMs,FLI.SigmaTNrProds,FLI.invchol_Sigma_TNs,np.array(psr_idxs),dist_only=False)
+#    for i in range(FLI.Npsr):
+#        phiinv_loc,logdetphi_loc = pls_temp[i]
+#        chol_Sigma = np.linalg.cholesky(TNTs[i]+(np.diag(phiinv_loc) if phiinv_loc.ndim == 1 else phiinv_loc))
+#        #invchol_Sigma_Ts.append(solve_triangular(chol_Sigma,Ts[i].T,lower_a=True,trans_a=False))
+#        invchol_Sigma_T_loc = solve_triangular(chol_Sigma,Ts[i].T,lower_a=True,trans_a=False)
+#        FLI.isqNvecs.append(1/np.sqrt(FLI.Nvecs[i]))
+#        FLI.Nrs.append(FLI.residuals[i]/np.sqrt(FLI.Nvecs[i]))
+#        FLI.invchol_Sigma_TNs.append(np.ascontiguousarray(invchol_Sigma_T_loc/np.sqrt(FLI.Nvecs[i])))
+#
+#        #find the latest arriving signal to prohibit signals that have already merged
+#        FLI.max_toa = max(FLI.max_toa,np.max(FLI.toas[i]))
+#
+#        #add the necessary component to logdet
+#        FLI.logdet += logdetphi_loc+np.sum(2 * np.log(np.diag(chol_Sigma)))
+#
+#    FLI.resres = get_resres(x0,FLI.Nvecs,FLI.residuals,FLI.invchol_Sigma_TNs)
+#
+#    FLI.SigmaTNrProds = List([np.dot(FLI.invchol_Sigma_TNs[i],FLI.Nrs[i]) for i in range(FLI.Npsr)])
+#
+#    update_intrinsic_params(x0,FLI.isqNvecs,FLI.Nrs,FLI.pos,FLI.pdist,FLI.toas,FLI.NN,FLI.MMs,FLI.SigmaTNrProds,FLI.invchol_Sigma_TNs,np.array(psr_idxs),dist_only=False)
 
 

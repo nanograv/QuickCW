@@ -272,7 +272,7 @@ def get_fisher_diagonal_alt(T_chain, samples_current, par_names, par_names_cw_ex
 if __name__ == '__main__':
 
 #with open('data/fast_like_test_psrs_A2e-15_M5e9_f2e-8_evolve_no_gwb_no_rn_no_ecorr_no_equad.pkl', 'rb') as psr_pkl:
-    with open('data/fast_like_test_psrs_A1e-15_M5e9_f2e-8_evolve_no_gwb_no_rn_no_ecorr_no_equad.pkl', 'rb') as psr_pkl:
+    with open('data/fast_like_test_psrs_A2e-15_M5e9_f2e-8_evolve_no_gwb.pkl', 'rb') as psr_pkl:
 #with open('data/fast_like_test_psrs.pkl', 'rb') as psr_pkl:
         psrs = pickle.load(psr_pkl)
 
@@ -347,6 +347,7 @@ if __name__ == '__main__':
     log10_h = parameter.Uniform(-18, -11)('0_log10_h')
     #log10_h = parameter.LinearExp(-18, -11)('0_log10_h')
 
+
     cw_wf = deterministic.cw_delay(cos_gwtheta=cos_gwtheta, gwphi=gwphi, log10_mc=log10_mc,
                                    log10_h=log10_h, log10_fgw=log10_fgw, phase0=phase0, psrTerm=True,
                                    p_phase=p_phase, p_dist=p_dist, evolve=True,
@@ -356,14 +357,15 @@ if __name__ == '__main__':
     log10_Agw = parameter.Constant(-16.27)('gwb_log10_A')
     gamma_gw = parameter.Constant(6.6)('gwb_gamma')
     cpl = utils.powerlaw(log10_A=log10_Agw, gamma=gamma_gw)
-    crn = gp_signals.FourierBasisGP(cpl, components=5, Tspan=Tspan,name='gw')
+    crn = gp_signals.FourierBasisGP(cpl, components=5, Tspan=Tspan,
+                                            name='gw')
 
     tm = gp_signals.TimingModel()
 
     #s = ef + eq + ec + rn + crn + cw + tm
-    #s = ef + eq + ec + rn + cw + tm
+    s = ef + eq + ec + rn + cw + tm
     #s = ef + eq + ec + cw + tm
-    s = ef + cw + tm
+    #s = ef + cw + tm
 
     models = [s(psr) for psr in psrs]
 
@@ -375,7 +377,7 @@ if __name__ == '__main__':
     #print(noisedict)
     pta.set_default_params(noisedict)
 
-    #print(pta.summary())
+    print(pta.summary())
     print(pta.params)
 
     FastPrior = CWFastPrior.FastPrior(pta)
@@ -389,14 +391,23 @@ if __name__ == '__main__':
     par_names_cw_ext = List(['0_cos_inc', '0_log10_h', '0_phase0', '0_psi'])
     par_names_cw_int = List(['0_cos_gwtheta', '0_gwphi', '0_log10_fgw', '0_log10_mc'])
 
+    par_names_noise = []
+
     par_inds_cw_p_phase_ext = np.zeros(len(pta.pulsars),dtype=np.int64)
+    par_inds_cw_p_dist_int = np.zeros(len(pta.pulsars),dtype=np.int64)
 
     for i,psr in enumerate(pta.pulsars):
+        par_inds_cw_p_dist_int[i] = len(par_names_cw)
         par_names_cw.append(psr + "_cw0_p_dist")
         par_inds_cw_p_phase_ext[i] = len(par_names_cw)
         par_names_cw.append(psr + "_cw0_p_phase")
         par_names_cw_ext.append(psr + "_cw0_p_phase")
         par_names_cw_int.append(psr + "_cw0_p_dist")
+        par_names_noise.append(psr + "_red_noise_gamma")
+        par_names_noise.append(psr + "_red_noise_log10_A")
+
+    n_par_tot = len(par_names)
+
 
     #using geometric spacing
     c = T_max**(1.0/(n_chain-1))
@@ -420,8 +431,8 @@ if __name__ == '__main__':
         samples[j,0,par_names.index('0_log10_mc')] = np.log10(5e9)
         for psr in pta.pulsars:
             samples[j,0,par_names.index(psr + "_cw0_p_dist")] = 0.0
-            #samples[j,0,par_names.index(psr + "_red_noise_gamma")] = noisedict[psr + "_red_noise_gamma"]
-            #samples[j,0,par_names.index(psr + "_red_noise_log10_A")] = noisedict[psr + "_red_noise_log10_A"]
+            samples[j,0,par_names.index(psr + "_red_noise_gamma")] = noisedict[psr + "_red_noise_gamma"]
+            samples[j,0,par_names.index(psr + "_red_noise_log10_A")] = noisedict[psr + "_red_noise_log10_A"]
 
         #also set external parameters for further testing
         samples[j,0,par_names.index("0_cos_inc")] = np.cos(1.0)
@@ -440,12 +451,158 @@ if __name__ == '__main__':
         for ii, psr in enumerate(pta.pulsars):
             samples[j,0,par_names.index(psr + "_cw0_p_phase")] = p_phases[ii]
 
+    print('setting up FastLikeMaster')
+    x0 = CWFastLikelihoodNumba.CWInfo(len(pta.pulsars),samples[j,0],par_names,par_names_cw_ext)
+    flm = CWFastLikelihoodNumba.FastLikeMaster(psrs,pta,dict(zip(par_names, samples[j, 0, :])),x0)
+    params_orig = dict(zip(par_names, samples[j, 0, :]))
+    FLI_temp = flm.get_new_FastLike(x0,params_orig)
+
+
+    n_jump_loc = 2*len(psrs)
+    #idx_choose_psr = np.random.randint(0,x0s[j].Npsr,cm.n_noise_main)
+    idx_choose_psr = list(range(len(psrs)))
+    idx_choose = np.concatenate((x0.idx_rn_gammas,x0.idx_rn_log10_As))
+    scaling = 2.38/np.sqrt(n_jump_loc)
+    jump = np.zeros(len(par_names))
+    jump[idx_choose] = np.random.normal(0.,1.,n_jump_loc)
+    new_point = samples[0,0]+jump
+
+    #params_hold1 = dict(zip(par_names, samples[0, 0, :]))
+    #params_hold2 = dict(zip(par_names, samples[0, 0, :]))
+    #params_hold3 = dict(zip(par_names, new_point))
+    #FLI_hold1 = CWFastLikelihoodNumba.get_FastLikeInfo(psrs, pta, params_hold1, x0)
+    #FLI_hold2 = CWFastLikelihoodNumba.get_FastLikeInfo(psrs, pta, params_hold2, x0)
+    #FLI_hold3 = CWFastLikelihoodNumba.get_FastLikeInfo(psrs, pta, params_hold3, x0)
+
+    #x0.update_params(new_point)
+    #CWFastLikelihoodNumba.update_FLI_rn(FLI_hold2,x0,idx_choose_psr,psrs,pta,par_names,new_point)
+    #FLI_hold4 = flm.recompute_FastLike(x0,new_point)
+    #flm2 = CWFastLikelihoodNumba.FastLikeMaster(psrs,pta,dict(zip(par_names, new_point)),x0)
+    #FLI_hold5 = flm2.recompute_FastLike(x0,new_point)
+
+    Npsr = len(psrs)
+    #for i in range(0,Npsr):
+    #    assert np.all(FLI_hold1.Nvecs[i]==FLI_hold2.Nvecs[i])
+    #    assert np.all(FLI_hold1.Nvecs[i]==FLI_hold3.Nvecs[i])
+    #    assert np.all(FLI_hold1.Nvecs[i]==FLI_hold4.Nvecs[i])
+    #    assert np.all(FLI_hold1.Nvecs[i]==FLI_hold5.Nvecs[i])
+
+    #    assert np.all(flm.TNTs[i]==flm2.TNTs[i])
+    #    #assert np.all(FLI_hold1.TNTs[i]==FLI_hold3.TNTs[i])
+
+    #    assert np.all(flm.TNvs[i]==flm2.TNvs[i])
+    #    #assert np.all(FLI_hold1.TNvs[i]==FLI_hold3.TNvs[i])
+
+    #    assert np.all(FLI_hold1.Nrs[i]==FLI_hold2.Nrs[i])
+    #    assert np.all(FLI_hold1.Nrs[i]==FLI_hold3.Nrs[i])
+    #    assert np.all(FLI_hold1.Nrs[i]==FLI_hold4.Nrs[i])
+    #    assert np.all(FLI_hold1.Nrs[i]==FLI_hold5.Nrs[i])
+
+    #    assert np.all(FLI_hold1.toas[i]==FLI_hold2.toas[i])
+    #    assert np.all(FLI_hold1.toas[i]==FLI_hold3.toas[i])
+    #    assert np.all(FLI_hold1.toas[i]==FLI_hold4.toas[i])
+    #    assert np.all(FLI_hold1.toas[i]==FLI_hold5.toas[i])
+
+    #    assert np.all(FLI_hold1.residuals[i]==FLI_hold2.residuals[i])
+    #    assert np.all(FLI_hold1.residuals[i]==FLI_hold3.residuals[i])
+    #    assert np.all(FLI_hold1.residuals[i]==FLI_hold4.residuals[i])
+    #    assert np.all(FLI_hold1.residuals[i]==FLI_hold5.residuals[i])
+
+    #    assert np.all(FLI_hold1.isqNvecs[i]==FLI_hold2.isqNvecs[i])
+    #    assert np.all(FLI_hold1.isqNvecs[i]==FLI_hold3.isqNvecs[i])
+    #    assert np.all(FLI_hold1.isqNvecs[i]==FLI_hold4.isqNvecs[i])
+    #    assert np.all(FLI_hold1.isqNvecs[i]==FLI_hold5.isqNvecs[i])
+    #    
+    #    assert np.all(FLI_hold1.pos[i]==FLI_hold2.pos[i])
+    #    assert np.all(FLI_hold1.pos[i]==FLI_hold3.pos[i])
+    #    assert np.all(FLI_hold1.pos[i]==FLI_hold4.pos[i])
+    #    assert np.all(FLI_hold1.pos[i]==FLI_hold5.pos[i])
+
+    #    assert np.all(FLI_hold1.pdist[i]==FLI_hold2.pdist[i])
+    #    assert np.all(FLI_hold1.pdist[i]==FLI_hold3.pdist[i])
+    #    assert np.all(FLI_hold1.pdist[i]==FLI_hold4.pdist[i])
+    #    assert np.all(FLI_hold1.pdist[i]==FLI_hold5.pdist[i])
+
+    #    #asse/var/folders/x2/ldvv5mnn3516rwwy1_mk51bw0000gn/T/com.apple.mail/com.apple.mail.drag-T0x600003180bc0.tmp.NBoQf6/A\ few\ days\ left\!\ Confirm\ your\ identity\ to\ keep\ using\ Venmo\ the\ way\ you\ always\ have.eml rt FLI_hold1.logdet == FLI_hold3.logdet
+
+    #assert FLI_hold1.max_toa == FLI_hold2.max_toa
+    #assert FLI_hold1.max_toa == FLI_hold3.max_toa
+    #assert FLI_hold1.max_toa == FLI_hold4.max_toa
+    #assert FLI_hold1.max_toa == FLI_hold5.max_toa
+
+    #assert flm.logdet == flm2.logdet
+    #import sys
+    #sys.exit()
+
+
     #set up fast likelihoods
-    x0s = List([])
-    FLIs  = List([])
-    for j in range(n_chain):
-        x0s.append( CWFastLikelihoodNumba.CWInfo(len(pta.pulsars),samples[j,0],par_names,par_names_cw_ext))
-        FLIs.append(CWFastLikelihoodNumba.get_FastLikeInfo(psrs, pta, dict(zip(par_names, samples[j, 0, :])), x0s[j]))
+    #x0s = List([])
+    #FLIs  = List([])
+    #for j in range(n_chain):
+    #    x0s.append( CWFastLikelihoodNumba.CWInfo(len(pta.pulsars),samples[j,0],par_names,par_names_cw_ext))
+    #    FLIs.append(CWFastLikelihoodNumba.get_FastLikeInfo(psrs, pta, dict(zip(par_names, samples[j, 0, :])), x0s[j]))
+
+
+
+    FLI_temp.update_intrinsic_params(x0)
+
+    MMs2 = FLI_temp.MMs.copy()
+    NN2 = FLI_temp.NN.copy()
+
+    FLI_temp.update_intrinsic_params(x0)
+    MMs1 = FLI_temp.MMs.copy()
+    NN1 = FLI_temp.NN.copy()
+
+    
+    #assert np.allclose(MMs1,MMs2)
+    #assert np.allclose(NN1,NN2)
+
+    flm.recompute_FastLike(FLI_temp,x0,dict(zip(par_names, samples[j, 0, :])))
+
+
+    #CWFastLikelihoodNumba.get_FastLikeInfo(psrs, pta, dict(zip(par_names, samples[j, 0, :])), x0)
+    print("started timings")
+    n_run_FLI = 10
+    t0 = perf_counter()
+    for m in range(n_run_FLI):
+        flm.recompute_FastLike(FLI_temp,x0,dict(zip(par_names, samples[j, 0, :])))
+        #CWFastLikelihoodNumba.get_FastLikeInfo(psrs, pta, dict(zip(par_names, samples[j, 0, :])), x0s[j])
+    tf = perf_counter()
+    print('FLI alt create_time %8.5fs'%((tf-t0)/n_run_FLI))
+
+    #n_run_FLI = 10
+    #t0 = perf_counter()
+    #for m in range(n_run_FLI):
+    #    CWFastLikelihoodNumba.get_FastLikeInfo(psrs, pta, dict(zip(par_names, samples[j, 0, :])), x0)
+    #tf = perf_counter()
+    #print('FLI create_time %8.5fs'%((tf-t0)/n_run_FLI))
+
+    FLI_temp.update_intrinsic_params(x0)
+
+    n_run_int = 1000
+    t0 = perf_counter()
+    for m in range(n_run_int):
+        FLI_temp.update_intrinsic_params(x0)
+        #CWFastLikelihoodNumba.get_FastLikeInfo(psrs, pta, dict(zip(par_names, samples[j, 0, :])), x0s[j])
+    tf = perf_counter()
+    print('FLI updatetime2 %8.5fs'%((tf-t0)/n_run_int))
+
+    import sys
+    sys.exit()
+
+    n_run_int = 1000
+    t0 = perf_counter()
+    for m in range(n_run_int):
+        FLI_temp.update_intrinsic_params(x0)
+        #CWFastLikelihoodNumba.get_FastLikeInfo(psrs, pta, dict(zip(par_names, samples[j, 0, :])), x0s[j])
+    tf = perf_counter()
+    print('FLI updatetime %8.5fs'%((tf-t0)/n_run_int))
+
+
+
+    import sys
+    sys.exit()
+
 
     #calculate the diagonal elements of the fisher matrix
     #    print(fisher_diag[j,:])
@@ -528,7 +685,7 @@ if __name__ == '__main__':
         print('time for updating all distances instrinsic %.5e s'%((tf_dist2-ti_dist2)/n_run2))
 
     ti_dist0 = perf_counter()
-    n_run0 = 100
+    n_run0 = 1000
     for mm in range(n_run0):
         FLIs[j].update_pulsar_distances(x0s[j], np.arange(0,x0s[j].Npsr)) #TODO validate assumption on psr index ranges
     tf_dist0 = perf_counter()
