@@ -11,7 +11,6 @@ use_default_noise_sigma = False
 sigma_noise_default = 0.5
 
 #jump parameters to control number of eigendirections
-
 n_ext_directions = 32
 n_phase_extra = 16
 
@@ -24,3 +23,5 @@ n_noise_main = 10
 idx_PT = -2
 idx_full = -1
 
+#jump type probabilities
+prior_draw_prob = 0.3

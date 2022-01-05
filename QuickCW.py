@@ -364,87 +364,52 @@ def do_intrinsic_update(n_chain, psrs, pta, samples, itrb, Ts, a_yes_counts, a_n
         #save MMs and NN so we can revert them if the chain is rejected
         MMs_save = FLIs[j].MMs.copy()
         NN_save = FLIs[j].NN.copy()
-        #jump_select = np.random.randint(len(par_names_cw_int)+len(par_names_noise))
+        
         which_jump = np.random.randint(3)
-        jump = np.zeros(len(par_names))
-        #if jump_select<len(par_names_cw_int):
-        #    jump_idx = par_names.index(par_names_cw_int[jump_select])
-        #else:
-        #    jump_idx = par_names.index(par_names_noise[jump_select-len(par_names_cw_int)])
 
-        #if jump_idx in x0s[j].idx_dists:
-        if which_jump==0:
+        if which_jump==0: #update psr distances
             n_jump_loc = cm.n_dist_main
-            idx_choose_psr = np.random.randint(0,x0s[j].Npsr,cm.n_dist_main)
+            idx_choose_psr = np.random.choice(x0s[j].Npsr,cm.n_dist_main,replace=False)
             #idx_choose_psr[0] = pta.pulsars.index(par_names_cw_int[jump_select][:-11])
             idx_choose = x0s[j].idx_dists[idx_choose_psr]
             scaling = 1.0
-        #elif jump_idx in x0s[j].idx_rn_gammas or jump_idx in x0s[j].idx_rn_log10_As:
-        elif which_jump==1:
+        elif which_jump==1: #update per psr RN
             #n_jump_loc = cm.n_noise_main*2 #2 parameters per pulsar
             n_jump_loc = 2*len(psrs)
             #idx_choose_psr = np.random.randint(0,x0s[j].Npsr,cm.n_noise_main)
             idx_choose_psr = list(range(len(psrs)))
             idx_choose = np.concatenate((x0s[j].idx_rn_gammas,x0s[j].idx_rn_log10_As))
             scaling = 2.38/np.sqrt(n_jump_loc)
-        #else:
-        elif which_jump==2:
-            #jump[jump_idx] = fisher_diag[j, jump_idx]*np.random.normal() #0.1
-
-            #add some extra jumps because they are free
-            #idx_choose_psr = np.random.randint(0,x0s[j].Npsr,cm.n_dist_extra)
-            #jump_idx2 = par_names.index(par_names_cw_int[np.random.randint(0,4)])#p.random.randint(0,4)
+        elif which_jump==2: #update common intrinsic parameters (chirp mass, frequency, sky location[2])
             n_jump_loc = 4# 2+cm.n_dist_extra
-            #idx_choose = np.zeros(n_jump_loc,dtype=np.int64)
             idx_choose = np.array([par_names.index(par_names_cw_int[itrk]) for itrk in range(4)])
-            #idx_choose[0] = jump_idx
-            #idx_choose[1] = jump_idx2
-            #idx_choose[2:] = idx_choose_psr
             scaling = 1.0
 
-        fisher_diag_loc = scaling * np.sqrt(Ts[j])*fisher_diag[j][idx_choose]
-        jump[idx_choose] += fisher_diag_loc*np.random.normal(0.,1.,n_jump_loc)
+        jump_type_decide = uniform(0.0, 1.0, 1)
+        if jump_type_decide<cm.prior_draw_prob: #do prior draw
+            #print("Prior draw")            
+            new_point = np.copy(samples[j,itrb,:])
+            new_point[idx_choose] = np.array([par.sample() for par in [pta.params[iii] for iii in idx_choose]])
+        else: #do regular fisher jump
+            fisher_diag_loc = scaling * np.sqrt(Ts[j])*fisher_diag[j][idx_choose]
+            jump = np.zeros(len(par_names))
+            jump[idx_choose] += fisher_diag_loc*np.random.normal(0.,1.,n_jump_loc)
+            new_point = samples[j,itrb,:] + jump
+
+        #TODO check wrapping is working right
+        new_point = correct_intrinsic(new_point,x0s[j])
 
         samples_current = np.copy(samples[j,itrb,:])
 
-        #print('jump select',jump_select,par_names_cw_int[jump_select])
-        new_point = samples[j,itrb,:] + jump
-        #TODO check wrapping is working right
-        new_point = correct_intrinsic(new_point,x0s[j])
-        #if jump_idx == x0s[j].idx_cos_gwtheta or jump_idx == x0s[j].idx_gwphi:
-
-
-        #if "_cw0_p_dist" in par_names_cw_int[jump_select]:
-        #if jump_idx in x0s[j].idx_dists:
-        if which_jump==0:
-            #take the absolute value of distance proposals to prevent negative values from crashing things
-            #new_point[jump_idx] = new_point[jump_idx]
+        if which_jump==0: #update psr distances
             x0s[j].update_params(new_point)
-            #FLIs[j].update_pulsar_distance(x0s[j], pta.pulsars.index(par_names_cw_int[jump_select][:-11]))
             FLIs[j].update_pulsar_distances(x0s[j], idx_choose_psr)
-            #acc_idx = 10
-        #elif jump_idx in x0s[j].idx_rn_gammas or jump_idx in x0s[j].idx_rn_log10_As:
-        elif which_jump==1:
+        elif which_jump==1: #update per psr RN
             x0s[j].update_params(new_point)
-            #FLIs[j].update_pulsar_noise(x0s[j], idx_choose_psr, pta, new_point)
-            #FLIs[j] = CWFastLikelihoodNumba.get_FastLikeInfo(psrs, pta, dict(zip(par_names, new_point)), x0s[j])
             flm.recompute_FastLike(FLI_swap,x0s[j],dict(zip(par_names, new_point)))
-            #CWFastLikelihoodNumba.update_FLI_rn(flm,FLIs[j], x0s[j], idx_choose_psr, psrs, pta, par_names, new_point)
-        #else:
-        elif which_jump==2:
+        elif which_jump==2: #update common intrinsic parameters (chirp mass, frequency, sky location[2])
             x0s[j].update_params(new_point)
-            #print("sky location, frequency, or chirp mass update")
             FLIs[j].update_intrinsic_params(x0s[j])
-            #if par_names_cw_int[jump_select]=="0_cos_gwtheta":
-            #    acc_idx = 1
-            #elif par_names_cw_int[jump_select]=="0_gwphi":
-            #    acc_idx = 3
-            #elif par_names_cw_int[jump_select]=="0_log10_fgw":
-            #    acc_idx = 4
-            #elif par_names_cw_int[jump_select]=="0_log10_mc":
-            #    acc_idx = 6
-            #else:
-            #    acc_idx = 10
 
         #check the maximum toa is not such that the source has already merged, and if so automatically reject the proposal
         w0 = np.pi * 10.0**x0s[j].log10_fgw
