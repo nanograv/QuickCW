@@ -27,6 +27,11 @@ idx_full = -1
 prior_draw_prob = 0.3
 de_prob = 0.2
 
+#jump parameter set probabilities
+dist_jump_weight = 0.3
+rn_jump_weight = 0.6
+common_jump_weight = 0.1
+
 #differencial evolution parameters
 de_history_size = 1_000
 sigma_de = 0.1

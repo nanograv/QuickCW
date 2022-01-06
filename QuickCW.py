@@ -376,7 +376,11 @@ def do_intrinsic_update(n_chain, psrs, pta, samples, itrb, Ts, a_yes_counts, a_n
         MMs_save = FLIs[j].MMs.copy()
         NN_save = FLIs[j].NN.copy()
         
-        which_jump = np.random.randint(3)
+        #which_jump = np.random.randint(3)
+        total_weight = cm.dist_jump_weight + cm.rn_jump_weight + cm.common_jump_weight
+        which_jump = np.random.choice(3, p=[cm.dist_jump_weight/total_weight,
+                                            cm.rn_jump_weight/total_weight,
+                                            cm.common_jump_weight/total_weight])
 
         if which_jump==0: #update psr distances
             n_jump_loc = cm.n_dist_main
