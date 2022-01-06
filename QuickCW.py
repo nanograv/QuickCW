@@ -12,6 +12,8 @@ import numba as nb
 #make sure to use the right threading layer
 from numba import config
 config.THREADING_LAYER = 'omp'
+#config.THREADING_LAYER = 'tbb'
+print("Number of cores used for parallel running: ", config.NUMBA_NUM_THREADS)
 
 from numba import jit,njit,prange
 from numba.experimental import jitclass
@@ -235,6 +237,11 @@ def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int
         fisher_diag[j,:] = get_fisher_diagonal(samples[j,0,:], par_names, par_names_cw_ext, par_names_noise, x0_swap, flm, FLI_swap)
         print(fisher_diag[j,:])
 
+    #set up differencial evolution
+    de_history = np.zeros((n_chain, cm.de_history_size, len(par_names)))
+    for j in range(n_chain):
+        for i in range(cm.de_history_size):
+            de_history[j,i,:] = np.array([par.sample() for par in pta.params])
 
     #setting up arrays to record acceptance and swaps
     a_yes_counts = np.zeros((n_par_tot+2,n_chain),dtype=np.int64)
@@ -320,14 +327,18 @@ def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int
         #always do pt steps in extrinsic
         do_extrinsic_block(n_chain, samples, itrb, Ts, x0s, FLIs, FPI, len(par_names), len(par_names_cw_ext), log_likelihood, n_int_block-2, fisher_diag,a_yes_counts,a_no_counts)
         #update intrinsic parameters once a block
-        FLI_swap = do_intrinsic_update(n_chain, psrs, pta, samples, itrb+n_int_block-2, Ts, a_yes_counts, a_no_counts, x0s, FLIs, FastPrior, par_names, par_names_cw_int, par_names_noise, log_likelihood, fisher_diag,flm,FLI_swap)
+        FLI_swap = do_intrinsic_update(n_chain, psrs, pta, samples, itrb+n_int_block-2, Ts, a_yes_counts, a_no_counts, x0s, FLIs, FastPrior, par_names, par_names_cw_int, par_names_noise, log_likelihood, fisher_diag, flm, FLI_swap, de_history)
         do_pt_swap(n_chain, samples, itrb+n_int_block-1, Ts, a_yes_counts, a_no_counts, x0s, FLIs, log_likelihood,fisher_diag)
+
+        #update de history array
+        for j in range(n_chain):
+            de_history[j,i%cm.de_history_size] = np.copy(samples[j,itrb,:])
 
         if itrn%n_update_fisher==0 and i!=0:
             print("Updating Fisher diagonals")
             for j in range(n_chain):
                 #compute fisher matrix at random recent points in the posterior
-                fisher_diag[j,:] = get_fisher_diagonal(samples[0,np.random.randint(itrb+n_int_block+1),:], par_names, par_names_cw_ext, par_names_noise, x0_swap, flm, FLI_swap)
+                fisher_diag[j,:] = get_fisher_diagonal(samples[j,np.random.randint(itrb+n_int_block+1),:], par_names, par_names_cw_ext, par_names_noise, x0_swap, flm, FLI_swap)
 
     a_yes = summarize_a_ext(a_yes_counts,par_inds_cw_p_phase_ext,par_inds_cw_p_dist_int, par_inds_rn) #columns: chain number; rows: proposal type (PT, cos_gwtheta, cos_inc, gwphi, fgw, h, mc, phase0, psi, p_phases, p_dists,full extrinsic)
     a_no = summarize_a_ext(a_no_counts,par_inds_cw_p_phase_ext,par_inds_cw_p_dist_int, par_inds_rn)
@@ -352,7 +363,7 @@ def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int
 #UPDATE INTRINSIC PARAMETERS AND RECALCULATE FILTERS
 #
 ################################################################################
-def do_intrinsic_update(n_chain, psrs, pta, samples, itrb, Ts, a_yes_counts, a_no_counts, x0s, FLIs, FPI, par_names, par_names_cw_int, par_names_noise, log_likelihood, fisher_diag, flm, FLI_swap):
+def do_intrinsic_update(n_chain, psrs, pta, samples, itrb, Ts, a_yes_counts, a_no_counts, x0s, FLIs, FPI, par_names, par_names_cw_int, par_names_noise, log_likelihood, fisher_diag, flm, FLI_swap, de_history):
     #print("EXT")
     for j in range(n_chain):
         assert FLIs[j].cos_gwtheta == x0s[j].cos_gwtheta
@@ -390,6 +401,24 @@ def do_intrinsic_update(n_chain, psrs, pta, samples, itrb, Ts, a_yes_counts, a_n
             #print("Prior draw")            
             new_point = np.copy(samples[j,itrb,:])
             new_point[idx_choose] = np.array([par.sample() for par in [pta.params[iii] for iii in idx_choose]])
+        elif jump_type_decide<cm.prior_draw_prob+cm.de_prob: #do differential evolution step
+            de_indices = np.random.choice(de_history.shape[1], size=2, replace=False)
+            ndim = idx_choose.size
+            alpha0 = 2.38/np.sqrt(2*ndim)
+            alpha = np.random.normal(scale=cm.sigma_de)            
+
+            x1 = np.copy(de_history[j,de_indices[0],idx_choose])
+            x2 = np.copy(de_history[j,de_indices[1],idx_choose])
+            
+            new_point = np.copy(samples[j,itrb,:])
+            new_point[idx_choose] += alpha0*(1+alpha)*(x1-x2)
+            
+            #big_jump_decide = uniform(0.0, 1.0, 1)
+            #if big_jump_decide<0.1: #do big jump
+            #    new_point[idx_choose] += (1+alpha)*(x1-x2)
+            #else: #do smaller jump scaled by alpha0
+            #    new_point[idx_choose] += alpha0*(1+alpha)*(x1-x2)
+
         else: #do regular fisher jump
             fisher_diag_loc = scaling * np.sqrt(Ts[j])*fisher_diag[j][idx_choose]
             jump = np.zeros(len(par_names))
