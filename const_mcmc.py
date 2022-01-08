@@ -24,7 +24,7 @@ idx_PT = -2
 idx_full = -1
 
 #jump type probabilities
-prior_draw_prob = 0.3
+prior_draw_prob = 0.1
 de_prob = 0.2
 
 #jump parameter set probabilities
@@ -35,3 +35,6 @@ common_jump_weight = 0.1
 #differencial evolution parameters
 de_history_size = 1_000
 sigma_de = 0.1
+
+#delayed rejection parameters
+num_delayed_rej = 5_000
