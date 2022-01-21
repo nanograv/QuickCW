@@ -37,4 +37,7 @@ de_history_size = 1_000
 sigma_de = 0.1
 
 #delayed rejection parameters
-num_delayed_rej = 5_000
+num_delayed_rej = 2_000
+
+#multiple try MCMC parameters
+n_multi_try = 10_000

@@ -48,6 +48,21 @@ class FastPrior:
         return get_lnprior_helper(x0, self.uniform_par_ids, self.uniform_lows, self.uniform_highs,
                                       self.normal_par_ids, self.normal_mus, self.normal_sigs)
 
+    def get_sample(self, idx):
+        """wrapper to quickly return random prior draw for the (idx)th parameter"""
+        return get_sample_helper(idx, self.uniform_par_ids, self.uniform_lows, self.uniform_highs,
+                                      self.normal_par_ids, self.normal_mus, self.normal_sigs)
+
+@njit()
+def get_sample_helper(idx, uniform_par_ids, uniform_lows, uniform_highs, normal_par_ids, normal_mus, normal_sigs):
+    """jittable helper for prior draws"""
+    if idx in uniform_par_ids:
+        #iii = uniform_par_ids.index(idx)
+        iii = np.min(np.nonzero(uniform_par_ids == idx)[0])
+        return np.random.uniform(uniform_lows[iii], uniform_highs[iii])
+    else:
+        iii = np.min(np.nonzero(normal_par_ids == idx)[0])
+        return np.random.normal(normal_mus[iii], normal_sigs[iii])
 
 @njit()
 def get_lnprior_helper(x0, uniform_par_ids, uniform_lows, uniform_highs, normal_par_ids, normal_mus, normal_sigs):
