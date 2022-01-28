@@ -25,19 +25,17 @@ idx_full = -1
 
 #jump type probabilities
 prior_draw_prob = 0.1
-de_prob = 0.2
+de_prob = 0.3
+fisher_prob = 0.6
 
 #jump parameter set probabilities
-dist_jump_weight = 0.3
+dist_jump_weight = 0.2
 rn_jump_weight = 0.6
-common_jump_weight = 0.1
+common_jump_weight = 0.2
 
 #differencial evolution parameters
 de_history_size = 1_000
 sigma_de = 0.1
-
-#delayed rejection parameters
-num_delayed_rej = 2_000
 
 #multiple try MCMC parameters
 n_multi_try = 10_000
