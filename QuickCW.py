@@ -245,6 +245,11 @@ def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int
         x0s.append( CWFastLikelihoodNumba.CWInfo(len(pta.pulsars),samples[j,0],par_names,par_names_cw_ext))
         FLIs.append(flm.get_new_FastLike(x0s[j], dict(zip(par_names, samples[j, 0, :]))))
 
+    #make extra x0s to help parallelizing MTMCMC updates
+    x0_extras = List([])
+    for k in range(25):
+        x0_extras.append(CWFastLikelihoodNumba.CWInfo(len(pta.pulsars),samples[0,0],par_names,par_names_cw_ext))
+
     #calculate the diagonal elements of the fisher matrix
     fisher_diag = np.ones((n_chain, len(par_names)))
     for j in range(n_chain):
@@ -351,7 +356,7 @@ def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int
         do_extrinsic_block(n_chain, samples, itrb, Ts, x0s, FLIs, FPI, len(par_names), len(par_names_cw_ext), log_likelihood, n_int_block-2, fisher_diag, a_yes, a_no)
         #update intrinsic parameters once a block
         #FLI_swap = do_intrinsic_update_dr(n_chain, psrs, pta, samples, itrb+n_int_block-2, Ts, a_yes_counts, a_no_counts, x0s, FLIs, FPI, par_names, par_names_cw_int, par_names_noise, len(par_names_cw_ext), log_likelihood, fisher_diag, flm, FLI_swap, de_history, n_dr_delays)
-        FLI_swap = do_intrinsic_update_mt(n_chain, psrs, pta, samples, itrb+n_int_block-2, Ts, a_yes, a_no, x0s, FLIs, FPI, par_names, par_names_cw_int, par_names_noise, len(par_names_cw_ext), log_likelihood, fisher_diag, flm, FLI_swap, de_history, cw_ext_lows, cw_ext_highs)
+        FLI_swap = do_intrinsic_update_mt(n_chain, psrs, pta, samples, itrb+n_int_block-2, Ts, a_yes, a_no, x0s, x0_extras, FLIs, FPI, par_names, par_names_cw_int, par_names_noise, len(par_names_cw_ext), log_likelihood, fisher_diag, flm, FLI_swap, de_history, cw_ext_lows, cw_ext_highs)
         do_pt_swap(n_chain, samples, itrb+n_int_block-1, Ts, a_yes, a_no, x0s, FLIs, log_likelihood, fisher_diag)
 
         #update de history array
@@ -386,7 +391,7 @@ def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int
 #
 ################################################################################
 #version using multiple try mcmc (based on Table 6 of https://vixra.org/pdf/1712.0244v3.pdf)
-def do_intrinsic_update_mt(n_chain, psrs, pta, samples, itrb, Ts, a_yes, a_no, x0s, FLIs, FPI, par_names, par_names_cw_int, par_names_noise, n_par_ext, log_likelihood, fisher_diag, flm, FLI_swap, de_history, cw_ext_lows, cw_ext_highs):
+def do_intrinsic_update_mt(n_chain, psrs, pta, samples, itrb, Ts, a_yes, a_no, x0s, x0_extras, FLIs, FPI, par_names, par_names_cw_int, par_names_noise, n_par_ext, log_likelihood, fisher_diag, flm, FLI_swap, de_history, cw_ext_lows, cw_ext_highs):
     #print("EXT")
     for j in range(n_chain):
         assert FLIs[j].cos_gwtheta == x0s[j].cos_gwtheta
@@ -529,9 +534,12 @@ def do_intrinsic_update_mt(n_chain, psrs, pta, samples, itrb, Ts, a_yes, a_no, x
                 random_draws_from_prior = np.random.uniform(np.repeat(cw_ext_lows,cm.n_multi_try), np.repeat(cw_ext_highs,cm.n_multi_try))
                 random_normals = np.random.normal(0.,1.,4*cm.n_multi_try)
 
-                tries, mt_weights, log_Ls = get_mt_weights(new_point, j, FPI, x0s, which_jump, FLIs, FLI_swap, Ts,
+                tries, mt_weights, log_Ls = get_mt_weights(new_point, j, FPI, x0s, x0_extras, which_jump, FLIs, FLI_swap, Ts,
                                                            log_posterior_old, cm.n_multi_try, random_draws_from_prior, random_normals, fisher_diag)
                 
+                #not sure why but still can get nans here...
+                mt_weights = np.where(np.isnan(mt_weights), 0.0, mt_weights)
+
                 if np.sum(mt_weights)==0.0:
                     acc_ratio = -1
                     acc_decide = 0.0
@@ -548,7 +556,7 @@ def do_intrinsic_update_mt(n_chain, psrs, pta, samples, itrb, Ts, a_yes, a_no, x
                         FLIs[j].log10_fgw = x0s[j].log10_fgw
                         FLIs[j].log10_mc = x0s[j].log10_mc
 
-                    ref_tries, ref_mt_weights = get_ref_mt_weights(samples_current, j, FPI, x0s, which_jump, FLIs, FLI_swap, Ts,
+                    ref_tries, ref_mt_weights = get_ref_mt_weights(samples_current, j, FPI, x0s, x0_extras, which_jump, FLIs, FLI_swap, Ts,
                                                                    log_posterior_old, cm.n_multi_try, random_draws_from_prior, random_normals, fisher_diag, tries, chosen_trial)
 
                     ref_mt_weights[chosen_trial] = 1.0
@@ -626,8 +634,8 @@ def do_intrinsic_update_mt(n_chain, psrs, pta, samples, itrb, Ts, a_yes, a_no, x
 
     return FLI_swap
 
-@njit()
-def get_mt_weights(new_point, j, FPI, x0s, which_jump, FLIs, FLI_swap, Ts, log_posterior_old, n_multi_try, random_draws_from_prior, random_normals, fisher_diag):
+@njit(parallel=True, fastmath=True)
+def get_mt_weights(new_point, j, FPI, x0s, x0_extras, which_jump, FLIs, FLI_swap, Ts, log_posterior_old, n_multi_try, random_draws_from_prior, random_normals, fisher_diag):
     """Helper function to quickly return multiple tries and their likelihoods fo MTMCMC"""
     #set up needed arrays
     tries = np.zeros((n_multi_try, new_point.shape[0]))
@@ -635,45 +643,54 @@ def get_mt_weights(new_point, j, FPI, x0s, which_jump, FLIs, FLI_swap, Ts, log_p
     log_Ls = np.zeros(n_multi_try)
 
     jump_idx = x0s[j].idx_cw_ext
+
+    loopsize = len(x0_extras)
+
+    #print("-"*30)
+    #print(FLI_swap.cos_gwtheta)
+    #print(FLIs[j].cos_gwtheta)
     
     #get mt_weights --------------------------------------------------------------------------------------------------------
-    for kk in range(n_multi_try):
-        tries[kk,:] = np.copy(new_point)
-        
-        for ii,ll in enumerate(jump_idx):
-            if ii < 4: #common parameters --> do fisher update
-                tries[kk,ll] += fisher_diag[j][ll]*random_normals[kk + n_multi_try*ii]
-            else: #psr phases --> do prior draw
-                tries[kk,ll] = random_draws_from_prior[kk + n_multi_try*ii]
+    for KK in prange(loopsize):
+        for kk in range(int(n_multi_try/loopsize)):
+            itrkk = KK*loopsize+kk
+            tries[itrkk,:] = np.copy(new_point)
+            
+            for ii,ll in enumerate(jump_idx):
+                if ii < 4: #common parameters --> do fisher update
+                    tries[itrkk,ll] += fisher_diag[j][ll]*random_normals[itrkk + n_multi_try*ii]
+                else: #psr phases --> do prior draw
+                    tries[itrkk,ll] = random_draws_from_prior[itrkk + n_multi_try*ii]
 
-        tries[kk,:] = correct_extrinsic(tries[kk,:],x0s[j])
-        x0s[j].update_params(tries[kk,:])
+            tries[itrkk,:] = correct_extrinsic(tries[itrkk,:],x0_extras[KK])
+            x0_extras[KK].update_params(tries[itrkk,:])
+            #print(x0_extras[KK].cos_gwtheta)
 
-        if which_jump == 1:
-            log_Ls[kk] = FLI_swap.get_lnlikelihood(x0s[j])
-        else:
-            log_Ls[kk] = FLIs[j].get_lnlikelihood(x0s[j])
-        log_prior_new = CWFastPrior.get_lnprior_helper(tries[kk,:], FPI.uniform_par_ids, FPI.uniform_lows, FPI.uniform_highs,
-                                                                    FPI.normal_par_ids, FPI.normal_mus, FPI.normal_sigs)
-        log_posterior_new = log_Ls[kk]/Ts[j] + log_prior_new
+            if which_jump == 1:
+                log_Ls[itrkk] = FLI_swap.get_lnlikelihood(x0_extras[KK])
+            else:
+                log_Ls[itrkk] = FLIs[j].get_lnlikelihood(x0_extras[KK])
+            log_prior_new = CWFastPrior.get_lnprior_helper(tries[itrkk,:], FPI.uniform_par_ids, FPI.uniform_lows, FPI.uniform_highs,
+                                                                        FPI.normal_par_ids, FPI.normal_mus, FPI.normal_sigs)
+            log_posterior_new = log_Ls[itrkk]/Ts[j] + log_prior_new
 
-        if log_prior_new>-np.inf:
-            mt_weights[kk] = np.exp(log_posterior_new - log_posterior_old)
-        else:
-            mt_weights[kk] = 0.0
-        
-        #TODO: check actually why we get nans sometimes
-        #this if loop avoids the situation where for some funky reason
-        #log_posterior_new=nan, which gives errors below
-        #not a problem in regular MCMCs, because a nan acceptance probability results in a rejection
-        if np.isnan(mt_weights[kk]):
-            mt_weights[kk] = 0.0
+            if log_prior_new>-np.inf:
+                mt_weights[itrkk] = np.exp(log_posterior_new - log_posterior_old)
+            else:
+                mt_weights[itrkk] = 0.0
+            
+            #TODO: check actually why we get nans sometimes
+            #this if loop avoids the situation where for some funky reason
+            #log_posterior_new=nan, which gives errors below
+            #not a problem in regular MCMCs, because a nan acceptance probability results in a rejection
+            if np.isnan(mt_weights[itrkk]):
+                mt_weights[itrkk] = 0.0
 
     return tries, mt_weights, log_Ls
 
 
-@njit()
-def get_ref_mt_weights(samples_current, j, FPI, x0s, which_jump, FLIs, FLI_swap, Ts, log_posterior_old, n_multi_try, random_draws_from_prior, random_normals, fisher_diag, tries, chosen_trial):
+@njit(parallel=True, fastmath=True)
+def get_ref_mt_weights(samples_current, j, FPI, x0s, x0_extras, which_jump, FLIs, FLI_swap, Ts, log_posterior_old, n_multi_try, random_draws_from_prior, random_normals, fisher_diag, tries, chosen_trial):
     """Helper function to quickly return multiple tries and their likelihoods fo MTMCMC"""
     #set up needed arrays
     ref_tries = np.zeros((n_multi_try, samples_current.shape[0]))
@@ -681,40 +698,41 @@ def get_ref_mt_weights(samples_current, j, FPI, x0s, which_jump, FLIs, FLI_swap,
 
     jump_idx = x0s[j].idx_cw_ext
 
+    loopsize = len(x0_extras)
+
     #get ref_mt_weights ----------------------------------------------------------------------------------------------------
-    for kk in range(n_multi_try):
-        ref_tries[kk,:] = np.copy(samples_current)
+    for KK in prange(loopsize):
+        for kk in range(int(n_multi_try/loopsize)):
+            itrkk = KK*loopsize+kk
+            ref_tries[itrkk,:] = np.copy(samples_current)
 
-        for ii,ll in enumerate(jump_idx):
-            if ii < 4: #common parameters --> do fisher update
-                jump = fisher_diag[j][ll]*np.random.normal(0.,1.)
-                ref_tries[kk,ll] = tries[chosen_trial,ll] + jump
-            else: #psr phases --> do prior draw
-                tries[kk,ll] = random_draws_from_prior[kk + n_multi_try*ii]
-                ref_tries[kk,ll] = random_draws_from_prior[kk + n_multi_try*ii]
+            for ii,ll in enumerate(jump_idx):
+                if ii < 4: #common parameters --> do fisher update
+                    jump = fisher_diag[j][ll]*np.random.normal(0.,1.)
+                    ref_tries[itrkk,ll] = tries[chosen_trial,ll] + jump
+                else: #psr phases --> do prior draw
+                    tries[itrkk,ll] = random_draws_from_prior[itrkk + n_multi_try*ii]
+                    ref_tries[itrkk,ll] = random_draws_from_prior[itrkk + n_multi_try*ii]
 
-        ref_tries[kk,:] = correct_extrinsic(ref_tries[kk,:],x0s[j])
-        x0s[j].update_params(ref_tries[kk,:])
+            ref_tries[itrkk,:] = correct_extrinsic(ref_tries[itrkk,:],x0_extras[KK])
+            x0_extras[KK].update_params(ref_tries[itrkk,:])
 
-        #print(FLIs[j].cos_gwtheta)
-        #print(x0s[j].cos_gwtheta)
+            log_L = FLIs[j].get_lnlikelihood(x0_extras[KK])
+            log_prior_ref = CWFastPrior.get_lnprior_helper(ref_tries[itrkk,:], FPI.uniform_par_ids, FPI.uniform_lows, FPI.uniform_highs,
+                                                                            FPI.normal_par_ids, FPI.normal_mus, FPI.normal_sigs)
+            log_posterior_ref = log_L/Ts[j] + log_prior_ref
 
-        log_L = FLIs[j].get_lnlikelihood(x0s[j])
-        log_prior_ref = CWFastPrior.get_lnprior_helper(ref_tries[kk,:], FPI.uniform_par_ids, FPI.uniform_lows, FPI.uniform_highs,
-                                                                        FPI.normal_par_ids, FPI.normal_mus, FPI.normal_sigs)
-        log_posterior_ref = log_L/Ts[j] + log_prior_ref
-
-        if log_prior_ref>-np.inf:
-            ref_mt_weights[kk] = np.exp(log_posterior_ref - log_posterior_old)
-        else:
-            ref_mt_weights[kk] = 0.0
-        
-        #TODO: check actually why we get nans sometimes
-        #this if loop avoids the situation where for some funky reason
-        #log_posterior_new=nan, which gives errors below
-        #not a problem in regular MCMCs, because a nan acceptance probability results in a rejection
-        if np.isnan(ref_mt_weights[kk]):
-            ref_mt_weights[kk] = 0.0
+            if log_prior_ref>-np.inf:
+                ref_mt_weights[itrkk] = np.exp(log_posterior_ref - log_posterior_old)
+            else:
+                ref_mt_weights[itrkk] = 0.0
+            
+            #TODO: check actually why we get nans sometimes
+            #this if loop avoids the situation where for some funky reason
+            #log_posterior_new=nan, which gives errors below
+            #not a problem in regular MCMCs, because a nan acceptance probability results in a rejection
+            if np.isnan(ref_mt_weights[itrkk]):
+                ref_mt_weights[itrkk] = 0.0
 
     return ref_tries, ref_mt_weights
 
