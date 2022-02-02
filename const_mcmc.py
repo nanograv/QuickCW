@@ -34,7 +34,7 @@ rn_jump_weight = 0.6
 common_jump_weight = 0.2
 
 #differencial evolution parameters
-de_history_size = 1_000
+de_history_size = 10_000
 sigma_de = 0.1
 
 #multiple try MCMC parameters

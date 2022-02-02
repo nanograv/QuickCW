@@ -256,6 +256,18 @@ def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int
         fisher_diag[j,:] = get_fisher_diagonal(samples[j,0,:], par_names, par_names_cw_ext, par_names_noise, x0_swap, flm, FLI_swap)
         print(fisher_diag[j,:])
 
+    #calculate RN fisher eigenvectors (using offdiagonals as well)
+    eig_rn = np.broadcast_to(np.eye(2)*0.1, (n_chain, len(pta.pulsars), 2, 2) ).copy()
+    print("Calculating RN fishers")
+    for j in range(n_chain):
+        for i in range(len(pta.pulsars)):
+            if j==0:
+                print(par_names_noise[2*i:2*(i+1)])
+            rn_eigvec = get_rn_fisher_eigenvectors(samples[j,0,:], par_names, par_names_noise[2*i:2*(i+1)], pta)
+            eig_rn[j,i,:,:] = rn_eigvec[:,:]
+            if j==0:
+                print(rn_eigvec)
+    
     #set up differencial evolution
     de_history = np.zeros((n_chain, cm.de_history_size, len(par_names)))
     for j in range(n_chain):
@@ -356,7 +368,7 @@ def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int
         do_extrinsic_block(n_chain, samples, itrb, Ts, x0s, FLIs, FPI, len(par_names), len(par_names_cw_ext), log_likelihood, n_int_block-2, fisher_diag, a_yes, a_no)
         #update intrinsic parameters once a block
         #FLI_swap = do_intrinsic_update_dr(n_chain, psrs, pta, samples, itrb+n_int_block-2, Ts, a_yes_counts, a_no_counts, x0s, FLIs, FPI, par_names, par_names_cw_int, par_names_noise, len(par_names_cw_ext), log_likelihood, fisher_diag, flm, FLI_swap, de_history, n_dr_delays)
-        FLI_swap = do_intrinsic_update_mt(n_chain, psrs, pta, samples, itrb+n_int_block-2, Ts, a_yes, a_no, x0s, x0_extras, FLIs, FPI, par_names, par_names_cw_int, par_names_noise, len(par_names_cw_ext), log_likelihood, fisher_diag, flm, FLI_swap, de_history, cw_ext_lows, cw_ext_highs)
+        FLI_swap = do_intrinsic_update_mt(n_chain, psrs, pta, samples, itrb+n_int_block-2, Ts, a_yes, a_no, x0s, x0_extras, FLIs, FPI, par_names, par_names_cw_int, par_names_noise, len(par_names_cw_ext), log_likelihood, fisher_diag, eig_rn, flm, FLI_swap, de_history, cw_ext_lows, cw_ext_highs)
         do_pt_swap(n_chain, samples, itrb+n_int_block-1, Ts, a_yes, a_no, x0s, FLIs, log_likelihood, fisher_diag)
 
         #update de history array
@@ -368,6 +380,11 @@ def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int
             for j in range(n_chain):
                 #compute fisher matrix at random recent points in the posterior
                 fisher_diag[j,:] = get_fisher_diagonal(samples[j,np.random.randint(itrb+n_int_block+1),:], par_names, par_names_cw_ext, par_names_noise, x0_swap, flm, FLI_swap)
+            if itrn%(n_update_fisher*10)==0:
+                    for j in range(n_chain):
+                        for jj in range(len(pta.pulsars)):
+                            rn_eigvec = get_rn_fisher_eigenvectors(samples[j,np.random.randint(itrb+n_int_block+1),:], par_names, par_names_noise[2*jj:2*(jj+1)], pta)
+                            eig_rn[j,jj,:,:] = rn_eigvec[:,:]
 
     acc_fraction = a_yes/(a_no+a_yes)
     print("Append to HDF5 file...")
@@ -391,7 +408,7 @@ def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int
 #
 ################################################################################
 #version using multiple try mcmc (based on Table 6 of https://vixra.org/pdf/1712.0244v3.pdf)
-def do_intrinsic_update_mt(n_chain, psrs, pta, samples, itrb, Ts, a_yes, a_no, x0s, x0_extras, FLIs, FPI, par_names, par_names_cw_int, par_names_noise, n_par_ext, log_likelihood, fisher_diag, flm, FLI_swap, de_history, cw_ext_lows, cw_ext_highs):
+def do_intrinsic_update_mt(n_chain, psrs, pta, samples, itrb, Ts, a_yes, a_no, x0s, x0_extras, FLIs, FPI, par_names, par_names_cw_int, par_names_noise, n_par_ext, log_likelihood, fisher_diag, eig_rn, flm, FLI_swap, de_history, cw_ext_lows, cw_ext_highs):
     #print("EXT")
     for j in range(n_chain):
         assert FLIs[j].cos_gwtheta == x0s[j].cos_gwtheta
@@ -426,7 +443,7 @@ def do_intrinsic_update_mt(n_chain, psrs, pta, samples, itrb, Ts, a_yes, a_no, x
             #idx_choose_psr = np.random.randint(0,x0s[j].Npsr,cm.n_noise_main)
             idx_choose_psr = list(range(len(psrs)))
             idx_choose = np.concatenate((x0s[j].idx_rn_gammas,x0s[j].idx_rn_log10_As))
-            scaling = 2.38/np.sqrt(n_jump_loc)
+            scaling = 2.38/np.sqrt(n_jump_loc/2)
             #scaling = 1/np.sqrt(n_jump_loc)
         elif which_jump==2: #update common intrinsic parameters (chirp mass, frequency, sky location[2])
             n_jump_loc = 4# 2+cm.n_dist_extra
@@ -465,11 +482,25 @@ def do_intrinsic_update_mt(n_chain, psrs, pta, samples, itrb, Ts, a_yes, a_no, x
             #else: #do smaller jump scaled by alpha0
             #    new_point[idx_choose] += alpha0*(1+alpha)*(x1-x2)
         elif which_jump_type==2: #do regular fisher jump
-            #fisher_diag_loc = scaling * np.sqrt(Ts[j])*fisher_diag[j][idx_choose]
-            fisher_diag_loc = scaling * fisher_diag[j][idx_choose]
-            jump = np.zeros(len(par_names))
-            jump[idx_choose] += fisher_diag_loc*np.random.normal(0.,1.,n_jump_loc)
-            new_point = samples_current + jump
+            if which_jump==1: #use RN eigenvectors
+                which_eig = np.random.choice(2, size=int(n_jump_loc/2))
+                jump = np.zeros(len(par_names))
+                for ll in range(int(n_jump_loc/2)):
+                    idx_psr = np.array([idx_choose[ll], idx_choose[which_eig.size+ll]])
+                    jump[idx_psr] = np.copy(eig_rn[j,idx_choose_psr[ll],which_eig[ll],:])*np.random.normal(0., 1.)*scaling
+                    #if j==0:
+                    #    print(idx_psr)
+                    #    print(idx_choose_psr[ll])
+                    #    print(which_eig[ll])
+                    #    print(jump[idx_psr])
+                #print(jump)
+                new_point = samples_current + jump
+            else: #use diagonal fishers
+                #fisher_diag_loc = scaling * np.sqrt(Ts[j])*fisher_diag[j][idx_choose]
+                fisher_diag_loc = scaling * fisher_diag[j][idx_choose]
+                jump = np.zeros(len(par_names))
+                jump[idx_choose] += fisher_diag_loc*np.random.normal(0.,1.,n_jump_loc)
+                new_point = samples_current + jump
 
         #TODO check wrapping is working right
         new_point = correct_intrinsic(new_point,x0s[j])
@@ -1363,6 +1394,83 @@ def get_fisher_diagonal(samples_fisher, par_names, par_names_cw_ext, par_names_n
     fisher_diag[fisher_diag<eig_limit] = eig_limit
 
     return 1/np.sqrt(fisher_diag)
+
+################################################################################
+#
+#CALCULATE RN FISHER EIGENVECTORS
+#
+################################################################################
+def get_rn_fisher_eigenvectors(params, par_names, par_names_to_perturb, pta, epsilon=1e-4):
+    dim = len(par_names_to_perturb)
+    fisher = np.zeros((dim,dim))
+
+    #lnlikelihood at specified point
+    nn = pta.get_lnlikelihood(params)
+
+    #calculate diagonal elements
+    for i in range(dim):
+        #create parameter vectors with +-epsilon in the ith component
+        paramsPP = np.copy(params)
+        paramsMM = np.copy(params)
+        paramsPP[par_names.index(par_names_to_perturb[i])] += 2*epsilon
+        paramsMM[par_names.index(par_names_to_perturb[i])] -= 2*epsilon
+        
+        #lnlikelihood at +-epsilon positions
+        pp = pta.get_lnlikelihood(paramsPP)
+        mm = pta.get_lnlikelihood(paramsMM)
+
+        #calculate diagonal elements of the Hessian from a central finite element scheme
+        #note the minus sign compared to the regular Hessian
+        fisher[i,i] = -(pp - 2.0*nn + mm)/(4.0*epsilon*epsilon)
+
+    #calculate off-diagonal elements
+    for i in range(dim):
+        for j in range(i+1,dim):
+            #create parameter vectors with ++, --, +-, -+ epsilon in the ith and jth component
+            paramsPP = np.copy(params)
+            paramsMM = np.copy(params)
+            paramsPM = np.copy(params)
+            paramsMP = np.copy(params)
+
+            paramsPP[par_names.index(par_names_to_perturb[i])] += epsilon
+            paramsPP[par_names.index(par_names_to_perturb[j])] += epsilon
+            paramsMM[par_names.index(par_names_to_perturb[i])] -= epsilon
+            paramsMM[par_names.index(par_names_to_perturb[j])] -= epsilon
+            paramsPM[par_names.index(par_names_to_perturb[i])] += epsilon
+            paramsPM[par_names.index(par_names_to_perturb[j])] -= epsilon
+            paramsMP[par_names.index(par_names_to_perturb[i])] -= epsilon
+            paramsMP[par_names.index(par_names_to_perturb[j])] += epsilon
+
+            pp = pta.get_lnlikelihood(paramsPP)
+            mm = pta.get_lnlikelihood(paramsMM)
+            pm = pta.get_lnlikelihood(paramsPM)
+            mp = pta.get_lnlikelihood(paramsMP)
+
+            #calculate off-diagonal elements of the Hessian from a central finite element scheme
+            #note the minus sign compared to the regular Hessian
+            fisher[i,j] = -(pp - mp - pm + mm)/(4.0*epsilon*epsilon)
+            fisher[j,i] = -(pp - mp - pm + mm)/(4.0*epsilon*epsilon)
+
+    try:
+        #Filter nans and infs and replace them with 1s
+        #this will imply that we will set the eigenvalue to 100 a few lines below
+        FISHER = np.where(np.isfinite(fisher), fisher, 1.0)
+        if not np.array_equal(FISHER, fisher):
+            print("Changed some nan elements in the Fisher matrix to 1.0")
+
+        #Find eigenvalues and eigenvectors of the Fisher matrix
+        w, v = np.linalg.eig(FISHER)
+
+        #filter w for eigenvalues smaller than 100 and set those to 100 -- Neil's trick
+        eig_limit = 1.0#0.25
+
+        W = np.where(np.abs(w)>eig_limit, w, eig_limit)
+
+        return (np.sqrt(1.0/np.abs(W))*v).T
+
+    except:
+        print("An Error occured in the eigenvalue calculation")
+        return np.array(False)
 
 @jitclass([('uniform_par_ids',nb.int64[:]),('uniform_lows',nb.float64[:]),('uniform_highs',nb.float64[:]),\
            ('normal_par_ids',nb.int64[:]),('normal_mus',nb.float64[:]),('normal_sigs',nb.float64[:])])
