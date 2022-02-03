@@ -38,4 +38,4 @@ de_history_size = 10_000
 sigma_de = 0.1
 
 #multiple try MCMC parameters
-n_multi_try = 3_000
+n_multi_try = 30_000#3_000

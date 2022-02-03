@@ -684,12 +684,12 @@ def get_mt_weights(new_point, j, FPI, x0s, x0_extras, which_jump, FLIs, FLI_swap
     #get mt_weights --------------------------------------------------------------------------------------------------------
     for KK in prange(loopsize):
         for kk in range(int(n_multi_try/loopsize)):
-            itrkk = KK*loopsize+kk
+            itrkk = KK*int(n_multi_try/loopsize)+kk
             tries[itrkk,:] = np.copy(new_point)
             
             for ii,ll in enumerate(jump_idx):
                 if ii < 4: #common parameters --> do fisher update
-                    tries[itrkk,ll] += fisher_diag[j][ll]*random_normals[itrkk + n_multi_try*ii]
+                    tries[itrkk,ll] += fisher_diag[j][ll]*random_normals[itrkk + n_multi_try*ii]/2.0
                 else: #psr phases --> do prior draw
                     tries[itrkk,ll] = random_draws_from_prior[itrkk + n_multi_try*ii]
 
@@ -734,12 +734,12 @@ def get_ref_mt_weights(samples_current, j, FPI, x0s, x0_extras, which_jump, FLIs
     #get ref_mt_weights ----------------------------------------------------------------------------------------------------
     for KK in prange(loopsize):
         for kk in range(int(n_multi_try/loopsize)):
-            itrkk = KK*loopsize+kk
+            itrkk = KK*int(n_multi_try/loopsize)+kk
             ref_tries[itrkk,:] = np.copy(samples_current)
 
             for ii,ll in enumerate(jump_idx):
                 if ii < 4: #common parameters --> do fisher update
-                    jump = fisher_diag[j][ll]*np.random.normal(0.,1.)
+                    jump = fisher_diag[j][ll]*np.random.normal(0.,1.)/2.0
                     ref_tries[itrkk,ll] = tries[chosen_trial,ll] + jump
                 else: #psr phases --> do prior draw
                     tries[itrkk,ll] = random_draws_from_prior[itrkk + n_multi_try*ii]
