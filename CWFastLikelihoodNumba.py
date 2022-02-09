@@ -804,22 +804,34 @@ class FastLikeInfo:
 
     def get_lnlikelihood(self,x0):
         """wrapper to get the log likelihood"""
-        assert self.cos_gwtheta == x0.cos_gwtheta
-        assert self.gwphi == x0.gwphi
-        assert self.log10_fgw == x0.log10_fgw
-        assert self.log10_mc == x0.log10_mc
+        #assert self.cos_gwtheta == x0.cos_gwtheta
+        #assert self.gwphi == x0.gwphi
+        #assert self.log10_fgw == x0.log10_fgw
+        #assert self.log10_mc == x0.log10_mc
+        #assert np.isclose(self.cos_gwtheta, x0.cos_gwtheta)
+        #assert np.isclose(self.gwphi, x0.gwphi)
+        #assert np.isclose(self.log10_fgw, x0.log10_fgw)
+        #assert np.isclose(self.log10_mc, x0.log10_mc)
 
         return get_lnlikelihood_helper(x0,self.resres,self.logdet,self.pos,self.pdist,self.NN,self.MMs)
 
     def update_pulsar_distance(self,x0,psr_idx):
         """recalculate MM and NN only for the affected pulsar if we only change a single pulsar distance"""
         #this method is just a wrapper for the special case of only 1 pulsar but it won't force recompilation
-        assert self.cos_gwtheta == x0.cos_gwtheta
-        assert self.gwphi == x0.gwphi
-        assert self.log10_fgw == x0.log10_fgw
-        assert self.log10_mc == x0.log10_mc
-        assert np.all(self.rn_gammas==x0.rn_gammas)
-        assert np.all(self.rn_log10_As==x0.rn_log10_As)
+        #assert self.cos_gwtheta == x0.cos_gwtheta
+        #assert self.gwphi == x0.gwphi
+        #assert self.log10_fgw == x0.log10_fgw
+        #assert self.log10_mc == x0.log10_mc
+        #self.rn_gammas = x0.rn_gammas.copy() #hot fix
+        #self.rn_log10_As = x0.rn_log10_As.copy()
+        #assert np.all(self.rn_gammas==x0.rn_gammas)
+        #assert np.all(self.rn_log10_As==x0.rn_log10_As)
+        #assert np.isclose(self.cos_gwtheta, x0.cos_gwtheta)
+        #assert np.isclose(self.gwphi, x0.gwphi)
+        #assert np.isclose(self.log10_fgw, x0.log10_fgw)
+        #assert np.isclose(self.log10_mc, x0.log10_mc)
+        #assert np.allclose(self.rn_gammas, x0.rn_gammas)
+        #assert np.allclose(self.rn_log10_As, x0.rn_log10_As)
         resres_old = self.resres_array.copy()
         update_intrinsic_params2(x0,self.isqNvecs,self.Nrs,self.pos,self.pdist,self.toas, self.NN, self.MMs,self.TNvs,self.chol_Sigmas,np.array([psr_idx]),self.resres_array,self.dotTNrs)
         #protect from incorrectly overwriting
@@ -828,12 +840,20 @@ class FastLikeInfo:
 
     def update_pulsar_distances(self,x0,psr_idxs):
         """recalculate MM and NN only for the affected pulsar if  change an arbitrary number of single pulsar distances"""
-        assert self.cos_gwtheta == x0.cos_gwtheta
-        assert self.gwphi == x0.gwphi
-        assert self.log10_fgw == x0.log10_fgw
-        assert self.log10_mc == x0.log10_mc
-        assert np.all(self.rn_gammas==x0.rn_gammas)
-        assert np.all(self.rn_log10_As==x0.rn_log10_As)
+        #assert self.cos_gwtheta == x0.cos_gwtheta
+        #assert self.gwphi == x0.gwphi
+        #assert self.log10_fgw == x0.log10_fgw
+        #assert self.log10_mc == x0.log10_mc
+        #self.rn_gammas = x0.rn_gammas.copy() #hot fix
+        #self.rn_log10_As = x0.rn_log10_As.copy()
+        #assert np.all(self.rn_gammas==x0.rn_gammas)
+        #assert np.all(self.rn_log10_As==x0.rn_log10_As)
+        #assert np.isclose(self.cos_gwtheta, x0.cos_gwtheta)
+        #assert np.isclose(self.gwphi, x0.gwphi)
+        #assert np.isclose(self.log10_fgw, x0.log10_fgw)
+        #assert np.isclose(self.log10_mc, x0.log10_mc)
+        #assert np.allclose(self.rn_gammas, x0.rn_gammas)
+        #assert np.allclose(self.rn_log10_As, x0.rn_log10_As)
         #leave dist_only in even though it is not currently respected in case it turns out to be faster later
         resres_temp = self.resres_array.copy()
         resres_old = self.resres_array.copy()
