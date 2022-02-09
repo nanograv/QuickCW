@@ -53,6 +53,7 @@ import const_mcmc as cm
 #MAIN MCMC ENGINE
 #
 ################################################################################
+#@profile
 def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int_block=1000, save_every_n=10_000, thin=10, samples_precision=np.single, savefile=None, n_update_fisher=100_000):
     #freq = 1e-8
     #safety checks on input variables
@@ -263,10 +264,19 @@ def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int
         for i in range(len(pta.pulsars)):
             if j==0:
                 print(par_names_noise[2*i:2*(i+1)])
-            rn_eigvec = get_rn_fisher_eigenvectors(samples[j,0,:], par_names, par_names_noise[2*i:2*(i+1)], pta)
+            rn_eigvec = get_fisher_eigenvectors(samples[j,0,:], par_names, par_names_noise[2*i:2*(i+1)], pta)
             eig_rn[j,i,:,:] = rn_eigvec[:,:]
             if j==0:
                 print(rn_eigvec)
+
+    #calculate common morphological fisher eigenvectors (using offdiagonals as well)
+    eig_common = np.broadcast_to(np.eye(4)*0.1, (n_chain, 4, 4) ).copy()
+    print("Calculating sky location/frequency/chirp mass fishers")
+    for j in range(n_chain):
+        common_eigvec = get_fisher_eigenvectors(samples[j,0,:], par_names, par_names_cw_int[:4], pta)
+        eig_common[j,:,:] = common_eigvec[:,:]
+        if j==0:
+            print(common_eigvec)
     
     #set up differencial evolution
     de_history = np.zeros((n_chain, cm.de_history_size, len(par_names)))
@@ -368,7 +378,7 @@ def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int
         do_extrinsic_block(n_chain, samples, itrb, Ts, x0s, FLIs, FPI, len(par_names), len(par_names_cw_ext), log_likelihood, n_int_block-2, fisher_diag, a_yes, a_no)
         #update intrinsic parameters once a block
         #FLI_swap = do_intrinsic_update_dr(n_chain, psrs, pta, samples, itrb+n_int_block-2, Ts, a_yes_counts, a_no_counts, x0s, FLIs, FPI, par_names, par_names_cw_int, par_names_noise, len(par_names_cw_ext), log_likelihood, fisher_diag, flm, FLI_swap, de_history, n_dr_delays)
-        FLI_swap = do_intrinsic_update_mt(n_chain, psrs, pta, samples, itrb+n_int_block-2, Ts, a_yes, a_no, x0s, x0_extras, FLIs, FPI, par_names, par_names_cw_int, par_names_noise, len(par_names_cw_ext), log_likelihood, fisher_diag, eig_rn, flm, FLI_swap, de_history, cw_ext_lows, cw_ext_highs)
+        FLI_swap = do_intrinsic_update_mt(n_chain, psrs, pta, samples, itrb+n_int_block-2, Ts, a_yes, a_no, x0s, x0_extras, FLIs, FPI, par_names, par_names_cw_int, par_names_noise, len(par_names_cw_ext), log_likelihood, fisher_diag, eig_rn, eig_common, flm, FLI_swap, de_history, cw_ext_lows, cw_ext_highs)
         do_pt_swap(n_chain, samples, itrb+n_int_block-1, Ts, a_yes, a_no, x0s, FLIs, log_likelihood, fisher_diag)
 
         #update de history array
@@ -383,8 +393,10 @@ def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int
             if itrn%(n_update_fisher*10)==0:
                     for j in range(n_chain):
                         for jj in range(len(pta.pulsars)):
-                            rn_eigvec = get_rn_fisher_eigenvectors(samples[j,np.random.randint(itrb+n_int_block+1),:], par_names, par_names_noise[2*jj:2*(jj+1)], pta)
+                            rn_eigvec = get_fisher_eigenvectors(samples[j,np.random.randint(itrb+n_int_block+1),:], par_names, par_names_noise[2*jj:2*(jj+1)], pta)
                             eig_rn[j,jj,:,:] = rn_eigvec[:,:]
+                        common_eigvec = get_fisher_eigenvectors(samples[j,np.random.randint(itrb+n_int_block+1),:], par_names, par_names_cw_int[:4], pta)
+                        eig_common[j,:,:] = common_eigvec[:,:]
 
     acc_fraction = a_yes/(a_no+a_yes)
     print("Append to HDF5 file...")
@@ -408,7 +420,8 @@ def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int
 #
 ################################################################################
 #version using multiple try mcmc (based on Table 6 of https://vixra.org/pdf/1712.0244v3.pdf)
-def do_intrinsic_update_mt(n_chain, psrs, pta, samples, itrb, Ts, a_yes, a_no, x0s, x0_extras, FLIs, FPI, par_names, par_names_cw_int, par_names_noise, n_par_ext, log_likelihood, fisher_diag, eig_rn, flm, FLI_swap, de_history, cw_ext_lows, cw_ext_highs):
+#@profile
+def do_intrinsic_update_mt(n_chain, psrs, pta, samples, itrb, Ts, a_yes, a_no, x0s, x0_extras, FLIs, FPI, par_names, par_names_cw_int, par_names_noise, n_par_ext, log_likelihood, fisher_diag, eig_rn, eig_common, flm, FLI_swap, de_history, cw_ext_lows, cw_ext_highs):
     #print("EXT")
     for j in range(n_chain):
         #assert FLIs[j].cos_gwtheta == x0s[j].cos_gwtheta
@@ -494,6 +507,11 @@ def do_intrinsic_update_mt(n_chain, psrs, pta, samples, itrb, Ts, a_yes, a_no, x
                 for ll in range(int(n_jump_loc/2)):
                     idx_psr = np.array([idx_choose[ll], idx_choose[which_eig.size+ll]])
                     jump[idx_psr] = np.copy(eig_rn[j,idx_choose_psr[ll],which_eig[ll],:])*np.random.normal(0., 1.)*scaling
+                new_point = samples_current + jump
+            elif which_jump==2:
+                which_eig = np.random.choice(4, size=1)
+                jump = np.zeros(len(par_names))
+                jump[idx_choose] = np.copy(eig_common[j,which_eig,:])*np.random.normal(0., 1.)*scaling
                 new_point = samples_current + jump
             else: #use diagonal fishers
                 #fisher_diag_loc = scaling * np.sqrt(Ts[j])*fisher_diag[j][idx_choose]
@@ -1423,7 +1441,7 @@ def get_fisher_diagonal(samples_fisher, par_names, par_names_cw_ext, par_names_n
 #CALCULATE RN FISHER EIGENVECTORS
 #
 ################################################################################
-def get_rn_fisher_eigenvectors(params, par_names, par_names_to_perturb, pta, epsilon=1e-4):
+def get_fisher_eigenvectors(params, par_names, par_names_to_perturb, pta, epsilon=1e-4):
     dim = len(par_names_to_perturb)
     fisher = np.zeros((dim,dim))
 
