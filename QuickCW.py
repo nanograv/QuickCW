@@ -375,7 +375,7 @@ def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int
             #    print("DR not accepted:", len(np.where(np.isnan(np.array(n_dr_delays)))[0]))
 
         #always do pt steps in extrinsic
-        do_extrinsic_block(n_chain, samples, itrb, Ts, x0s, FLIs, FPI, len(par_names), len(par_names_cw_ext), log_likelihood, n_int_block-2, fisher_diag, a_yes, a_no)
+        do_extrinsic_block(n_chain, samples, itrb, Ts, x0s, FLIs, FPI, len(par_names), len(par_names_cw_ext), log_likelihood, n_int_block-2, fisher_diag, a_yes, a_no, cw_ext_lows, cw_ext_highs)
         #update intrinsic parameters once a block
         #FLI_swap = do_intrinsic_update_dr(n_chain, psrs, pta, samples, itrb+n_int_block-2, Ts, a_yes_counts, a_no_counts, x0s, FLIs, FPI, par_names, par_names_cw_int, par_names_noise, len(par_names_cw_ext), log_likelihood, fisher_diag, flm, FLI_swap, de_history, n_dr_delays)
         FLI_swap = do_intrinsic_update_mt(n_chain, psrs, pta, samples, itrb+n_int_block-2, Ts, a_yes, a_no, x0s, x0_extras, FLIs, FPI, par_names, par_names_cw_int, par_names_noise, len(par_names_cw_ext), log_likelihood, fisher_diag, eig_rn, eig_common, flm, FLI_swap, de_history, cw_ext_lows, cw_ext_highs)
@@ -424,12 +424,6 @@ def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int
 def do_intrinsic_update_mt(n_chain, psrs, pta, samples, itrb, Ts, a_yes, a_no, x0s, x0_extras, FLIs, FPI, par_names, par_names_cw_int, par_names_noise, n_par_ext, log_likelihood, fisher_diag, eig_rn, eig_common, flm, FLI_swap, de_history, cw_ext_lows, cw_ext_highs):
     #print("EXT")
     for j in range(n_chain):
-        #assert FLIs[j].cos_gwtheta == x0s[j].cos_gwtheta
-        #assert FLIs[j].gwphi == x0s[j].gwphi
-        #assert FLIs[j].log10_fgw == x0s[j].log10_fgw
-        #assert FLIs[j].log10_mc == x0s[j].log10_mc
-        #assert np.all(FLIs[j].rn_gammas==x0s[j].rn_gammas)
-        #assert np.all(FLIs[j].rn_log10_As==x0s[j].rn_log10_As)
         assert np.isclose(FLIs[j].cos_gwtheta, x0s[j].cos_gwtheta)
         assert np.isclose(FLIs[j].gwphi, x0s[j].gwphi)
         assert np.isclose(FLIs[j].log10_fgw, x0s[j].log10_fgw)
@@ -472,11 +466,19 @@ def do_intrinsic_update_mt(n_chain, psrs, pta, samples, itrb, Ts, a_yes, a_no, x
             #scaling = 0.5
 
         #decide what kind of jump we do
-        jump_type_decide = uniform(0.0, 1.0, 1)
-        total_type_weight = cm.prior_draw_prob + cm.de_prob + cm.fisher_prob
-        which_jump_type = np.random.choice(3, p=[cm.prior_draw_prob/total_type_weight,
+        if which_jump==1: #RN jump --> don't do prior draws, only fisher and DE
+            total_type_weight = cm.de_prob + cm.fisher_prob
+            which_jump_type = np.random.choice(3, p=[0.0,
                                                  cm.de_prob/total_type_weight,
                                                  cm.fisher_prob/total_type_weight])
+        else:
+            if j==(n_chain-1): #hottest chain and not RN --> only do prior draws
+                which_jump_type = 0
+            else: #not hottest chain and not RN --> choose jump type based in default probabilities of them
+                total_type_weight = cm.prior_draw_prob + cm.de_prob + cm.fisher_prob
+                which_jump_type = np.random.choice(3, p=[cm.prior_draw_prob/total_type_weight,
+                                                         cm.de_prob/total_type_weight,
+                                                         cm.fisher_prob/total_type_weight])
         if which_jump_type==0: #do prior draw
             #print("Prior draw")            
             new_point = np.copy(samples_current)
@@ -648,17 +650,9 @@ def do_intrinsic_update_mt(n_chain, psrs, pta, samples, itrb, Ts, a_yes, a_no, x
             #Add to both elements of a_no, so we can get acceptance over total jumps w/ and w/o projection perturbation
             a_no[6*which_jump+2*which_jump_type,j] += 1
             a_no[6*which_jump+2*which_jump_type+1,j] += 1
-            #if np.sum(mt_weights)==0.0:
-            #    a_no[6*which_jump+2*which_jump_type+1,j] += 1
-            #else:
-            #    if chosen_trial==0:
-            #        a_no[6*which_jump+2*which_jump_type,j] += 1
-            #    else:
-            #        a_no[6*which_jump+2*which_jump_type+1,j] += 1
             
             x0s[j].update_params(samples_current)
 
-            #if jump_idx in x0s[j].idx_rn_gammas or jump_idx in x0s[j].idx_rn_log10_As:
             if not which_jump==1:
                 #don't needs to do anything if which_jump==1 because we didn't update FLIs[j] at all,
                 #and FLI_swap will just be completely overwritten next time it is used
@@ -675,12 +669,6 @@ def do_intrinsic_update_mt(n_chain, psrs, pta, samples, itrb, Ts, a_yes, a_no, x
                 #FLIs[j].rn_log10_As = x0s[j].rn_log10_As.copy()
                 #print("sky location, frequency, or chirp mass update")
 
-        #assert FLIs[j].cos_gwtheta == x0s[j].cos_gwtheta
-        #assert FLIs[j].gwphi == x0s[j].gwphi
-        #assert FLIs[j].log10_fgw == x0s[j].log10_fgw
-        #assert FLIs[j].log10_mc == x0s[j].log10_mc
-        #assert np.all(FLIs[j].rn_gammas==x0s[j].rn_gammas)
-        #assert np.all(FLIs[j].rn_log10_As==x0s[j].rn_log10_As)
         assert np.isclose(FLIs[j].cos_gwtheta, x0s[j].cos_gwtheta)
         assert np.isclose(FLIs[j].gwphi, x0s[j].gwphi)
         assert np.isclose(FLIs[j].log10_fgw, x0s[j].log10_fgw)
@@ -831,32 +819,23 @@ def correct_intrinsic(sample,x0):
 #
 ################################################################################
 @njit(parallel=True)
-def do_extrinsic_block(n_chain, samples, itrb, Ts, x0s, FLIs, FPI, n_par_tot, n_par_ext, log_likelihood, n_int_block, fisher_diag,a_yes,a_no):
+def do_extrinsic_block(n_chain, samples, itrb, Ts, x0s, FLIs, FPI, n_par_tot, n_par_ext, log_likelihood, n_int_block, fisher_diag, a_yes, a_no, cw_ext_lows, cw_ext_highs):
 
     for k in range(0,n_int_block,2):
         for j in prange(0,n_chain):
             samples_current = samples[j,itrb+k,:]
 
-            jump = np.zeros(n_par_tot)
-            jump_idx = x0s[j].idx_cw_ext
-            jump[jump_idx] = 2.38/np.sqrt(n_par_ext)*np.sqrt(Ts[j])*fisher_diag[j][jump_idx]*np.random.normal(0.,1.,n_par_ext)
+            if k%10==0: #every 10th k (so every 5th jump) do a prior draw
+                new_point = np.copy(samples_current)
+                jump_idx = x0s[j].idx_cw_ext
+                for ii, idx in enumerate(jump_idx):
+                    new_point[idx] = uniform(cw_ext_lows[ii], cw_ext_highs[ii])
+            else:
+                jump = np.zeros(n_par_tot)
+                jump_idx = x0s[j].idx_cw_ext
+                jump[jump_idx] = 2.38/np.sqrt(n_par_ext)*np.sqrt(Ts[j])*fisher_diag[j][jump_idx]*np.random.normal(0.,1.,n_par_ext)
+                new_point = samples_current + jump
 
-            #jump_select = np.random.randint(0,n_par_ext,cm.n_ext_directions)
-            #jump[jump_idx] += fisher_diag[j][jump_idx]*np.random.normal(0.,1.,cm.n_ext_directions)
-            #print(k,j,x0s[j].cos_gwtheta,samples[j,i%save_every_n,x0s[j].idx_cos_gwtheta])
-            #if jump_idx in x0s[j].idx_phases:
-            #    #print('b1')
-            #    fisher_diag_loc = fisher_diag[j][x0s[j].idx_phases]
-            #    jump[x0s[j].idx_phases] = fisher_diag_loc*np.random.normal(0.,1.,x0s[j].Npsr)
-            #    #for itrp in range(0,cm.n_phase_jumps):
-            #    #    idx_psr = x0s[j].idx_phases[np.random.randint(x0s[j].Npsr)]
-            #    #    jump[idx_psr] += fisher_diag[j,idx_psr]*np.random.normal()
-            #else:
-            #    idx_phases_loc = x0s[j].idx_phases[np.random.randint(0,x0s[j].Npsr,cm.n_phase_extra)]
-            #    jump[jump_idx] = fisher_diag[j][jump_idx]*np.random.normal() #0.5
-            #    jump[idx_phases_loc] += fisher_diag[j][idx_phases_loc]*np.random.normal(0.,1.,cm.n_phase_extra)
-
-            new_point = samples_current + jump#*np.random.normal()
             new_point = correct_extrinsic(new_point,x0s[j])
 
             x0s[j].update_params(new_point)

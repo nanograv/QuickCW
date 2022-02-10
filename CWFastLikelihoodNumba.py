@@ -808,10 +808,10 @@ class FastLikeInfo:
         #assert self.gwphi == x0.gwphi
         #assert self.log10_fgw == x0.log10_fgw
         #assert self.log10_mc == x0.log10_mc
-        #assert np.isclose(self.cos_gwtheta, x0.cos_gwtheta)
-        #assert np.isclose(self.gwphi, x0.gwphi)
-        #assert np.isclose(self.log10_fgw, x0.log10_fgw)
-        #assert np.isclose(self.log10_mc, x0.log10_mc)
+        assert isclose(self.cos_gwtheta, x0.cos_gwtheta)
+        assert isclose(self.gwphi, x0.gwphi)
+        assert isclose(self.log10_fgw, x0.log10_fgw)
+        assert isclose(self.log10_mc, x0.log10_mc)
 
         return get_lnlikelihood_helper(x0,self.resres,self.logdet,self.pos,self.pdist,self.NN,self.MMs)
 
@@ -826,12 +826,12 @@ class FastLikeInfo:
         #self.rn_log10_As = x0.rn_log10_As.copy()
         #assert np.all(self.rn_gammas==x0.rn_gammas)
         #assert np.all(self.rn_log10_As==x0.rn_log10_As)
-        #assert np.isclose(self.cos_gwtheta, x0.cos_gwtheta)
-        #assert np.isclose(self.gwphi, x0.gwphi)
-        #assert np.isclose(self.log10_fgw, x0.log10_fgw)
-        #assert np.isclose(self.log10_mc, x0.log10_mc)
-        #assert np.allclose(self.rn_gammas, x0.rn_gammas)
-        #assert np.allclose(self.rn_log10_As, x0.rn_log10_As)
+        assert isclose(self.cos_gwtheta, x0.cos_gwtheta)
+        assert isclose(self.gwphi, x0.gwphi)
+        assert isclose(self.log10_fgw, x0.log10_fgw)
+        assert isclose(self.log10_mc, x0.log10_mc)
+        assert np.all(isclose(self.rn_gammas, x0.rn_gammas))
+        assert np.all(isclose(self.rn_log10_As, x0.rn_log10_As))
         resres_old = self.resres_array.copy()
         update_intrinsic_params2(x0,self.isqNvecs,self.Nrs,self.pos,self.pdist,self.toas, self.NN, self.MMs,self.TNvs,self.chol_Sigmas,np.array([psr_idx]),self.resres_array,self.dotTNrs)
         #protect from incorrectly overwriting
@@ -848,12 +848,12 @@ class FastLikeInfo:
         #self.rn_log10_As = x0.rn_log10_As.copy()
         #assert np.all(self.rn_gammas==x0.rn_gammas)
         #assert np.all(self.rn_log10_As==x0.rn_log10_As)
-        #assert np.isclose(self.cos_gwtheta, x0.cos_gwtheta)
-        #assert np.isclose(self.gwphi, x0.gwphi)
-        #assert np.isclose(self.log10_fgw, x0.log10_fgw)
-        #assert np.isclose(self.log10_mc, x0.log10_mc)
-        #assert np.allclose(self.rn_gammas, x0.rn_gammas)
-        #assert np.allclose(self.rn_log10_As, x0.rn_log10_As)
+        assert isclose(self.cos_gwtheta, x0.cos_gwtheta)
+        assert isclose(self.gwphi, x0.gwphi)
+        assert isclose(self.log10_fgw, x0.log10_fgw)
+        assert isclose(self.log10_mc, x0.log10_mc)
+        assert np.all(isclose(self.rn_gammas, x0.rn_gammas))
+        assert np.all(isclose(self.rn_log10_As, x0.rn_log10_As))
         #leave dist_only in even though it is not currently respected in case it turns out to be faster later
         resres_temp = self.resres_array.copy()
         resres_old = self.resres_array.copy()
@@ -956,4 +956,6 @@ class FastLikeInfo:
 #
 #    update_intrinsic_params(x0,FLI.isqNvecs,FLI.Nrs,FLI.pos,FLI.pdist,FLI.toas,FLI.NN,FLI.MMs,FLI.SigmaTNrProds,FLI.invchol_Sigma_TNs,np.array(psr_idxs),dist_only=False)
 
-
+@njit()
+def isclose(a,b,rtol=1.e-5,atol=1.e-8):
+    return np.abs(a - b) <= (atol + rtol * np.abs(b)) 
