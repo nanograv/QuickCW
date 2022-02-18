@@ -54,7 +54,7 @@ import const_mcmc as cm
 #
 ################################################################################
 #@profile
-def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int_block=1000, save_every_n=10_000, thin=10, samples_precision=np.single, savefile=None, n_update_fisher=100_000):
+def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int_block=1000, save_every_n=10_000, thin=10, samples_precision=np.single, savefile=None, save_first_n_chains=1, n_update_fisher=100_000):
     #freq = 1e-8
     #safety checks on input variables
     assert n_int_block%2==0 and n_int_block>=4 #need to have n_int block>=4 a multiple of 2
@@ -64,6 +64,7 @@ def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int
     assert int(N/(n_status_update))%n_int_block == 0 #or we won't print status updates
     assert N%save_every_n == 0 #or we won't save a complete block
     assert N%n_int_block == 0 #or we won't execute the right number of blocks
+    assert save_first_n_chains <= n_chain #or we would try to save more chains than we have
 
     ti = perf_counter()
 
@@ -207,21 +208,21 @@ def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int
                                                                     FPI.normal_par_ids, FPI.normal_mus, FPI.normal_sigs) for i in range(len(par_names))])
 
         #set non-external parameters to injected for testing
-        samples[j,0,par_names.index('0_cos_gwtheta')] = np.cos(np.pi/3.0)
-        samples[j,0,par_names.index('0_gwphi')] = 4.5
-        samples[j,0,par_names.index('0_log10_fgw')] = np.log10(2e-8)
-        samples[j,0,par_names.index('0_log10_mc')] = np.log10(5e9)
+        #samples[j,0,par_names.index('0_cos_gwtheta')] = np.cos(np.pi/3.0)
+        #samples[j,0,par_names.index('0_gwphi')] = 4.5
+        #samples[j,0,par_names.index('0_log10_fgw')] = np.log10(2e-8)
+        #samples[j,0,par_names.index('0_log10_mc')] = np.log10(5e9)
         for psr in pta.pulsars:
-            samples[j,0,par_names.index(psr + "_cw0_p_dist")] = 0.0
+            #samples[j,0,par_names.index(psr + "_cw0_p_dist")] = 0.0
             samples[j,0,par_names.index(psr + "_red_noise_gamma")] = noisedict[psr + "_red_noise_gamma"]
             samples[j,0,par_names.index(psr + "_red_noise_log10_A")] = noisedict[psr + "_red_noise_log10_A"]
 
         #also set external parameters for further testing
-        samples[j,0,par_names.index("0_cos_inc")] = np.cos(1.0)
+        #samples[j,0,par_names.index("0_cos_inc")] = np.cos(1.0)
         #samples[j,0,par_names.index("0_log10_h")] = np.log10(1e-15)
-        samples[j,0,par_names.index("0_log10_h")] = np.log10(5e-15)
-        samples[j,0,par_names.index("0_phase0")] = 1.0
-        samples[j,0,par_names.index("0_psi")] = 1.0
+        #samples[j,0,par_names.index("0_log10_h")] = np.log10(5e-15)
+        #samples[j,0,par_names.index("0_phase0")] = 1.0
+        #samples[j,0,par_names.index("0_psi")] = 1.0
         p_phases = [2.6438308,3.2279381,2.9511881,5.3586592,1.0639523,
                     2.1564047,1.1287014,5.9545189,4.3189053,1.3181107,
                     0.1205947,1.1594364,3.5189818,5.8613215,3.6653746,
@@ -231,8 +232,8 @@ def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int
                     4.4504891,4.8126553,3.6622998,4.4647441,2.8561429,
                     0.6874573,0.3762146,1.6691351,0.8147172,0.3051969,
                     1.6177042,2.8609930,5.0392969,0.3359030,1.0489710]
-        for ii, psr in enumerate(pta.pulsars):
-            samples[j,0,par_names.index(psr + "_cw0_p_phase")] = p_phases[ii]
+        #for ii, psr in enumerate(pta.pulsars):
+        #    samples[j,0,par_names.index(psr + "_cw0_p_phase")] = p_phases[ii]
 
     #set up master object for creating fast likelihoods
     x0_swap = CWFastLikelihoodNumba.CWInfo(len(pta.pulsars),samples[j,0],par_names,par_names_cw_ext)
@@ -248,7 +249,7 @@ def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int
 
     #make extra x0s to help parallelizing MTMCMC updates
     x0_extras = List([])
-    for k in range(25):
+    for k in range(50):
         x0_extras.append(CWFastLikelihoodNumba.CWInfo(len(pta.pulsars),samples[0,0],par_names,par_names_cw_ext))
 
     #calculate the diagonal elements of the fisher matrix
@@ -327,8 +328,8 @@ def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int
                 if itrn>save_every_n:
                     print("Append to HDF5 file...")
                     with h5py.File(savefile, 'a') as f:
-                        f['samples_cold'].resize((f['samples_cold'].shape[0] + int((samples.shape[1] - 1)/thin)), axis=0)
-                        f['samples_cold'][-int((samples.shape[1]-1)/thin):] = samples[0,:-1:thin,:]
+                        f['samples_cold'].resize((f['samples_cold'].shape[1] + int((samples.shape[1] - 1)/thin)), axis=1)
+                        f['samples_cold'][:,-int((samples.shape[1]-1)/thin):,:] = samples[:save_first_n_chains,:-1:thin,:]
                         f['log_likelihood'].resize((f['log_likelihood'].shape[1] + int((log_likelihood.shape[1] - 1)/thin)), axis=1)
                         f['log_likelihood'][:,-int((log_likelihood.shape[1]-1)/thin):] = log_likelihood[:,:-1:thin]
                         f['acc_fraction'][...] = np.copy(acc_fraction)
@@ -336,7 +337,7 @@ def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int
                 else:
                     print("Create HDF5 file...")
                     with h5py.File(savefile, 'w') as f:
-                        f.create_dataset('samples_cold', data=samples[0,:-1:thin,:], dtype=samples_precision, compression="gzip", chunks=True, maxshape=(int(N/thin),samples.shape[2]))
+                        f.create_dataset('samples_cold', data=samples[:save_first_n_chains,:-1:thin,:], dtype=samples_precision, compression="gzip", chunks=True, maxshape=(save_first_n_chains,int(N/thin),samples.shape[2]))
                         f.create_dataset('log_likelihood', data=log_likelihood[:,:-1:thin], compression="gzip", chunks=True, maxshape=(samples.shape[0],int(N/thin)))
                         f.create_dataset('par_names', data=np.array(par_names, dtype='S'))
                         f.create_dataset('acc_fraction', data=acc_fraction)
@@ -402,8 +403,8 @@ def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int
     print("Append to HDF5 file...")
     if savefile is not None:
         with h5py.File(savefile, 'a') as f:
-            f['samples_cold'].resize((f['samples_cold'].shape[0] + int((samples.shape[1] - 1)/thin)), axis=0)
-            f['samples_cold'][-int((samples.shape[1]-1)/thin):] = samples[0,:-1:thin,:]
+            f['samples_cold'].resize((f['samples_cold'].shape[1] + int((samples.shape[1] - 1)/thin)), axis=1)
+            f['samples_cold'][:,-int((samples.shape[1]-1)/thin):,:] = samples[:save_first_n_chains,:-1:thin,:]
             f['log_likelihood'].resize((f['log_likelihood'].shape[1] + int((log_likelihood.shape[1] - 1)/thin)), axis=1)
             f['log_likelihood'][:,-int((log_likelihood.shape[1]-1)/thin):] = log_likelihood[:,:-1:thin]
             f['acc_fraction'][...] = np.copy(acc_fraction)
