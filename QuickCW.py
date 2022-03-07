@@ -98,7 +98,8 @@ def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int
 
     #log_f = np.log10(freq)
     #log10_fgw = parameter.Constant(log_f)('0_log10_fgw')
-    log10_fgw = parameter.Uniform(np.log10(3.5e-9), -7.0)('0_log10_fgw')
+    #log10_fgw = parameter.Uniform(np.log10(3.5e-9), -7.0)('0_log10_fgw')
+    log10_fgw = parameter.LinearExp(np.log10(3.5e-9), -7.0)('0_log10_fgw')
 
     #if freq>=191.3e-9:
     #    m = (1./(6**(3./2)*np.pi*freq*u.Hz))*(1./4)**(3./5)*(c.c**3/c.G)
@@ -115,8 +116,8 @@ def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int
     p_phase = parameter.Uniform(0, 2*np.pi)
     p_dist = parameter.Normal(0, 1)
 
-    log10_h = parameter.Uniform(-18, -11)('0_log10_h')
-    #log10_h = parameter.LinearExp(-18, -11)('0_log10_h')
+    #log10_h = parameter.Uniform(-18, -11)('0_log10_h')
+    log10_h = parameter.LinearExp(-18, -11)('0_log10_h')
 
     cw_wf = deterministic.cw_delay(cos_gwtheta=cos_gwtheta, gwphi=gwphi, log10_mc=log10_mc,
                                    log10_h=log10_h, log10_fgw=log10_fgw, phase0=phase0, psrTerm=True,
@@ -153,6 +154,7 @@ def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int
     FastPrior = CWFastPrior.FastPrior(pta)
     print(FastPrior.uniform_par_ids)
     FPI = FastPriorInfo(FastPrior.uniform_par_ids, FastPrior.uniform_lows, FastPrior.uniform_highs,
+                        FastPrior.lin_exp_par_ids, FastPrior.lin_exp_lows, FastPrior.lin_exp_highs,
                         FastPrior.normal_par_ids, FastPrior.normal_mus, FastPrior.normal_sigs)
 
     par_names = List(pta.param_names)
@@ -205,6 +207,7 @@ def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int
     for j in range(n_chain):
         #samples[j,0,:] = np.array([par.sample() for par in pta.params])
         samples[j,0,:] = np.array([CWFastPrior.get_sample_helper(i, FPI.uniform_par_ids, FPI.uniform_lows, FPI.uniform_highs,
+                                                                    FPI.lin_exp_par_ids, FPI.lin_exp_lows, FPI.lin_exp_highs,
                                                                     FPI.normal_par_ids, FPI.normal_mus, FPI.normal_sigs) for i in range(len(par_names))])
 
         #set non-external parameters to injected for testing
@@ -259,23 +262,25 @@ def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int
         print(fisher_diag[j,:])
 
     #calculate RN fisher eigenvectors (using offdiagonals as well)
-    eig_rn = np.broadcast_to(np.eye(2)*0.1, (n_chain, len(pta.pulsars), 2, 2) ).copy()
+    eig_rn = np.broadcast_to(np.eye(2)*0.5, (n_chain, len(pta.pulsars), 2, 2) ).copy()
     print("Calculating RN fishers")
     for j in range(n_chain):
         for i in range(len(pta.pulsars)):
             if j==0:
                 print(par_names_noise[2*i:2*(i+1)])
             rn_eigvec = get_fisher_eigenvectors(samples[j,0,:], par_names, par_names_noise[2*i:2*(i+1)], pta)
-            eig_rn[j,i,:,:] = rn_eigvec[:,:]
+            if np.all(rn_eigvec):
+                eig_rn[j,i,:,:] = rn_eigvec[:,:]
             if j==0:
                 print(rn_eigvec)
 
     #calculate common morphological fisher eigenvectors (using offdiagonals as well)
-    eig_common = np.broadcast_to(np.eye(4)*0.1, (n_chain, 4, 4) ).copy()
+    eig_common = np.broadcast_to(np.eye(4)*0.5, (n_chain, 4, 4) ).copy()
     print("Calculating sky location/frequency/chirp mass fishers")
     for j in range(n_chain):
         common_eigvec = get_fisher_eigenvectors(samples[j,0,:], par_names, par_names_cw_int[:4], pta)
-        eig_common[j,:,:] = common_eigvec[:,:]
+        if np.all(common_eigvec):
+            eig_common[j,:,:] = common_eigvec[:,:]
         if j==0:
             print(common_eigvec)
     
@@ -285,6 +290,7 @@ def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int
         for i in range(cm.de_history_size):
             #de_history[j,i,:] = np.array([par.sample() for par in pta.params])
             de_history[j,i,:] = np.array([CWFastPrior.get_sample_helper(i, FPI.uniform_par_ids, FPI.uniform_lows, FPI.uniform_highs,
+                                                                           FPI.lin_exp_par_ids, FPI.lin_exp_lows, FPI.lin_exp_highs,
                                                                            FPI.normal_par_ids, FPI.normal_mus, FPI.normal_sigs) for i in range(len(par_names))])
 
     #setting up arrays to record acceptance and swaps
@@ -303,7 +309,7 @@ def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int
         #log_likelihood[j,0] = pta.get_lnlikelihood(samples[j,0,:])
         log_likelihood[j,0] = FLIs[j].get_lnlikelihood(x0s[j])
         print("log_likelihood="+str(log_likelihood[j,0]))
-        #print("log_prior="+str(pta.get_lnprior(samples[j,0,:])))
+        print("log_prior="+str(pta.get_lnprior(samples[j,0,:])))
         print("log_prior="+str(FastPrior.get_lnprior(samples[j,0,:])))
 
     #ext_update = List([False,]*n_chain)
@@ -395,9 +401,11 @@ def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int
                     for j in range(n_chain):
                         for jj in range(len(pta.pulsars)):
                             rn_eigvec = get_fisher_eigenvectors(samples[j,np.random.randint(itrb+n_int_block+1),:], par_names, par_names_noise[2*jj:2*(jj+1)], pta)
-                            eig_rn[j,jj,:,:] = rn_eigvec[:,:]
+                            if np.all(rn_eigvec):
+                                eig_rn[j,jj,:,:] = rn_eigvec[:,:]
                         common_eigvec = get_fisher_eigenvectors(samples[j,np.random.randint(itrb+n_int_block+1),:], par_names, par_names_cw_int[:4], pta)
-                        eig_common[j,:,:] = common_eigvec[:,:]
+                        if np.all(common_eigvec):
+                            eig_common[j,:,:] = common_eigvec[:,:]
 
     acc_fraction = a_yes/(a_no+a_yes)
     print("Append to HDF5 file...")
@@ -485,6 +493,7 @@ def do_intrinsic_update_mt(n_chain, psrs, pta, samples, itrb, Ts, a_yes, a_no, x
             new_point = np.copy(samples_current)
             #new_point[idx_choose] = np.array([par.sample() for par in [pta.params[iii] for iii in idx_choose]])
             new_point[idx_choose] = np.array([CWFastPrior.get_sample_helper(iii, FPI.uniform_par_ids, FPI.uniform_lows, FPI.uniform_highs,
+                                                                                 FPI.lin_exp_par_ids, FPI.lin_exp_lows, FPI.lin_exp_highs,
                                                                                  FPI.normal_par_ids, FPI.normal_mus, FPI.normal_sigs) for iii in idx_choose])
         elif which_jump_type==1: #do differential evolution step
             de_indices = np.random.choice(de_history.shape[1], size=2, replace=False)
@@ -551,6 +560,7 @@ def do_intrinsic_update_mt(n_chain, psrs, pta, samples, itrb, Ts, a_yes, a_no, x
             print("Rejected due to too fast evolution.")
         else:
             log_prior_old = CWFastPrior.get_lnprior_helper(samples_current, FPI.uniform_par_ids, FPI.uniform_lows, FPI.uniform_highs,
+                                                                            FPI.lin_exp_par_ids, FPI.lin_exp_lows, FPI.lin_exp_highs,
                                                                             FPI.normal_par_ids, FPI.normal_mus, FPI.normal_sigs)
             log_posterior_old = log_likelihood[j,itrb]/Ts[j] + log_prior_old
             
@@ -718,7 +728,8 @@ def get_mt_weights(new_point, j, FPI, x0s, x0_extras, which_jump, FLIs, FLI_swap
             else:
                 log_Ls[itrkk] = FLIs[j].get_lnlikelihood(x0_extras[KK])
             log_prior_new = CWFastPrior.get_lnprior_helper(tries[itrkk,:], FPI.uniform_par_ids, FPI.uniform_lows, FPI.uniform_highs,
-                                                                        FPI.normal_par_ids, FPI.normal_mus, FPI.normal_sigs)
+                                                                           FPI.lin_exp_par_ids, FPI.lin_exp_lows, FPI.lin_exp_highs,
+                                                                           FPI.normal_par_ids, FPI.normal_mus, FPI.normal_sigs)
             log_posterior_new = log_Ls[itrkk]/Ts[j] + log_prior_new
 
             if log_prior_new>-np.inf:
@@ -771,7 +782,8 @@ def get_ref_mt_weights(samples_current, j, FPI, x0s, x0_extras, which_jump, FLIs
 
             log_L = FLIs[j].get_lnlikelihood(x0_extras[KK])
             log_prior_ref = CWFastPrior.get_lnprior_helper(ref_tries[itrkk,:], FPI.uniform_par_ids, FPI.uniform_lows, FPI.uniform_highs,
-                                                                            FPI.normal_par_ids, FPI.normal_mus, FPI.normal_sigs)
+                                                                               FPI.lin_exp_par_ids, FPI.lin_exp_lows, FPI.lin_exp_highs,
+                                                                               FPI.normal_par_ids, FPI.normal_mus, FPI.normal_sigs)
             log_posterior_ref = log_L/Ts[j] + log_prior_ref
 
             if log_prior_ref>-np.inf:
@@ -844,9 +856,11 @@ def do_extrinsic_block(n_chain, samples, itrb, Ts, x0s, FLIs, FPI, n_par_tot, n_
             log_L = FLIs[j].get_lnlikelihood(x0s[j])#FLIs[j].resres,FLIs[j].logdet,FLIs[j].pos,FLIs[j].pdist,FLIs[j].NN,FLIs[j].MMs)
             log_acc_ratio = log_L/Ts[j]
             log_acc_ratio += CWFastPrior.get_lnprior_helper(new_point, FPI.uniform_par_ids, FPI.uniform_lows, FPI.uniform_highs,
+                                                                       FPI.lin_exp_par_ids, FPI.lin_exp_lows, FPI.lin_exp_highs,
                                                                        FPI.normal_par_ids, FPI.normal_mus, FPI.normal_sigs)
             log_acc_ratio += -log_likelihood[j,itrb+k]/Ts[j]
             log_acc_ratio += -CWFastPrior.get_lnprior_helper(samples_current, FPI.uniform_par_ids, FPI.uniform_lows, FPI.uniform_highs,
+                                                                              FPI.lin_exp_par_ids, FPI.lin_exp_lows, FPI.lin_exp_highs,
                                                                               FPI.normal_par_ids, FPI.normal_mus, FPI.normal_sigs)
 
             acc_decide = np.log(uniform(0.0, 1.0, 1))
@@ -1422,57 +1436,57 @@ def get_fisher_diagonal(samples_fisher, par_names, par_names_cw_ext, par_names_n
 #
 ################################################################################
 def get_fisher_eigenvectors(params, par_names, par_names_to_perturb, pta, epsilon=1e-4):
-    dim = len(par_names_to_perturb)
-    fisher = np.zeros((dim,dim))
+    try:
+        dim = len(par_names_to_perturb)
+        fisher = np.zeros((dim,dim))
 
-    #lnlikelihood at specified point
-    nn = pta.get_lnlikelihood(params)
+        #lnlikelihood at specified point
+        nn = pta.get_lnlikelihood(params)
 
-    #calculate diagonal elements
-    for i in range(dim):
-        #create parameter vectors with +-epsilon in the ith component
-        paramsPP = np.copy(params)
-        paramsMM = np.copy(params)
-        paramsPP[par_names.index(par_names_to_perturb[i])] += 2*epsilon
-        paramsMM[par_names.index(par_names_to_perturb[i])] -= 2*epsilon
-        
-        #lnlikelihood at +-epsilon positions
-        pp = pta.get_lnlikelihood(paramsPP)
-        mm = pta.get_lnlikelihood(paramsMM)
-
-        #calculate diagonal elements of the Hessian from a central finite element scheme
-        #note the minus sign compared to the regular Hessian
-        fisher[i,i] = -(pp - 2.0*nn + mm)/(4.0*epsilon*epsilon)
-
-    #calculate off-diagonal elements
-    for i in range(dim):
-        for j in range(i+1,dim):
-            #create parameter vectors with ++, --, +-, -+ epsilon in the ith and jth component
+        #calculate diagonal elements
+        for i in range(dim):
+            #create parameter vectors with +-epsilon in the ith component
             paramsPP = np.copy(params)
             paramsMM = np.copy(params)
-            paramsPM = np.copy(params)
-            paramsMP = np.copy(params)
-
-            paramsPP[par_names.index(par_names_to_perturb[i])] += epsilon
-            paramsPP[par_names.index(par_names_to_perturb[j])] += epsilon
-            paramsMM[par_names.index(par_names_to_perturb[i])] -= epsilon
-            paramsMM[par_names.index(par_names_to_perturb[j])] -= epsilon
-            paramsPM[par_names.index(par_names_to_perturb[i])] += epsilon
-            paramsPM[par_names.index(par_names_to_perturb[j])] -= epsilon
-            paramsMP[par_names.index(par_names_to_perturb[i])] -= epsilon
-            paramsMP[par_names.index(par_names_to_perturb[j])] += epsilon
-
+            paramsPP[par_names.index(par_names_to_perturb[i])] += 2*epsilon
+            paramsMM[par_names.index(par_names_to_perturb[i])] -= 2*epsilon
+            
+            #lnlikelihood at +-epsilon positions
             pp = pta.get_lnlikelihood(paramsPP)
             mm = pta.get_lnlikelihood(paramsMM)
-            pm = pta.get_lnlikelihood(paramsPM)
-            mp = pta.get_lnlikelihood(paramsMP)
 
-            #calculate off-diagonal elements of the Hessian from a central finite element scheme
+            #calculate diagonal elements of the Hessian from a central finite element scheme
             #note the minus sign compared to the regular Hessian
-            fisher[i,j] = -(pp - mp - pm + mm)/(4.0*epsilon*epsilon)
-            fisher[j,i] = -(pp - mp - pm + mm)/(4.0*epsilon*epsilon)
+            fisher[i,i] = -(pp - 2.0*nn + mm)/(4.0*epsilon*epsilon)
 
-    try:
+        #calculate off-diagonal elements
+        for i in range(dim):
+            for j in range(i+1,dim):
+                #create parameter vectors with ++, --, +-, -+ epsilon in the ith and jth component
+                paramsPP = np.copy(params)
+                paramsMM = np.copy(params)
+                paramsPM = np.copy(params)
+                paramsMP = np.copy(params)
+
+                paramsPP[par_names.index(par_names_to_perturb[i])] += epsilon
+                paramsPP[par_names.index(par_names_to_perturb[j])] += epsilon
+                paramsMM[par_names.index(par_names_to_perturb[i])] -= epsilon
+                paramsMM[par_names.index(par_names_to_perturb[j])] -= epsilon
+                paramsPM[par_names.index(par_names_to_perturb[i])] += epsilon
+                paramsPM[par_names.index(par_names_to_perturb[j])] -= epsilon
+                paramsMP[par_names.index(par_names_to_perturb[i])] -= epsilon
+                paramsMP[par_names.index(par_names_to_perturb[j])] += epsilon
+
+                pp = pta.get_lnlikelihood(paramsPP)
+                mm = pta.get_lnlikelihood(paramsMM)
+                pm = pta.get_lnlikelihood(paramsPM)
+                mp = pta.get_lnlikelihood(paramsMP)
+
+                #calculate off-diagonal elements of the Hessian from a central finite element scheme
+                #note the minus sign compared to the regular Hessian
+                fisher[i,j] = -(pp - mp - pm + mm)/(4.0*epsilon*epsilon)
+                fisher[j,i] = -(pp - mp - pm + mm)/(4.0*epsilon*epsilon)
+
         #Filter nans and infs and replace them with 1s
         #this will imply that we will set the eigenvalue to 100 a few lines below
         FISHER = np.where(np.isfinite(fisher), fisher, 1.0)
@@ -1491,16 +1505,22 @@ def get_fisher_eigenvectors(params, par_names, par_names_to_perturb, pta, epsilo
 
     except:
         print("An Error occured in the eigenvalue calculation")
+        print(par_names_to_perturb)
+        print(params)
         return np.array(False)
 
 @jitclass([('uniform_par_ids',nb.int64[:]),('uniform_lows',nb.float64[:]),('uniform_highs',nb.float64[:]),\
+           ('lin_exp_par_ids',nb.int64[:]),('lin_exp_lows',nb.float64[:]),('lin_exp_highs',nb.float64[:]),\
            ('normal_par_ids',nb.int64[:]),('normal_mus',nb.float64[:]),('normal_sigs',nb.float64[:])])
 class FastPriorInfo:
     """simple jitclass to store the various elements of fast prior calculation in a way that can be accessed quickly from a numba environment"""
-    def __init__(self, uniform_par_ids, uniform_lows, uniform_highs, normal_par_ids, normal_mus, normal_sigs):
+    def __init__(self, uniform_par_ids, uniform_lows, uniform_highs, lin_exp_par_ids, lin_exp_lows, lin_exp_highs, normal_par_ids, normal_mus, normal_sigs):
         self.uniform_par_ids = uniform_par_ids
         self.uniform_lows = uniform_lows
         self.uniform_highs = uniform_highs
+        self.lin_exp_par_ids = lin_exp_par_ids
+        self.lin_exp_lows = lin_exp_lows
+        self.lin_exp_highs = lin_exp_highs
         self.normal_par_ids = normal_par_ids
         self.normal_mus = normal_mus
         self.normal_sigs = normal_sigs
