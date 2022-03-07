@@ -75,35 +75,58 @@ class FastLikeMaster:
 
     def get_new_FastLike(self,x0,params):
         chol_Sigmas = List()
+        phiinvs = List()
         for i in range(self.Npsr):
             chol_Sigmas.append(np.identity((self.TNvs[i].shape[1])).T) #temporary but can't be 0 or else the initialization of FLI will crash
+            phiinvs.append(np.ones(self.TNvs[i].shape[1]))
 
-        FLI = FastLikeInfo(self.logdet,self.pos,self.pdist,self.toas,self.Nvecs,self.Nrs,self.max_toa,x0,self.Npsr,self.isqrNvecs,self.TNvs,self.dotTNrs,chol_Sigmas)
+        FLI = FastLikeInfo(self.logdet,self.pos,self.pdist,self.toas,self.Nvecs,self.Nrs,self.max_toa,x0,self.Npsr,self.isqrNvecs,self.TNvs,self.dotTNrs,chol_Sigmas,phiinvs)
         return self.recompute_FastLike(FLI,x0,params)
-
-    def recompute_FastLike(self,FLI,x0,params):
+    #@profile
+    def recompute_FastLike(self,FLI,x0,params, chol_update=False):
         pls_temp = self.pta.get_phiinv(params, logdet=True, method='partition')
+        
+        if chol_update: #update Cholesky of Sigma instead of recompute
+            #chol_Sigmas, logdet_array, new_phiinvs = cholupdate_loop(FLI.chol_Sigmas, List(pls_temp), FLI.phiinvs, self.Npsr)
+            #
+            #FLI.chol_Sigmas = chol_Sigmas
+            #FLI.logdet_array = logdet_array
+            #FLI.phiinvs = new_phiinvs
 
-        for i in range(self.Npsr):
-            phiinv_loc,logdetphi_loc = pls_temp[i]
-            if phiinv_loc.ndim == 1:
-                #Sigma_alt = self.TNTs[i]+np.diag(phiinv_loc)
-                #overwrite old chol_Sigma so can be done without allocating new array
-                Sigma = create_Sigma(phiinv_loc,self.TNTs[i],FLI.chol_Sigmas[i].T)
-                #assert np.allclose(Sigma,Sigma_alt)
-            else:
-                Sigma = self.TNTs[i]+phiinv_loc
+            for i in range(self.Npsr):
+                phiinv_loc,logdetphi_loc = pls_temp[i]
+                chol_Sigma = cholupdate(FLI.chol_Sigmas[i], phiinv_loc-FLI.phiinvs[i])
+            
+                logdet_Sigma_loc = logdet_Sigma_helper(chol_Sigma)
+            
+                FLI.chol_Sigmas[i][:] = chol_Sigma
+            
+                FLI.logdet_array[i] = logdetphi_loc+logdet_Sigma_loc
 
-            #mutate inplace to avoid memory allocation overheads
-            chol_Sigma,lower = scipy.linalg.cho_factor(Sigma.T,lower=True,overwrite_a=True,check_finite=False)
+                FLI.phiinvs[i][:] = phiinv_loc
 
-            logdet_Sigma_loc = logdet_Sigma_helper(chol_Sigma)#2 * np.sum(np.log(np.diag(chol_Sigma)))
+        else:
+            for i in range(self.Npsr):
+                phiinv_loc,logdetphi_loc = pls_temp[i]
+                FLI.phiinvs[i][:] = phiinv_loc 
+                if phiinv_loc.ndim == 1:
+                    #Sigma_alt = self.TNTs[i]+np.diag(phiinv_loc)
+                    #overwrite old chol_Sigma so can be done without allocating new array
+                    Sigma = create_Sigma(phiinv_loc,self.TNTs[i],FLI.chol_Sigmas[i].T)
+                    #assert np.allclose(Sigma,Sigma_alt)
+                else:
+                    Sigma = self.TNTs[i]+phiinv_loc
 
-           #this should be mutated in place but assign it anyway to be safe
-            FLI.chol_Sigmas[i][:] = chol_Sigma
+                #mutate inplace to avoid memory allocation overheads
+                chol_Sigma,lower = scipy.linalg.cho_factor(Sigma.T,lower=True,overwrite_a=True,check_finite=False)
 
-            #add the necessary component to logdet
-            FLI.logdet_array[i] = logdetphi_loc+logdet_Sigma_loc
+                logdet_Sigma_loc = logdet_Sigma_helper(chol_Sigma)#2 * np.sum(np.log(np.diag(chol_Sigma)))
+
+                #this should be mutated in place but assign it anyway to be safe
+                FLI.chol_Sigmas[i][:] = chol_Sigma
+
+                #add the necessary component to logdet
+                FLI.logdet_array[i] = logdetphi_loc+logdet_Sigma_loc
 
 
         #set logdet
@@ -111,6 +134,53 @@ class FastLikeMaster:
         FLI.update_intrinsic_params(x0)
 
         return FLI#FastLikeInfo(resres,logdet,self.pos,self.pdist,self.toas,invchol_Sigma_TNs,self.Nvecs,self.Nrs,self.max_toa,x0,self.Npsr,self.isqrNvecs,self.residuals)
+
+@njit(fastmath=True,parallel=False)
+def cholupdate_loop(chol_Sigmas, pls_temp, old_phiinvs, Npsr):
+    logdet_array = np.zeros(Npsr)
+    new_phiinvs = List()
+    for i in range(Npsr):
+        phiinv_loc,logdetphi_loc = pls_temp[i]
+        chol_Sigmas[i] = cholupdate(chol_Sigmas[i], phiinv_loc-old_phiinvs[i])
+        new_phiinvs.append(phiinv_loc)
+        logdet_array[i] = logdet_Sigma_helper(chol_Sigmas[i]) + logdetphi_loc
+
+    return chol_Sigmas, logdet_array, new_phiinvs
+
+@njit(fastmath=True,parallel=False)
+def cholupdate(L_in,diag_diff):
+    n = L_in.shape[0]
+    #L = L_in
+    L = np.copy(L_in)
+    #for idx, diff in enumerate(diag_diff):
+    for idx in range(n):
+        diff = diag_diff[idx]
+        if diff!=0.0:
+            x = np.zeros(n)
+            if diff>0:
+                x[idx] = np.sqrt(diff)
+                sign = 1.0
+            elif diff<0:
+                x[idx] = np.sqrt(-diff)
+                sign = -1.0
+            #print(x)
+            for k in range(idx,n):
+                #print(L[k,k]**2)
+                #print(x[k]**2)
+                #print(L[k,k]**2 + sign * x[k]**2)
+                r = np.sqrt(L[k,k]**2 + sign * x[k]**2)
+                c = r / L[k,k]
+                s = x[k] / L[k,k]
+                L[k,k] = r
+                #L[k+1:n,k] = (L[k+1:n,k] + sign * s*x[k+1:n]) / c
+                #x[k+1:n] = c * x[k+1:n] - s * L[k+1:n,k]
+                #for j in prange(k+1,n): #1 ms (~30% of runtime) this loop
+                for j in range(k+1,n): #1 ms (~30% of runtime) this loop
+                    L[j,k] = (L[j,k] + sign* s*x[j]) / c
+                    x[j] = c * x[j] - s * L[j,k]
+
+    return L
+
 
 @njit(parallel=True,fastmath=True)
 def logdet_Sigma_helper(chol_Sigma):
@@ -770,10 +840,10 @@ def update_intrinsic_params(x0,isqNvecs,Nrs,pos,pdist,toas,NN,MMs,SigmaTNrProds,
         ('cos_gwtheta',nb.float64),('gwphi',nb.float64),('log10_fgw',nb.float64),('log10_mc',nb.float64),('max_toa',nb.float64),\
         ('Npsr',nb.int64),('isqNvecs',nb.types.ListType(nb.types.float64[::1])),('TNvs',nb.types.ListType(nb.types.float64[::1,:])),\
         ('resres_array',nb.float64[:]),('logdet_array',nb.float64[:]),('logdet_base',nb.float64),\
-        ('rn_gammas',nb.float64[:]),('rn_log10_As',nb.float64[:]),('dotTNrs',nb.types.ListType(nb.types.float64[::1]))])
+        ('rn_gammas',nb.float64[:]),('rn_log10_As',nb.float64[:]),('dotTNrs',nb.types.ListType(nb.types.float64[::1])),('phiinvs',nb.types.ListType(nb.types.float64[::1]))])
 class FastLikeInfo:
     """simple jitclass to store the various elements of fast likelihood calculation in a way that can be accessed quickly from a numba environment"""
-    def __init__(self,logdet_base,pos,pdist,toas,Nvecs,Nrs,max_toa,x0,Npsr,isqNvecs,TNvs,dotTNrs,chol_Sigmas):
+    def __init__(self,logdet_base,pos,pdist,toas,Nvecs,Nrs,max_toa,x0,Npsr,isqNvecs,TNvs,dotTNrs,chol_Sigmas,phiinvs):
         self.resres = 0. #compute internally
         self.resres_array = np.zeros(Npsr)
         self.logdet_array = np.zeros(Npsr)
@@ -782,6 +852,7 @@ class FastLikeInfo:
         self.pos = pos
         self.pdist = pdist
         self.toas = toas
+        self.phiinvs = phiinvs
         #self.invchol_Sigma_Ts = invchol_Sigma_Ts
         #self.invchol_Sigma_TNs = invchol_Sigma_TNs#List([invchol_Sigma_Ts[i]/Nvecs[i] for i in range(self.Npsr)])
 
