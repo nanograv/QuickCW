@@ -49,9 +49,9 @@ class FastPrior:
         self.lin_exp_highs = np.array(le_highs)
         self.normal_mus = np.array(nm_mus)
         self.normal_sigs = np.array(nm_sigs)
-        self.uniform_par_ids = np.array([self.param_names.index(u_par) for u_par in uniform_pars])
-        self.lin_exp_par_ids = np.array([self.param_names.index(l_par) for l_par in lin_exp_pars])
-        self.normal_par_ids = np.array([self.param_names.index(n_par) for n_par in normal_pars])
+        self.uniform_par_ids = np.array([self.param_names.index(u_par) for u_par in uniform_pars], dtype='int')
+        self.lin_exp_par_ids = np.array([self.param_names.index(l_par) for l_par in lin_exp_pars], dtype='int')
+        self.normal_par_ids = np.array([self.param_names.index(n_par) for n_par in normal_pars], dtype='int')
 
     def get_lnprior(self, x0):
         """wrapper to get ln prior"""
