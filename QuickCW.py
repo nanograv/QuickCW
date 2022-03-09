@@ -54,7 +54,7 @@ import const_mcmc as cm
 #
 ################################################################################
 #@profile
-def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int_block=1000, save_every_n=10_000, thin=10, samples_precision=np.single, savefile=None, save_first_n_chains=1, n_update_fisher=100_000):
+def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int_block=1000, save_every_n=10_000, thin=10, samples_precision=np.single, savefile=None, save_first_n_chains=1, n_update_fisher=100_000, T_ladder=None):
     #freq = 1e-8
     #safety checks on input variables
     assert n_int_block%2==0 and n_int_block>=4 #need to have n_int block>=4 a multiple of 2
@@ -98,8 +98,8 @@ def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int
 
     #log_f = np.log10(freq)
     #log10_fgw = parameter.Constant(log_f)('0_log10_fgw')
-    #log10_fgw = parameter.Uniform(np.log10(3.5e-9), -7.0)('0_log10_fgw')
-    log10_fgw = parameter.LinearExp(np.log10(3.5e-9), -7.0)('0_log10_fgw')
+    log10_fgw = parameter.Uniform(np.log10(3.5e-9), -7.0)('0_log10_fgw')
+    #log10_fgw = parameter.LinearExp(np.log10(3.5e-9), -7.0)('0_log10_fgw')
 
     #if freq>=191.3e-9:
     #    m = (1./(6**(3./2)*np.pi*freq*u.Hz))*(1./4)**(3./5)*(c.c**3/c.G)
@@ -192,10 +192,15 @@ def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int
     print(cw_ext_lows)
     print(cw_ext_highs)
 
-    #using geometric spacing
-    c = T_max**(1.0/(n_chain-1))
-    Ts = c**np.arange(n_chain)
-    print("Using {0} temperature chains with a geometric spacing of {1:.3f}.\nTemperature ladder is:\n".format(n_chain,c),Ts)
+    if T_ladder is None:
+        #using geometric spacing
+        c = T_max**(1.0/(n_chain-1))
+        Ts = c**np.arange(n_chain)
+        print("Using {0} temperature chains with a geometric spacing of {1:.3f}.\nTemperature ladder is:\n".format(n_chain,c),Ts)
+    else:
+        Ts = np.array(T_ladder)
+        n_chain = Ts.size
+        print("Using {0} temperature chains with custom spacing: ".format(n_chain),Ts)
 
     #set up samples array
     samples = np.zeros((n_chain, save_every_n+1, len(par_names)))
