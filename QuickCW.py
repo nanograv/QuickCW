@@ -390,7 +390,7 @@ def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int
         do_extrinsic_block(n_chain, samples, itrb, Ts, x0s, FLIs, FPI, len(par_names), len(par_names_cw_ext), log_likelihood, n_int_block-2, fisher_diag, a_yes, a_no, cw_ext_lows, cw_ext_highs)
         #update intrinsic parameters once a block
         #FLI_swap = do_intrinsic_update_dr(n_chain, psrs, pta, samples, itrb+n_int_block-2, Ts, a_yes_counts, a_no_counts, x0s, FLIs, FPI, par_names, par_names_cw_int, par_names_noise, len(par_names_cw_ext), log_likelihood, fisher_diag, flm, FLI_swap, de_history, n_dr_delays)
-        FLI_swap = do_intrinsic_update_mt(n_chain, psrs, pta, samples, itrb+n_int_block-2, Ts, a_yes, a_no, x0s, x0_extras, FLIs, FPI, par_names, par_names_cw_int, par_names_noise, len(par_names_cw_ext), log_likelihood, fisher_diag, eig_rn, eig_common, flm, FLI_swap, de_history, cw_ext_lows, cw_ext_highs)
+        FLI_swap = do_intrinsic_update_mt(n_chain, psrs, pta, samples, itrb+n_int_block-2, Ts, a_yes, a_no, x0s, x0_extras, FLIs, FPI, par_names, par_names_cw_int, par_names_noise, len(par_names_cw_ext), log_likelihood, fisher_diag, eig_rn, eig_common, flm, FLI_swap, de_history, cw_ext_lows, cw_ext_highs, freq_bounds)
         do_pt_swap(n_chain, samples, itrb+n_int_block-1, Ts, a_yes, a_no, x0s, FLIs, log_likelihood, fisher_diag)
 
         #update de history array
@@ -435,7 +435,7 @@ def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int
 ################################################################################
 #version using multiple try mcmc (based on Table 6 of https://vixra.org/pdf/1712.0244v3.pdf)
 #@profile
-def do_intrinsic_update_mt(n_chain, psrs, pta, samples, itrb, Ts, a_yes, a_no, x0s, x0_extras, FLIs, FPI, par_names, par_names_cw_int, par_names_noise, n_par_ext, log_likelihood, fisher_diag, eig_rn, eig_common, flm, FLI_swap, de_history, cw_ext_lows, cw_ext_highs):
+def do_intrinsic_update_mt(n_chain, psrs, pta, samples, itrb, Ts, a_yes, a_no, x0s, x0_extras, FLIs, FPI, par_names, par_names_cw_int, par_names_noise, n_par_ext, log_likelihood, fisher_diag, eig_rn, eig_common, flm, FLI_swap, de_history, cw_ext_lows, cw_ext_highs, freq_bounds):
     #print("EXT")
     for j in range(n_chain):
         assert np.isclose(FLIs[j].cos_gwtheta, x0s[j].cos_gwtheta)
@@ -493,6 +493,7 @@ def do_intrinsic_update_mt(n_chain, psrs, pta, samples, itrb, Ts, a_yes, a_no, x
                 which_jump_type = np.random.choice(3, p=[cm.prior_draw_prob/total_type_weight,
                                                          cm.de_prob/total_type_weight,
                                                          cm.fisher_prob/total_type_weight])
+        
         if which_jump_type==0: #do prior draw
             #print("Prior draw")            
             new_point = np.copy(samples_current)
@@ -538,7 +539,7 @@ def do_intrinsic_update_mt(n_chain, psrs, pta, samples, itrb, Ts, a_yes, a_no, x
                 new_point = samples_current + jump
 
         #TODO check wrapping is working right
-        new_point = correct_intrinsic(new_point,x0s[j])
+        new_point = correct_intrinsic(new_point,x0s[j],freq_bounds)
 
         if which_jump==0: #update psr distances
             x0s[j].update_params(new_point)
@@ -815,9 +816,10 @@ def correct_extrinsic(sample,x0):
     return sample
 
 @njit()
-def correct_intrinsic(sample,x0):
+def correct_intrinsic(sample,x0,freq_bounds):
     """correct intrinsic parameters for phases and cosines"""
     #TODO check these are the right parameters to be shifting
+    #TODO remove hard-coded prior boundaries
     sample[x0.idx_cos_gwtheta],sample[x0.idx_gwphi] = reflect_cosines(sample[x0.idx_cos_gwtheta],sample[x0.idx_gwphi],np.pi,2*np.pi)
     #sample[x0.idx_rn_gammas] = np.abs(sample[x0.idx_rn_gammas])
     #sample[x0.idx_rn_gammas] = 7.0-np.abs(7.0-np.abs(sample[x0.idx_rn_gammas])) #making sure gamma is within 0.0 and 7.0
@@ -826,7 +828,7 @@ def correct_intrinsic(sample,x0):
         sample[idx] = reflect_into_range(sample[idx], 0.0, 7.0)
     for idx in x0.idx_rn_log10_As:
         sample[idx] = reflect_into_range(sample[idx], -20.0, -11.0)
-    sample[x0.idx_log10_fgw] = reflect_into_range(sample[x0.idx_log10_fgw], np.log10(3.5e-9), -7.0)
+    sample[x0.idx_log10_fgw] = reflect_into_range(sample[x0.idx_log10_fgw], np.log10(freq_bounds[0]), np.log10(freq_bounds[1]))
     sample[x0.idx_log10_mc] = reflect_into_range(sample[x0.idx_log10_mc], 7.0, 10.0)
     
     return sample
