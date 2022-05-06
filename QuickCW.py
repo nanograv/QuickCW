@@ -36,10 +36,6 @@ import enterprise.constants as const
 
 from enterprise_extensions import deterministic
 
-import libstempo as T2
-import libstempo.toasim as LT
-import libstempo.plot as LP
-
 #import re
 
 import h5py
