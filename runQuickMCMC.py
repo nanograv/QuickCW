@@ -32,7 +32,10 @@ with open(data_pkl, 'rb') as psr_pkl:
 
 print(len(psrs))
 
-N = 100_000
+#number of iterations
+N = 1_000_000
+
+#Parallel tempering prameters
 T_max = 3.0
 n_chain = 5
 
@@ -44,7 +47,9 @@ savefile = 'results/quickCW_test.h5'
 
 #Setup and start MCMC
 pta = QuickCW.QuickCW(N, T_max, n_chain, psrs,
-                      n_status_update=200, n_int_block=1000, save_every_n=10000,
+                      n_int_block=10_000, #number of iterations in a block (which has one shape update and the rest are projection updates)
+                      n_status_update=100, #number of status update printouts (N/n_status_update needs to be an intiger multiple of n_int_block)
+                      save_every_n=100_000, #number of iterations between saving intermediate results (needs to be intiger multiple of n_int_block)
                       noise_json=noisefile,
                       savefile=savefile)
 
