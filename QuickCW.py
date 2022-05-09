@@ -50,7 +50,7 @@ import const_mcmc as cm
 #
 ################################################################################
 #@profile
-def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int_block=1000, save_every_n=10_000, thin=10, samples_precision=np.single, savefile=None, save_first_n_chains=1, n_update_fisher=100_000, T_ladder=None, freq_bounds=[3.5e-9, 1e-7]):
+def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int_block=1000, save_every_n=10_000, thin=10, samples_precision=np.single, savefile=None, save_first_n_chains=1, n_update_fisher=100_000, T_ladder=None, freq_bounds=[3.5e-9, 1e-7], use_legacy_equad=False):
     #freq = 1e-8
     #safety checks on input variables
     assert n_int_block%2==0 and n_int_block>=4 #need to have n_int block>=4 a multiple of 2
@@ -77,8 +77,11 @@ def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int
     selection = selections.Selection(selections.by_backend)
 
     # define white noise signals
-    ef = white_signals.MeasurementNoise(efac=efac, selection=selection)
-    eq = white_signals.EquadNoise(log10_equad=equad, selection=selection)
+    if use_legacy_equad:
+        ef = white_signals.MeasurementNoise(efac=efac, selection=selection)
+        eq = white_signals.TNEquadNoise(log10_tnequad=equad, selection=selection)
+    else:
+        efq = white_signals.MeasurementNoise(efac=efac, log10_t2equad=equad, selection=selection)
     #ec = white_signals.EcorrKernelNoise(log10_ecorr=ecorr, selection=selection)
     ec = gp_signals.EcorrBasisModel(log10_ecorr=ecorr, selection=selection)
 
@@ -129,10 +132,10 @@ def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int
 
     tm = gp_signals.TimingModel()
 
-    #s = ef + eq + ec + rn + crn + cw + tm
-    s = ef + eq + ec + rn + cw + tm
-    #s = ef + eq + ec + cw + tm
-    #s = ef + cw + tm
+    if use_legacy_equad:
+        s = ef + eq + ec + rn + cw + tm
+    else:
+        s = efq + ec + rn + cw + tm
 
     models = [s(psr) for psr in psrs]
 
