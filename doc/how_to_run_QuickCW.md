@@ -6,7 +6,7 @@
 enterprise
 enterprise_extensions
 numba
-h5py
+numba_stats
 ```
 
 Using `conda`, we can set up a new clean environment with these as follows. Create new `conda` environment:
@@ -29,9 +29,9 @@ Install `numba`:
 ```
 conda install numba
 ```
-Install `numba_stats`:
+Install v1.0.1 of `numba_stats` (make sure to use this because the latest release v1.1.0 breaks things):
 ```
-pip install numba-stats
+pip install numba-stats==1.0.1
 ```
 
 Once these are installed `QuickCW` can be used without installation.
