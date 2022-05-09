@@ -3,10 +3,35 @@
 ## Setup
 `QuickCW` relies on the following non-standard packages:
 ```
-numba
-h5py
 enterprise
 enterprise_extensions
+numba
+h5py
+```
+
+Using `conda`, we can set up a new clean environment with these as follows. Create new `conda` environment:
+```
+conda create --name QuickCW python=3.9
+```
+Active our new environment:
+```
+conda activate QuickCW
+```
+Install `enterprise`:
+```
+conda install -c conda-forge enterprise-pulsar
+```
+Install `enterprise_extensions`:
+```
+pip install git+https://github.com/nanograv/enterprise_extensions@master
+```
+Install `numba`:
+```
+conda install numba
+```
+Install `numba_stats`:
+```
+pip install numba-stats
 ```
 
 Once these are installed `QuickCW` can be used without installation.
