@@ -32,10 +32,10 @@ with open(data_pkl, 'rb') as psr_pkl:
 
 print(len(psrs))
 
-#number of iterations
+#number of iterations (increase to 100 million - 1 billion for actual analysis)
 N = 1_000_000
 
-#Parallel tempering prameters (increase to 100 million - 1 billion for actual analysis)
+#Parallel tempering prameters
 T_max = 3.0
 n_chain = 5
 
