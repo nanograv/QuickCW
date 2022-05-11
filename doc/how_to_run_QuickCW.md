@@ -41,6 +41,8 @@ The main analysis code can be found in `QuickCW.py`, which can be executed by th
 * `data_pkl` points to the pickled pulsar object you want to analyze. Alternatively one can rewrite the script so that it loads in par/tim files. What matters in the end is that `psrs` contain the pulsar objects we want to use.
 * `noisefile` points to the json file containing the noise dictionary we plan to use for setting the white noise parameters.
 * `savefile` is the name of the file we want to save our results.
+* The number of iterations (`N`) is set properly. The example script has `N=1_000_000`, which is good for a quick test run to see that everything works, but not enough for an actual analysis. Depending on the details of the analysis and the dataset one might want to set at least `N=100_000_000` (or even `N=1_000_000_000`). Note that the number of steps in the shape parameters is `N/n_int_block`, so for example the example script gives '1_000_000/10_000=100' steps in shape parameters.
+* If using a higher `N` than in the example script, it can also be useful to set `thin=10` (or even 100), which results in only saving every 10th/100th sample to file and thus helps keep file sizes down.
 
 Once these are set, we can run the MCMC by executing:
 
