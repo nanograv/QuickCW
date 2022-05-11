@@ -42,7 +42,7 @@ The main analysis code can be found in `QuickCW.py`, which can be executed by th
 * `noisefile` points to the json file containing the noise dictionary we plan to use for setting the white noise parameters.
 * `savefile` is the name of the file we want to save our results.
 * The number of iterations (`N`) is set properly. The example script has `N=1_000_000`, which is good for a quick test run to see that everything works, but not enough for an actual analysis. Depending on the details of the analysis and the dataset one might want to set at least `N=100_000_000` (or even `N=1_000_000_000`). Note that the number of steps in the shape parameters is `N/n_int_block`, so for example the example script gives '1_000_000/10_000=100' steps in shape parameters.
-* If using a higher `N` than in the example script, it can also be useful to set `thin=10` (or even 100), which results in only saving every 10th/100th sample to file and thus helps keep file sizes down.
+* If using a higher `N` than in the example script, it can also be useful to set `thin=100` (or even 1000), which results in only saving every 100th/1000th sample to file and thus helps keep file sizes down (default is 10).
 
 Once these are set, we can run the MCMC by executing:
 
