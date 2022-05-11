@@ -35,7 +35,7 @@ print(len(psrs))
 #number of iterations
 N = 1_000_000
 
-#Parallel tempering prameters
+#Parallel tempering prameters (increase to 100 million - 1 billion for actual analysis)
 T_max = 3.0
 n_chain = 5
 
@@ -50,6 +50,7 @@ pta = QuickCW.QuickCW(N, T_max, n_chain, psrs,
                       n_int_block=10_000, #number of iterations in a block (which has one shape update and the rest are projection updates)
                       n_status_update=100, #number of status update printouts (N/n_status_update needs to be an intiger multiple of n_int_block)
                       save_every_n=100_000, #number of iterations between saving intermediate results (needs to be intiger multiple of n_int_block)
+                      thin=10, #thinning, i.e. save every `thin`th sample to file (increase to higher than one to keep file sizes small)
                       noise_json=noisefile,
                       savefile=savefile)
 
