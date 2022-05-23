@@ -86,7 +86,8 @@ def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int
     #ec = white_signals.EcorrKernelNoise(log10_ecorr=ecorr, selection=selection)
     ec = gp_signals.EcorrBasisModel(log10_ecorr=ecorr, selection=selection)
 
-    log10_A = parameter.Uniform(-20, -11)
+    #log10_A = parameter.Uniform(-20, -11)
+    log10_A = parameter.Uniform(-18, -11)
     gamma = parameter.Uniform(0, 7)
 
     # define powerlaw PSD and red noise signal
@@ -220,10 +221,10 @@ def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int
         #samples[j,0,par_names.index('0_gwphi')] = 4.5
         #samples[j,0,par_names.index('0_log10_fgw')] = np.log10(2e-8)
         #samples[j,0,par_names.index('0_log10_mc')] = np.log10(5e9)
-        for psr in pta.pulsars:
-            #samples[j,0,par_names.index(psr + "_cw0_p_dist")] = 0.0
-            samples[j,0,par_names.index(psr + "_red_noise_gamma")] = noisedict[psr + "_red_noise_gamma"]
-            samples[j,0,par_names.index(psr + "_red_noise_log10_A")] = noisedict[psr + "_red_noise_log10_A"]
+        #for psr in pta.pulsars:
+        #    #samples[j,0,par_names.index(psr + "_cw0_p_dist")] = 0.0
+        #    samples[j,0,par_names.index(psr + "_red_noise_gamma")] = noisedict[psr + "_red_noise_gamma"]
+        #    samples[j,0,par_names.index(psr + "_red_noise_log10_A")] = noisedict[psr + "_red_noise_log10_A"]
 
         #also set external parameters for further testing
         #samples[j,0,par_names.index("0_cos_inc")] = np.cos(1.0)
@@ -231,15 +232,15 @@ def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int
         #samples[j,0,par_names.index("0_log10_h")] = np.log10(5e-15)
         #samples[j,0,par_names.index("0_phase0")] = 1.0
         #samples[j,0,par_names.index("0_psi")] = 1.0
-        p_phases = [2.6438308,3.2279381,2.9511881,5.3586592,1.0639523,
-                    2.1564047,1.1287014,5.9545189,4.3189053,1.3181107,
-                    0.1205947,1.1594364,3.5189818,5.8613215,3.6653746,
-                    0.0653161,4.3756635,2.2423111,4.5429403,5.1370920,
-                    1.9794586,1.0159356,2.9529407,1.7553771,1.5110336,
-                    4.0558141,1.6855663,3.5614665,4.1527070,5.2239841,
-                    4.4504891,4.8126553,3.6622998,4.4647441,2.8561429,
-                    0.6874573,0.3762146,1.6691351,0.8147172,0.3051969,
-                    1.6177042,2.8609930,5.0392969,0.3359030,1.0489710]
+        #p_phases = [2.6438308,3.2279381,2.9511881,5.3586592,1.0639523,
+        #            2.1564047,1.1287014,5.9545189,4.3189053,1.3181107,
+        #            0.1205947,1.1594364,3.5189818,5.8613215,3.6653746,
+        #            0.0653161,4.3756635,2.2423111,4.5429403,5.1370920,
+        #            1.9794586,1.0159356,2.9529407,1.7553771,1.5110336,
+        #            4.0558141,1.6855663,3.5614665,4.1527070,5.2239841,
+        #            4.4504891,4.8126553,3.6622998,4.4647441,2.8561429,
+        #            0.6874573,0.3762146,1.6691351,0.8147172,0.3051969,
+        #            1.6177042,2.8609930,5.0392969,0.3359030,1.0489710]
         #for ii, psr in enumerate(pta.pulsars):
         #    samples[j,0,par_names.index(psr + "_cw0_p_phase")] = p_phases[ii]
 
