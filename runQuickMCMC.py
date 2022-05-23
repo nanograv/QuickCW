@@ -18,37 +18,39 @@ import enterprise.constants as const
 
 from enterprise_extensions import deterministic
 
-import libstempo as T2
-import libstempo.toasim as LT
-import libstempo.plot as LP
-
 import glob
 import json
 
 import QuickCW
 import CWFastLikelihoodNumba
 
-#with open('data/fast_like_test_psrs_A2e-15_M5e9_f2e-8_evolve_no_gwb_no_rn_no_ecorr_no_equad.pkl', 'rb') as psr_pkl:
-with open('data/fast_like_test_psrs_A2e-15_M5e9_f2e-8_evolve_no_gwb.pkl', 'rb') as psr_pkl:
-#with open('data/fast_like_test_psrs.pkl', 'rb') as psr_pkl:
+#make sure this points to the pickled pulsars you want to analyze
+data_pkl = 'data/quickCW_test.pkl'
+
+with open(data_pkl, 'rb') as psr_pkl:
     psrs = pickle.load(psr_pkl)
 
 print(len(psrs))
 
-#N = 30_000
-#N = 500_000
-N = 2_000_000
-T_max = 5
-n_chain = 8
+#number of iterations (increase to 100 million - 1 billion for actual analysis)
+N = 1_000_000
 
-noisefile = 'data/channelized_12p5yr_v3_full_noisedict_gp_ecorr.json'
+#Parallel tempering prameters
+T_max = 3.0
+n_chain = 5
 
-#savefile = 'results/quickCW_test_A2e-15_M5e9_f2e-8_evolve_no_gwb_no_rn_no_ecorr_no_equad_v1.npz'
-#savefile = 'results/quickCW_test_A1e-15_M5e9_f2e-8_evolve_no_gwb_no_rn_no_ecorr_no_equad_v1.npz'
-savefile = None#'results/quickCW_test_A1e-15_M5e9_f2e-8_evolve_no_gwb_no_rn_no_ecorr_no_equad_v1.h5'
+#make sure this points to your white noise dictionary
+noisefile = 'data/quickCW_noisedict_gp_ecorr.json'
 
+#this is where results will be saved
+savefile = 'results/quickCW_test.h5'
+
+#Setup and start MCMC
 pta = QuickCW.QuickCW(N, T_max, n_chain, psrs,
-                      n_status_update=200, n_int_block=1000, save_every_n=10000,
+                      n_int_block=10_000, #number of iterations in a block (which has one shape update and the rest are projection updates)
+                      n_status_update=100, #number of status update printouts (N/n_status_update needs to be an intiger multiple of n_int_block)
+                      save_every_n=100_000, #number of iterations between saving intermediate results (needs to be intiger multiple of n_int_block)
+                      thin=10, #thinning, i.e. save every `thin`th sample to file (increase to higher than one to keep file sizes small)
                       noise_json=noisefile,
                       savefile=savefile)
 
