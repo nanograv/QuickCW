@@ -50,7 +50,7 @@ import const_mcmc as cm
 #
 ################################################################################
 #@profile
-def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int_block=1000, save_every_n=10_000, thin=10, samples_precision=np.single, savefile=None, save_first_n_chains=1, n_update_fisher=100_000, T_ladder=None, freq_bounds=[3.5e-9, 1e-7], use_legacy_equad=False):
+def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int_block=1000, save_every_n=10_000, thin=10, samples_precision=np.single, savefile=None, save_first_n_chains=1, n_update_fisher=100_000, T_ladder=None, freq_bounds=[3.5e-9, 1e-7], use_legacy_equad=False, includeCW=True):
     #freq = 1e-8
     #safety checks on input variables
     assert n_int_block%2==0 and n_int_block>=4 #need to have n_int block>=4 a multiple of 2
@@ -245,7 +245,7 @@ def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int
 
     #set up master object for creating fast likelihoods
     x0_swap = CWFastLikelihoodNumba.CWInfo(len(pta.pulsars),samples[j,0],par_names,par_names_cw_ext)
-    flm = CWFastLikelihoodNumba.FastLikeMaster(psrs,pta,dict(zip(par_names, samples[j, 0, :])),x0_swap)
+    flm = CWFastLikelihoodNumba.FastLikeMaster(psrs,pta,dict(zip(par_names, samples[j, 0, :])),x0_swap,includeCW=includeCW)
     FLI_swap = flm.get_new_FastLike(x0_swap, dict(zip(par_names, samples[0, 0, :])))
 
     #set up fast likelihoods
@@ -345,6 +345,9 @@ def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int
                         f['log_likelihood'][:,-int((log_likelihood.shape[1]-1)/thin):] = log_likelihood[:,:-1:thin]
                         f['acc_fraction'][...] = np.copy(acc_fraction)
                         f['fisher_diag'][...] = np.copy(fisher_diag)
+                        f['T-ladder'][...] = np.copy(Ts)
+                        f['samples_freq'].resize((f['samples_freq'].shape[1] + int((samples.shape[1] - 1)/thin)), axis=1)
+                        f['samples_freq'][:,-int((samples.shape[1]-1)/thin):] = samples[:,:-1:thin,par_names.index('0_log10_fgw')]
                 else:
                     print("Create HDF5 file...")
                     with h5py.File(savefile, 'w') as f:
@@ -353,6 +356,8 @@ def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int
                         f.create_dataset('par_names', data=np.array(par_names, dtype='S'))
                         f.create_dataset('acc_fraction', data=acc_fraction)
                         f.create_dataset('fisher_diag', data=fisher_diag)
+                        f.create_dataset('T-ladder', data=Ts)
+                        f.create_dataset('samples_freq', data=samples[:,:-1:thin,par_names.index('0_log10_fgw')], dtype=samples_precision, compression="gzip", chunks=True, maxshape=(n_chain,int(N/thin)))
             #clear out log_likelihood and samples arrays
             samples_now = samples[:,-1,:]
             log_likelihood_now = log_likelihood[:,-1]
@@ -422,6 +427,9 @@ def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int
             f['log_likelihood'][:,-int((log_likelihood.shape[1]-1)/thin):] = log_likelihood[:,:-1:thin]
             f['acc_fraction'][...] = np.copy(acc_fraction)
             f['fisher_diag'][...] = np.copy(fisher_diag)
+            f['T-ladder'][...] = np.copy(Ts)
+            f['samples_freq'].resize((f['samples_freq'].shape[1] + int((samples.shape[1] - 1)/thin)), axis=1)
+            f['samples_freq'][:,-int((samples.shape[1]-1)/thin):] = samples[:,:-1:thin,par_names.index('0_log10_fgw')]
         #return samples, par_names, acc_fraction, pta, log_likelihood
     tf = perf_counter()
     print('whole function time ='+str(tf-ti)+'s')
