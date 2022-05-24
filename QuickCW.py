@@ -220,10 +220,10 @@ def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int
         #samples[j,0,par_names.index('0_gwphi')] = 4.5
         #samples[j,0,par_names.index('0_log10_fgw')] = np.log10(2e-8)
         #samples[j,0,par_names.index('0_log10_mc')] = np.log10(5e9)
-        #for psr in pta.pulsars:
-        #    #samples[j,0,par_names.index(psr + "_cw0_p_dist")] = 0.0
-        #    samples[j,0,par_names.index(psr + "_red_noise_gamma")] = noisedict[psr + "_red_noise_gamma"]
-        #    samples[j,0,par_names.index(psr + "_red_noise_log10_A")] = noisedict[psr + "_red_noise_log10_A"]
+        for psr in pta.pulsars:
+            #samples[j,0,par_names.index(psr + "_cw0_p_dist")] = 0.0
+            samples[j,0,par_names.index(psr + "_red_noise_gamma")] = noisedict[psr + "_red_noise_gamma"]
+            samples[j,0,par_names.index(psr + "_red_noise_log10_A")] = noisedict[psr + "_red_noise_log10_A"]
 
         #also set external parameters for further testing
         #samples[j,0,par_names.index("0_cos_inc")] = np.cos(1.0)
@@ -409,10 +409,10 @@ def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int
                 fisher_diag[j,:] = get_fisher_diagonal(samples[j,np.random.randint(itrb+n_int_block+1),:], par_names, par_names_cw_ext, par_names_noise, x0_swap, flm, FLI_swap)
             if itrn%(n_update_fisher*10)==0:
                     for j in range(n_chain):
-                        for jj in range(len(pta.pulsars)):
-                            rn_eigvec = get_fisher_eigenvectors(samples[j,np.random.randint(itrb+n_int_block+1),:], par_names, par_names_noise[2*jj:2*(jj+1)], pta)
-                            if np.all(rn_eigvec):
-                                eig_rn[j,jj,:,:] = rn_eigvec[:,:]
+                        #for jj in range(len(pta.pulsars)):
+                        #    rn_eigvec = get_fisher_eigenvectors(samples[j,np.random.randint(itrb+n_int_block+1),:], par_names, par_names_noise[2*jj:2*(jj+1)], pta)
+                        #    if np.all(rn_eigvec):
+                        #        eig_rn[j,jj,:,:] = rn_eigvec[:,:]
                         common_eigvec = get_fisher_eigenvectors(samples[j,np.random.randint(itrb+n_int_block+1),:], par_names, par_names_cw_int[:4], pta)
                         if np.all(common_eigvec):
                             eig_common[j,:,:] = common_eigvec[:,:]
