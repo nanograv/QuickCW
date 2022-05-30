@@ -85,8 +85,8 @@ def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int
     #ec = white_signals.EcorrKernelNoise(log10_ecorr=ecorr, selection=selection)
     ec = gp_signals.EcorrBasisModel(log10_ecorr=ecorr, selection=selection)
 
-    #log10_A = parameter.Uniform(-20, -11)
-    log10_A = parameter.Uniform(-18, -11)
+    log10_A = parameter.Uniform(-20, -11)
+    #log10_A = parameter.Uniform(-18, -11)
     gamma = parameter.Uniform(0, 7)
 
     # define powerlaw PSD and red noise signal
