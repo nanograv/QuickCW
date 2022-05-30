@@ -207,13 +207,26 @@ def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int
 
     #set up log_likelihood array
     log_likelihood = np.zeros((n_chain,save_every_n+1))
+    
+    #get max toa which is needed to mae sure the initial parameters don't result in an already merged system
+    max_toa = np.max(psrs[0].toas)
+    for i in range(len(psrs)):
+        max_toa = max(max_toa,np.max(psrs[i].toas))
 
     print("Setting up first sample")
     for j in range(n_chain):
         #samples[j,0,:] = np.array([par.sample() for par in pta.params])
-        samples[j,0,:] = np.array([CWFastPrior.get_sample_helper(i, FPI.uniform_par_ids, FPI.uniform_lows, FPI.uniform_highs,
-                                                                    FPI.lin_exp_par_ids, FPI.lin_exp_lows, FPI.lin_exp_highs,
-                                                                    FPI.normal_par_ids, FPI.normal_mus, FPI.normal_sigs) for i in range(len(par_names))])
+        acceptable_initial_samples = False
+        while not acceptable_initial_samples:
+            samples[j,0,:] = np.array([CWFastPrior.get_sample_helper(i, FPI.uniform_par_ids, FPI.uniform_lows, FPI.uniform_highs,
+                                                                        FPI.lin_exp_par_ids, FPI.lin_exp_lows, FPI.lin_exp_highs,
+                                                                        FPI.normal_par_ids, FPI.normal_mus, FPI.normal_sigs) for i in range(len(par_names))])
+            #check the maximum toa is not such that the source has already merged, and if so draw new parameters to avoid starting from nan likelihood
+            w0 = np.pi * 10.0**samples[j,0,par_names.index("0_log10_fgw")]
+            mc = 10.0**samples[j,0,par_names.index("0_log10_mc")]
+
+            if (1. - 256./5. * (mc * const.Tsun)**(5./3.) * w0**(8./3.) * (max_toa - cm.tref)) >= 0:
+               acceptable_initial_samples = True 
 
         #set non-external parameters to injected for testing
         #samples[j,0,par_names.index('0_cos_gwtheta')] = np.cos(np.pi/3.0)
@@ -565,9 +578,9 @@ def do_intrinsic_update_mt(n_chain, psrs, pta, samples, itrb, Ts, a_yes, a_no, x
         
         #check the maximum toa is not such that the source has already merged, and if so automatically reject the proposal
         w0 = np.pi * 10.0**x0s[j].log10_fgw
-        mc = 10.0**x0s[j].log10_mc * const.Tsun
+        mc = 10.0**x0s[j].log10_mc
 
-        if (1. - 256./5. * mc * const.Tsun**(5./3.) * w0**(8./3.) * (FLIs[j].max_toa - cm.tref)) < 0:
+        if (1. - 256./5. * (mc * const.Tsun)**(5./3.) * w0**(8./3.) * (FLIs[j].max_toa - cm.tref)) < 0:
             #set these so that the step is rejected
             acc_ratio = -1
             acc_decide = 0.
