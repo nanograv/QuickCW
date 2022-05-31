@@ -50,7 +50,7 @@ import const_mcmc as cm
 #
 ################################################################################
 #@profile
-def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int_block=1000, save_every_n=10_000, thin=10, samples_precision=np.single, savefile=None, save_first_n_chains=1, n_update_fisher=100_000, T_ladder=None, freq_bounds=[3.5e-9, 1e-7], use_legacy_equad=False, includeCW=True):
+def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int_block=1000, save_every_n=10_000, thin=10, samples_precision=np.single, savefile=None, save_first_n_chains=1, n_update_fisher=100_000, T_ladder=None, freq_bounds=[3.5e-9, 1e-7], use_legacy_equad=False, includeCW=True, amplitude_prior='UL'):
     #freq = 1e-8
     #safety checks on input variables
     assert n_int_block%2==0 and n_int_block>=4 #need to have n_int block>=4 a multiple of 2
@@ -116,8 +116,12 @@ def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int
     p_phase = parameter.Uniform(0, 2*np.pi)
     p_dist = parameter.Normal(0, 1)
 
-    #log10_h = parameter.Uniform(-18, -11)('0_log10_h')
-    log10_h = parameter.LinearExp(-18, -11)('0_log10_h')
+    if amplitude_prior=='detection':
+        log10_h = parameter.Uniform(-18, -11)('0_log10_h')
+    elif amplitude_prior=='UL':
+        log10_h = parameter.LinearExp(-18, -11)('0_log10_h')
+    else:
+        raise NotImplementedError("amplitude_prior provided not implemented\nuse either 'detection' for uniform in log-amplitude or 'UL' for uniform in amplitude prior")
 
     cw_wf = deterministic.cw_delay(cos_gwtheta=cos_gwtheta, gwphi=gwphi, log10_mc=log10_mc,
                                    log10_h=log10_h, log10_fgw=log10_fgw, phase0=phase0, psrTerm=True,
