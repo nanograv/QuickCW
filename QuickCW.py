@@ -153,10 +153,11 @@ def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int
     pta.set_default_params(noisedict)
 
     print(pta.summary())
+    print("List of parameters in the model with their priors:")
     print(pta.params)
 
     FastPrior = CWFastPrior.FastPrior(pta)
-    print(FastPrior.uniform_par_ids)
+    #print(FastPrior.uniform_par_ids)
     FPI = FastPriorInfo(FastPrior.uniform_par_ids, FastPrior.uniform_lows, FastPrior.uniform_highs,
                         FastPrior.lin_exp_par_ids, FastPrior.lin_exp_lows, FastPrior.lin_exp_highs,
                         FastPrior.normal_par_ids, FastPrior.normal_mus, FastPrior.normal_sigs)
@@ -187,14 +188,14 @@ def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int
     cw_ext_lows = []
     cw_ext_highs = []
     for par in [pta.params[iii] for iii in [par_names.index(ppp) for ppp in par_names_cw_ext]]:
-        print(par)
+        #print(par)
         cw_ext_lows.append(float(par._typename.split('=')[1].split(',')[0]))
         cw_ext_highs.append(float(par._typename.split('=')[2][:-1]))
     
     cw_ext_lows = np.array(cw_ext_lows)
     cw_ext_highs = np.array(cw_ext_highs)
-    print(cw_ext_lows)
-    print(cw_ext_highs)
+    #print(cw_ext_lows)
+    #print(cw_ext_highs)
 
     if T_ladder is None:
         #using geometric spacing
@@ -217,7 +218,7 @@ def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int
     for i in range(len(psrs)):
         max_toa = max(max_toa,np.max(psrs[i].toas))
 
-    print("Setting up first sample")
+    print("Setting up first sample...")
     for j in range(n_chain):
         #samples[j,0,:] = np.array([par.sample() for par in pta.params])
         acceptable_initial_samples = False
@@ -277,15 +278,28 @@ def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int
     for k in range(50):
         x0_extras.append(CWFastLikelihoodNumba.CWInfo(len(pta.pulsars),samples[0,0],par_names,par_names_cw_ext))
 
+    #printing info about initial parameters
+    for j in range(n_chain):
+        print("chain #"+str(j))
+        #log_likelihood[j,0] = pta.get_lnlikelihood(samples[j,0,:])
+        log_likelihood[j,0] = FLIs[j].get_lnlikelihood(x0s[j])
+        print("log_likelihood="+str(log_likelihood[j,0]))
+        print("log_prior_old="+str(pta.get_lnprior(samples[j,0,:])))
+        print("log_prior_new="+str(FastPrior.get_lnprior(samples[j,0,:])))
+        print("Initial samples:")
+        print(samples[j,0,:])
+
     #calculate the diagonal elements of the fisher matrix
     fisher_diag = np.ones((n_chain, len(par_names)))
+    print("Diagonal of Fisher matrix for all parameters:")
     for j in range(n_chain):
         fisher_diag[j,:] = get_fisher_diagonal(samples[j,0,:], par_names, par_names_cw_ext, par_names_noise, x0_swap, flm, FLI_swap)
-        print(fisher_diag[j,:])
+        if j==0:
+            print(fisher_diag[j,:])
 
     #calculate RN fisher eigenvectors (using offdiagonals as well)
     eig_rn = np.broadcast_to(np.eye(2)*0.5, (n_chain, len(pta.pulsars), 2, 2) ).copy()
-    print("Calculating RN fishers")
+    print("RN fisher matrices:")
     for j in range(n_chain):
         for i in range(len(pta.pulsars)):
             if j==0:
@@ -298,7 +312,7 @@ def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int
 
     #calculate common morphological fisher eigenvectors (using offdiagonals as well)
     eig_common = np.broadcast_to(np.eye(4)*0.5, (n_chain, 4, 4) ).copy()
-    print("Calculating sky location/frequency/chirp mass fishers")
+    print("Sky location/frequency/chirp mass fisher matrices:")
     for j in range(n_chain):
         common_eigvec = get_fisher_eigenvectors(samples[j,0,:], par_names, par_names_cw_int[:4], pta)
         if np.all(common_eigvec):
@@ -323,16 +337,6 @@ def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int
 
     #list to hold at what step delayed rejection stage are accepted/rejected
     n_dr_delays = []
-
-    #printing info about initial parameters
-    for j in range(n_chain):
-        print("j="+str(j))
-        print(samples[j,0,:])
-        #log_likelihood[j,0] = pta.get_lnlikelihood(samples[j,0,:])
-        log_likelihood[j,0] = FLIs[j].get_lnlikelihood(x0s[j])
-        print("log_likelihood="+str(log_likelihood[j,0]))
-        print("log_prior="+str(pta.get_lnprior(samples[j,0,:])))
-        print("log_prior="+str(FastPrior.get_lnprior(samples[j,0,:])))
 
     #ext_update = List([False,]*n_chain)
     #sample_updates = List([np.copy(samples[j,0,:]) for j in range(n_chain)])
