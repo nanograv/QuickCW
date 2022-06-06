@@ -272,7 +272,8 @@ def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int
         #    samples[j,0,par_names.index(psr + "_cw0_p_phase")] = p_phases[ii]
 
     #set up master object for creating fast likelihoods
-    x0_swap = CWFastLikelihoodNumba.CWInfo(len(pta.pulsars),samples[j,0],par_names,par_names_cw_ext)
+    x0_swap = CWFastLikelihoodNumba.CWInfo(len(pta.pulsars),samples[j,0],par_names,par_names_cw_ext,
+                                           np.array([p.pdist[0] for p in psrs]),np.array([p.pdist[1] for p in psrs]))
     flm = CWFastLikelihoodNumba.FastLikeMaster(psrs,pta,dict(zip(par_names, samples[j, 0, :])),x0_swap,includeCW=includeCW)
     FLI_swap = flm.get_new_FastLike(x0_swap, dict(zip(par_names, samples[0, 0, :])))
 
@@ -280,13 +281,20 @@ def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int
     x0s = List([])
     FLIs  = List([])
     for j in range(n_chain):
-        x0s.append( CWFastLikelihoodNumba.CWInfo(len(pta.pulsars),samples[j,0],par_names,par_names_cw_ext))
+        x0s.append( CWFastLikelihoodNumba.CWInfo(len(pta.pulsars),samples[j,0],par_names,par_names_cw_ext,
+                                                 np.array([p.pdist[0] for p in psrs]),np.array([p.pdist[1] for p in psrs])))
+        #correct intrinsic parameters to avoid negative distances
+        samples[j,0,:] = correct_intrinsic(samples[j,0,:],x0s[j],freq_bounds)
+        #Update x0 so that it has the corrected distances
+        x0s[j] = CWFastLikelihoodNumba.CWInfo(len(pta.pulsars),samples[j,0],par_names,par_names_cw_ext,
+                                              np.array([p.pdist[0] for p in psrs]),np.array([p.pdist[1] for p in psrs]))
         FLIs.append(flm.get_new_FastLike(x0s[j], dict(zip(par_names, samples[j, 0, :]))))
 
     #make extra x0s to help parallelizing MTMCMC updates
     x0_extras = List([])
     for k in range(50):
-        x0_extras.append(CWFastLikelihoodNumba.CWInfo(len(pta.pulsars),samples[0,0],par_names,par_names_cw_ext))
+        x0_extras.append(CWFastLikelihoodNumba.CWInfo(len(pta.pulsars),samples[0,0],par_names,par_names_cw_ext,
+                                                      np.array([p.pdist[0] for p in psrs]),np.array([p.pdist[1] for p in psrs])))
 
     #printing info about initial parameters
     for j in range(n_chain):
@@ -869,6 +877,20 @@ def correct_intrinsic(sample,x0,freq_bounds):
         sample[idx] = reflect_into_range(sample[idx], -20.0, -11.0)
     sample[x0.idx_log10_fgw] = reflect_into_range(sample[x0.idx_log10_fgw], np.log10(freq_bounds[0]), np.log10(freq_bounds[1]))
     sample[x0.idx_log10_mc] = reflect_into_range(sample[x0.idx_log10_mc], 7.0, 10.0)
+    
+    psr_id = 0
+    for idx in x0.idx_dists:
+        dist_delta = sample[idx]
+        dist_mu = x0.psr_dist_mus[psr_id]
+        dist_sigma = x0.psr_dist_sigmas[psr_id]
+
+        dist = dist_mu + dist_sigma*dist_delta
+        if dist<0.0: #change the sample so that dist-->-dist (i.e. reflect around zero)
+            sample[idx] = -dist_delta - 2*dist_mu/dist_sigma
+            #print(dist_mu + dist_sigma*dist_delta)
+            #print(dist_mu + dist_sigma*sample[idx])
+
+        psr_id += 1
     
     return sample
 
