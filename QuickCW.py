@@ -83,7 +83,9 @@ def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int
     else:
         efq = white_signals.MeasurementNoise(efac=efac, log10_t2equad=equad, selection=selection)
     #ec = white_signals.EcorrKernelNoise(log10_ecorr=ecorr, selection=selection)
-    ec = gp_signals.EcorrBasisModel(log10_ecorr=ecorr, selection=selection)
+    #ec = gp_signals.EcorrBasisModel(log10_ecorr=ecorr, selection=selection)
+    #give ecorr a name so that we can use the usual noisefiles created for Kernel ecorr
+    ec = gp_signals.EcorrBasisModel(log10_ecorr=ecorr, selection=selection, name='')
 
     log10_A = parameter.Uniform(-20, -11)
     #log10_A = parameter.Uniform(-18, -11)
