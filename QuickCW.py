@@ -240,8 +240,16 @@ def QuickCW(N, T_max, n_chain, psrs, noise_json=None, n_status_update=100, n_int
         #samples[j,0,par_names.index('0_log10_mc')] = np.log10(5e9)
         for psr in pta.pulsars:
             #samples[j,0,par_names.index(psr + "_cw0_p_dist")] = 0.0
-            samples[j,0,par_names.index(psr + "_red_noise_gamma")] = noisedict[psr + "_red_noise_gamma"]
-            samples[j,0,par_names.index(psr + "_red_noise_log10_A")] = noisedict[psr + "_red_noise_log10_A"]
+            if (psr + "_red_noise_gamma") in noisedict.keys():
+                samples[j,0,par_names.index(psr + "_red_noise_gamma")] = noisedict[psr + "_red_noise_gamma"]
+            else:
+                print("No value found in noisedict for: " + psr + "_red_noise_gamma")
+                print("Using a random draw from the prior as a first sample instead")
+            if (psr + "_red_noise_log10_A") in noisedict.keys():
+                samples[j,0,par_names.index(psr + "_red_noise_log10_A")] = noisedict[psr + "_red_noise_log10_A"]
+            else:
+                print("No value found in noisedict for: " + psr + "_red_noise_log10_A")
+                print("Using a random draw from the prior as a first sample instead")
 
         #also set external parameters for further testing
         #samples[j,0,par_names.index("0_cos_inc")] = np.cos(1.0)
