@@ -33,6 +33,10 @@ Install v1.0.1 of `numba_stats` (make sure to use this because the latest releas
 ```
 pip install numba-stats==1.0.1
 ```
+At this point `h5py` might already be installed. If not, install it with:
+```
+pip install h5py
+```
 
 Once these are installed `QuickCW` can be used without installation.
 
