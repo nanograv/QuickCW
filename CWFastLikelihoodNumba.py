@@ -87,9 +87,12 @@ class FastLikeMaster:
                            self.Npsr,self.isqrNvecs,self.TNvs,self.dotTNrs,chol_Sigmas,phiinvs,self.includeCW)
         return self.recompute_FastLike(FLI,x0,params)
     #@profile
-    def recompute_FastLike(self,FLI,x0,params, chol_update=False):
+    def recompute_FastLike(self,FLI,x0,params, chol_update=False,mask=None):
         pls_temp = self.pta.get_phiinv(params, logdet=True, method='partition')
-        
+        if mask is None:
+            #mask to skip updating values if set to True
+            mask = np.zeros(self.Npsr,dtype=np.bool_)
+
         if chol_update: #update Cholesky of Sigma instead of recompute
             #chol_Sigmas, logdet_array, new_phiinvs = cholupdate_loop(FLI.chol_Sigmas, List(pls_temp), FLI.phiinvs, self.Npsr)
             #
@@ -98,21 +101,27 @@ class FastLikeMaster:
             #FLI.phiinvs = new_phiinvs
 
             for i in range(self.Npsr):
+                if mask[i]:
+                    continue
+
                 phiinv_loc,logdetphi_loc = pls_temp[i]
                 chol_Sigma = cholupdate(FLI.chol_Sigmas[i], phiinv_loc-FLI.phiinvs[i])
-            
+
                 logdet_Sigma_loc = logdet_Sigma_helper(chol_Sigma)
-            
+
                 FLI.chol_Sigmas[i][:] = chol_Sigma
-            
+
                 FLI.logdet_array[i] = logdetphi_loc+logdet_Sigma_loc
 
                 FLI.phiinvs[i][:] = phiinv_loc
 
         else:
             for i in range(self.Npsr):
+                if mask[i]:
+                    continue
+
                 phiinv_loc,logdetphi_loc = pls_temp[i]
-                FLI.phiinvs[i][:] = phiinv_loc 
+                FLI.phiinvs[i][:] = phiinv_loc
                 if phiinv_loc.ndim == 1:
                     #Sigma_alt = self.TNTs[i]+np.diag(phiinv_loc)
                     #overwrite old chol_Sigma so can be done without allocating new array
@@ -134,7 +143,8 @@ class FastLikeMaster:
 
 
         #set logdet
-        FLI.logdet = FLI.logdet_base+FLI.logdet_array.sum()
+        FLI.set_resres_logdet(FLI.resres_array,FLI.logdet_array,FLI.logdet_base)
+
         FLI.update_intrinsic_params(x0)
 
         return FLI#FastLikeInfo(resres,logdet,self.pos,self.pdist,self.toas,invchol_Sigma_TNs,self.Nvecs,self.Nrs,self.max_toa,x0,self.Npsr,self.isqrNvecs,self.residuals)
@@ -191,7 +201,7 @@ def logdet_Sigma_helper(chol_Sigma):
     """get logdet sigma from cholesky"""
     res = 0.
     for itrj in prange(0,chol_Sigma.shape[0]):
-        res += np.log(chol_Sigma[itrj,itrj]) 
+        res += np.log(chol_Sigma[itrj,itrj])
     return 2*res
 
 
@@ -209,13 +219,13 @@ def create_Sigma(phiinv_loc,TNT,Sigma):
 @jitclass([('Npsr',nb.int64),('cw_p_dists',nb.float64[:]),('cw_p_phases',nb.float64[:]),('cos_gwtheta',nb.float64),\
         ('cos_inc',nb.float64),('gwphi',nb.float64),('log10_fgw',nb.float64),('log10_h',nb.float64),\
         ('log10_mc',nb.float64),('phase0',nb.float64),('psi',nb.float64),\
-        ('idx_phases',nb.int64[:]),('idx_dists',nb.int64[:]),('idx_rn_gammas',nb.int64[:]),('idx_rn_log10_As',nb.int64[:]),\
+        ('idx_phases',nb.int64[:]),('idx_dists',nb.int64[:]),('idx_rn_gammas',nb.int64[:]),('idx_rn_log10_As',nb.int64[:]),('idx_rn',nb.int64[:]),('idx_int',nb.int64[:]),\
         ('idx_cos_gwtheta',nb.int64),('idx_cos_inc',nb.int64),\
         ('idx_gwphi',nb.int64),('idx_log10_fgw',nb.int64),('idx_log10_mc',nb.int64),('idx_log10_h',nb.int64),('idx_phase0',nb.int64),('idx_psi',nb.int64),
-        ('idx_cw_ext',nb.int64[:]),('rn_gammas',nb.float64[:]),('rn_log10_As',nb.float64[:])])
+        ('idx_cw_ext',nb.int64[:]),('idx_cw_int',nb.int64[:]),('rn_gammas',nb.float64[:]),('rn_log10_As',nb.float64[:])])
 class CWInfo:
     """simple jitclass to store the various parmeters in a way that can be accessed quickly from a numba environment"""
-    def __init__(self,Npsr,params_in,par_names,par_names_cw_ext):
+    def __init__(self,Npsr,params_in,par_names,par_names_cw_ext,par_names_cw_int):
         """parmeters are mostly the same as the params object for the ptas"""
         self.Npsr = Npsr
         self.idx_phases = np.array([par_names.index(par) for par in par_names if "_cw0_p_phase" in par])
@@ -223,6 +233,7 @@ class CWInfo:
 
         self.idx_rn_gammas = np.array([par_names.index(par) for par in par_names if "_red_noise_gamma" in par])
         self.idx_rn_log10_As = np.array([par_names.index(par) for par in par_names if "_red_noise_log10_A" in par])
+        self.idx_rn = np.concatenate((self.idx_rn_gammas,self.idx_rn_log10_As))
 
         self.idx_cos_inc = par_names.index("0_cos_inc")
         self.idx_log10_h = par_names.index("0_log10_h")
@@ -237,6 +248,13 @@ class CWInfo:
         self.idx_cw_ext = np.zeros(len(par_names_cw_ext),dtype=np.int64)
         for i,name_ext in enumerate(par_names_cw_ext):
             self.idx_cw_ext[i] = par_names.index(name_ext)
+
+        self.idx_cw_int = np.zeros(len(par_names_cw_int),dtype=np.int64)
+        for i,name_int in enumerate(par_names_cw_int):
+            self.idx_cw_int[i] = par_names.index(name_int)
+
+        self.idx_int = np.concatenate((self.idx_rn,self.idx_cw_int))
+
 
         self.update_params(params_in)
 
@@ -253,6 +271,22 @@ class CWInfo:
         self.log10_mc = params_in[self.idx_log10_mc]
         self.rn_gammas = params_in[self.idx_rn_gammas]
         self.rn_log10_As = params_in[self.idx_rn_log10_As]
+
+    def validate_consistent(self,params_in):
+        """check current params match input params"""
+        assert np.all(isclose(self.cw_p_phases,params_in[self.idx_phases]))
+        assert np.all(isclose(self.cw_p_dists, params_in[self.idx_dists]))
+        assert isclose(self.cos_inc, params_in[self.idx_cos_inc])
+        assert isclose(self.log10_h, params_in[self.idx_log10_h])
+        assert isclose(self.phase0, params_in[self.idx_phase0])
+        assert isclose(self.psi, params_in[self.idx_psi])
+        assert isclose(self.cos_gwtheta, params_in[self.idx_cos_gwtheta])
+        assert isclose(self.gwphi, params_in[self.idx_gwphi])
+        assert isclose(self.log10_fgw, params_in[self.idx_log10_fgw])
+        assert isclose(self.log10_mc, params_in[self.idx_log10_mc])
+        assert np.all(isclose(self.rn_gammas, params_in[self.idx_rn_gammas]))
+        assert np.all(isclose(self.rn_log10_As, params_in[self.idx_rn_log10_As]))
+        return True
 
 @njit()
 def get_lnlikelihood_helper(x0,resres,logdet,pos,pdist,NN,MMs,includeCW=True):
@@ -846,15 +880,18 @@ def update_intrinsic_params(x0,isqNvecs,Nrs,pos,pdist,toas,NN,MMs,SigmaTNrProds,
         ('Npsr',nb.int64),('isqNvecs',nb.types.ListType(nb.types.float64[::1])),('TNvs',nb.types.ListType(nb.types.float64[::1,:])),\
         ('resres_array',nb.float64[:]),('logdet_array',nb.float64[:]),('logdet_base',nb.float64),\
         ('rn_gammas',nb.float64[:]),('rn_log10_As',nb.float64[:]),('dotTNrs',nb.types.ListType(nb.types.float64[::1])),('phiinvs',nb.types.ListType(nb.types.float64[::1])),
-        ('includeCW',nb.boolean)])
+        ('includeCW',nb.boolean),('cw_p_dists',nb.float64[:]),('logdet_base_orig',nb.float64)])
 class FastLikeInfo:
     """simple jitclass to store the various elements of fast likelihood calculation in a way that can be accessed quickly from a numba environment"""
     def __init__(self,logdet_base,pos,pdist,toas,Nvecs,Nrs,max_toa,x0,Npsr,isqNvecs,TNvs,dotTNrs,chol_Sigmas,phiinvs,includeCW=True):
         self.resres = 0. #compute internally
+        self.logdet = 0.
         self.resres_array = np.zeros(Npsr)
         self.logdet_array = np.zeros(Npsr)
         self.logdet_base = logdet_base
-        self.logdet = self.logdet_base+np.sum(self.logdet_array)
+        self.logdet_base_orig = logdet_base
+        self.set_resres_logdet(self.resres_array,self.logdet_array,self.logdet_base)
+
         self.pos = pos
         self.pdist = pdist
         self.toas = toas
@@ -882,14 +919,15 @@ class FastLikeInfo:
 
     def get_lnlikelihood(self,x0):
         """wrapper to get the log likelihood"""
-        #assert self.cos_gwtheta == x0.cos_gwtheta
-        #assert self.gwphi == x0.gwphi
-        #assert self.log10_fgw == x0.log10_fgw
-        #assert self.log10_mc == x0.log10_mc
-        assert isclose(self.cos_gwtheta, x0.cos_gwtheta)
-        assert isclose(self.gwphi, x0.gwphi)
-        assert isclose(self.log10_fgw, x0.log10_fgw)
-        assert isclose(self.log10_mc, x0.log10_mc)
+        #assert isclose(self.cos_gwtheta, x0.cos_gwtheta)
+        #assert isclose(self.gwphi, x0.gwphi)
+        #assert isclose(self.log10_fgw, x0.log10_fgw)
+        #assert isclose(self.log10_mc, x0.log10_mc)
+
+        assert self.cos_gwtheta==x0.cos_gwtheta
+        assert self.gwphi==x0.gwphi
+        assert self.log10_fgw==x0.log10_fgw
+        assert self.log10_mc==x0.log10_mc
 
         return get_lnlikelihood_helper(x0,self.resres,self.logdet,self.pos,self.pdist,self.NN,self.MMs,includeCW=self.includeCW)
 
@@ -904,16 +942,20 @@ class FastLikeInfo:
         #self.rn_log10_As = x0.rn_log10_As.copy()
         #assert np.all(self.rn_gammas==x0.rn_gammas)
         #assert np.all(self.rn_log10_As==x0.rn_log10_As)
-        assert isclose(self.cos_gwtheta, x0.cos_gwtheta)
-        assert isclose(self.gwphi, x0.gwphi)
-        assert isclose(self.log10_fgw, x0.log10_fgw)
-        assert isclose(self.log10_mc, x0.log10_mc)
-        assert np.all(isclose(self.rn_gammas, x0.rn_gammas))
-        assert np.all(isclose(self.rn_log10_As, x0.rn_log10_As))
+        assert self.cos_gwtheta==x0.cos_gwtheta
+        assert self.gwphi==x0.gwphi
+        assert self.log10_fgw==x0.log10_fgw
+        assert self.log10_mc==x0.log10_mc
+        assert np.all(self.rn_gammas==x0.rn_gammas)
+        assert np.all(self.rn_log10_As==x0.rn_log10_As)
+        assert np.all(self.cw_p_dists[:psr_idx]==x0.cw_p_dists[:psr_idx])
+        assert np.all(self.cw_p_dists[psr_idx:]==x0.cw_p_dists[psr_idx:])
         resres_old = self.resres_array.copy()
         update_intrinsic_params2(x0,self.isqNvecs,self.Nrs,self.pos,self.pdist,self.toas, self.NN, self.MMs,self.TNvs,self.chol_Sigmas,np.array([psr_idx]),self.resres_array,self.dotTNrs)
         #protect from incorrectly overwriting
+        self.cw_p_dists[psr_idx] = x0.cw_p_dists[psr_idx]
         self.resres_array[:] = resres_old
+        self.set_resres_logdet(resres_old,self.logdet_array,self.logdet_base)
         #assert np.all(resres_old==self.resres_array)
 
     def update_pulsar_distances(self,x0,psr_idxs):
@@ -926,18 +968,20 @@ class FastLikeInfo:
         #self.rn_log10_As = x0.rn_log10_As.copy()
         #assert np.all(self.rn_gammas==x0.rn_gammas)
         #assert np.all(self.rn_log10_As==x0.rn_log10_As)
-        assert isclose(self.cos_gwtheta, x0.cos_gwtheta)
-        assert isclose(self.gwphi, x0.gwphi)
-        assert isclose(self.log10_fgw, x0.log10_fgw)
-        assert isclose(self.log10_mc, x0.log10_mc)
-        assert np.all(isclose(self.rn_gammas, x0.rn_gammas))
-        assert np.all(isclose(self.rn_log10_As, x0.rn_log10_As))
+        assert self.cos_gwtheta==x0.cos_gwtheta
+        assert self.gwphi==x0.gwphi
+        assert self.log10_fgw==x0.log10_fgw
+        assert self.log10_mc==x0.log10_mc
+        assert np.all(self.rn_gammas==x0.rn_gammas)
+        assert np.all(self.rn_log10_As==x0.rn_log10_As)
         #leave dist_only in even though it is not currently respected in case it turns out to be faster later
-        resres_temp = self.resres_array.copy()
+        #resres_temp = self.resres_array.copy()
         resres_old = self.resres_array.copy()
         update_intrinsic_params2(x0,self.isqNvecs,self.Nrs,self.pos,self.pdist,self.toas, self.NN, self.MMs,self.TNvs,self.chol_Sigmas,psr_idxs,self.resres_array,self.dotTNrs)
         #protect from incorrectly overwriting
-        self.resres_array[:] = resres_old
+        self.cw_p_dists[:] = x0.cw_p_dists
+        self.set_resres_logdet(resres_old,self.logdet_array,self.logdet_base)
+
         #if not np.all(resres_temp==resres_old):
         #    print(resres_temp)
         #    print(resres_old)
@@ -965,8 +1009,11 @@ class FastLikeInfo:
     def update_intrinsic_params(self,x0):
         """Recalculate filters with updated intrinsic parameters - not quite the same as the setup, since a few things are already stored"""
         #TODO ensure complete consistency with handling of resres
-        update_intrinsic_params2(x0,self.isqNvecs,self.Nrs,self.pos,self.pdist,self.toas, self.NN, self.MMs,self.TNvs,self.chol_Sigmas,np.arange(x0.Npsr),self.resres_array,self.dotTNrs)
-        self.resres = self.resres_array.sum()
+        resres_temp = self.resres_array.copy()
+
+        update_intrinsic_params2(x0,self.isqNvecs,self.Nrs,self.pos,self.pdist,self.toas, self.NN, self.MMs,self.TNvs,self.chol_Sigmas,np.arange(x0.Npsr),resres_temp,self.dotTNrs)
+
+        self.set_resres_logdet(resres_temp,self.logdet_array,self.logdet_base)
         #track the intrinsic parameters this was set at so we can throw in error if they are inconsistent with an input x0
         self.rn_gammas = x0.rn_gammas.copy()
         self.rn_log10_As = x0.rn_log10_As.copy()
@@ -974,6 +1021,29 @@ class FastLikeInfo:
         self.gwphi = x0.gwphi
         self.log10_fgw = x0.log10_fgw
         self.log10_mc = x0.log10_mc
+        self.cw_p_dists = x0.cw_p_dists.copy()
+
+    def validate_consistent(self,x0):
+        """validate parameters are consistent with input x0"""
+        assert self.cos_gwtheta==x0.cos_gwtheta
+        assert self.gwphi==x0.gwphi
+        assert self.log10_fgw==x0.log10_fgw
+        assert self.log10_mc==x0.log10_mc
+        assert np.all(self.rn_gammas==x0.rn_gammas)
+        assert np.all(self.rn_log10_As==x0.rn_log10_As)
+        assert np.all(self.cw_p_dists==x0.cw_p_dists)
+        assert self.logdet_base_orig==self.logdet_base
+        assert self.logdet==self.logdet_base+self.logdet_array.sum()
+        assert self.resres==self.resres_array.sum()
+        return True
+
+    def set_resres_logdet(self,resres_array,logdet_array,logdet_base):
+        """always reset resres and logdet with this method for maximum numerical consistency"""
+        self.resres_array[:] = resres_array
+        self.logdet_array[:] = logdet_array
+        self.logdet_base = logdet_base
+        self.resres = np.sum(resres_array)
+        self.logdet = self.logdet_base+np.sum(self.logdet_array)
 
 
 #def update_FLI_rn(flm,FLI,x0,psr_idxs,psrs,pta,par_names,new_point):
@@ -1036,4 +1106,5 @@ class FastLikeInfo:
 
 @njit()
 def isclose(a,b,rtol=1.e-5,atol=1.e-8):
-    return np.abs(a - b) <= (atol + rtol * np.abs(b)) 
+    """check if close in same way as np.isclose"""
+    return np.abs(a - b) <= (atol + rtol * np.abs(b))
