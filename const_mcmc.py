@@ -63,12 +63,16 @@ sigma_de = 0.1
 n_x0_extra = config.NUMBA_NUM_THREADS
 n_multi_try = 2000#3_000
 
-if n_multi_try == 1:
-    n_x0_extra = 1
+if n_multi_try < n_x0_extra:
+    print("Reset n_x0_extra from "+str(n_x0_extra)+" to "+str(n_multi_try)+" in order to not exceed n_multi_try")
+    n_x0_extra = n_multi_try
 
 n_block_try = np.int64(n_multi_try//n_x0_extra)
 if n_multi_try%n_x0_extra!=0:
+    n_multi_try_old = n_multi_try
     n_block_try = n_block_try+1
     n_multi_try = n_block_try*n_x0_extra
+    print("adjusted number multiple tries from "+str(n_multi_try_old)+" to be next even divisor of n_x0_extra="+str(n_x0_extra)+", "+str(n_multi_try))
+
 assert n_multi_try%n_x0_extra == 0
     
