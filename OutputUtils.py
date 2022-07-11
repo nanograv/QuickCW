@@ -19,7 +19,7 @@ display_names ={'dist-prior-noproj':'Dist Prior','dist-DE-noproj':'Dist DE','dis
         'all-prior-proj':'All Prior','all-DE-proj':'All DE','all-fisher-proj':'All Fisher',\
         'PT':'PT','proj':'proj'}
 
-def print_acceptance_progress(itrn,N,n_int_block,a_yes,a_no,t_itr,ti_loop,tf1_loop,Ts):
+def print_acceptance_progress(itrn,N,n_int_block,a_yes,a_no,t_itr,ti_loop,tf1_loop,Ts,verbosity):
     """print the acceptance fraction"""
     with np.errstate(invalid='ignore'):
         acc_fraction = a_yes/(a_no+a_yes)
@@ -72,11 +72,12 @@ def print_acceptance_progress(itrn,N,n_int_block,a_yes,a_no,t_itr,ti_loop,tf1_lo
     for str_build in str_proj_rows:
         print(str_build)
 
-    #the noproj rows have different meaning so print them as a separate channel
-    print("")
-    print("Fraction of time Multiple Try selected first sample, whether or not trial was accepted:")
-    for str_build in str_noproj_rows:
-        print(str_build)
+    if verbosity>1:
+        #the noproj rows have different meaning so print them as a separate channel
+        print("")
+        print("Fraction of time Multiple Try selected first sample, whether or not trial was accepted:")
+        for str_build in str_noproj_rows:
+            print(str_build)
 
 
 def output_hdf5_loop(itrn,chain_params,evolve_params,samples,log_likelihood,acc_fraction,fisher_diag,par_names,N):

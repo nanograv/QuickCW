@@ -612,7 +612,7 @@ class MCMCChain():
     def do_status_update(self,itrn,N_blocks):
         """print a status update"""
         t_itr = perf_counter()
-        print_acceptance_progress(itrn,N_blocks*self.n_int_block,self.n_int_block,self.a_yes,self.a_no,t_itr,self.ti_loop,self.tf1_loop,self.chain_params.Ts)
+        print_acceptance_progress(itrn,N_blocks*self.n_int_block,self.n_int_block,self.a_yes,self.a_no,t_itr,self.ti_loop,self.tf1_loop,self.chain_params.Ts, self.verbosity)
         print("New log_L=%+12.3f Best log_L=%+12.3f"%(self.FLIs[0].get_lnlikelihood(self.x0s[0]),self.best_logL))#,FLIs[0].resres,FLIs[0].logdet,FLIs[0].pos,FLIs[0].pdist,FLIs[0].NN,FLIs[0].MMs)))
 
     def output_and_wrap_state(self,evolve_params,itrn,N_blocks):
