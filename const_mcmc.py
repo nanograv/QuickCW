@@ -62,4 +62,13 @@ sigma_de = 0.1
 #multiple try MCMC parameters
 n_x0_extra = config.NUMBA_NUM_THREADS
 n_multi_try = 2000#3_000
+
+if n_multi_try == 1:
+    n_x0_extra = 1
+
 n_block_try = np.int64(n_multi_try//n_x0_extra)
+if n_multi_try%n_x0_extra!=0:
+    n_block_try = n_block_try+1
+    n_multi_try = n_block_try*n_x0_extra
+assert n_multi_try%n_x0_extra == 0
+    
