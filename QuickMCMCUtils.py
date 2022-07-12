@@ -617,7 +617,7 @@ class MCMCChain():
 
     def output_and_wrap_state(self,evolve_params,itrn,N_blocks):
         """wrap the samples around to the first element and save the old ones to the hdf5 file"""
-        output_hdf5_loop(itrn,self.chain_params,evolve_params,self.samples,self.log_likelihood,self.acc_fraction,self.fisher_diag,self.par_names,N_blocks*self.n_int_block)
+        output_hdf5_loop(itrn,self.chain_params,evolve_params,self.samples,self.log_likelihood,self.acc_fraction,self.fisher_diag,self.par_names,N_blocks*self.n_int_block,self.verbosity)
 
         #clear out log_likelihood and samples arrays
         samples_now = self.samples[:,-1,:]
@@ -644,7 +644,7 @@ class MCMCChain():
             #advance the block state
             self.advance_block()
 
-        output_hdf5_end(self.chain_params,evolve_params,self.samples,self.log_likelihood,self.acc_fraction,self.fisher_diag,self.par_names)
+        output_hdf5_end(self.chain_params,evolve_params,self.samples,self.log_likelihood,self.acc_fraction,self.fisher_diag,self.par_names,self.verbosity)
         tf = perf_counter()
         print('whole function time = %8.3f s'%(tf-self.ti))
         print('loop time = %8.3f s'%(tf-self.ti_loop))
