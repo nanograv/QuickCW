@@ -216,7 +216,7 @@ def create_Sigma(phiinv_loc,TNT,Sigma):
     #for itrj1 in prange(0,phiinv_loc.size):
     return Sigma
 
-@jitclass([('Npsr',nb.int64),('cw_p_dists',nb.float64[:]),('cw_p_phases',nb.float64[:]),('cos_gwtheta',nb.float64),\
+@jitclass([('Npsr',nb.int64),('psr_dist_mus',nb.float64[:]),('psr_dist_sigmas',nb.float64[:]),('cw_p_dists',nb.float64[:]),('cw_p_phases',nb.float64[:]),('cos_gwtheta',nb.float64),\
         ('cos_inc',nb.float64),('gwphi',nb.float64),('log10_fgw',nb.float64),('log10_h',nb.float64),\
         ('log10_mc',nb.float64),('phase0',nb.float64),('psi',nb.float64),\
         ('idx_phases',nb.int64[:]),('idx_dists',nb.int64[:]),('idx_rn_gammas',nb.int64[:]),('idx_rn_log10_As',nb.int64[:]),('idx_rn',nb.int64[:]),('idx_int',nb.int64[:]),\
@@ -225,9 +225,12 @@ def create_Sigma(phiinv_loc,TNT,Sigma):
         ('idx_cw_ext',nb.int64[:]),('idx_cw_int',nb.int64[:]),('rn_gammas',nb.float64[:]),('rn_log10_As',nb.float64[:])])
 class CWInfo:
     """simple jitclass to store the various parmeters in a way that can be accessed quickly from a numba environment"""
+    
     def __init__(self,Npsr,params_in,par_names,par_names_cw_ext,par_names_cw_int):
         """parmeters are mostly the same as the params object for the ptas"""
         self.Npsr = Npsr
+        self.psr_dist_mus = psr_dist_mus
+        self.psr_dist_sigmas = psr_dist_sigmas
         self.idx_phases = np.array([par_names.index(par) for par in par_names if "_cw0_p_phase" in par])
         self.idx_dists = np.array([par_names.index(par) for par in par_names if "_cw0_p_dist" in par])
 

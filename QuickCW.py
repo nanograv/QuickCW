@@ -63,6 +63,7 @@ def QuickCW(chain_params, psrs, noise_json=None, use_legacy_equad=False,amplitud
         efq = white_signals.MeasurementNoise(efac=efac, log10_t2equad=equad, selection=selection)
     #ec = white_signals.EcorrKernelNoise(log10_ecorr=ecorr, selection=selection)
     #ec = gp_signals.EcorrBasisModel(log10_ecorr=ecorr, selection=selection)
+    #give ecorr a name so that we can use the usual noisefiles created for Kernel ecorr
     ec = gp_signals.EcorrBasisModel(log10_ecorr=ecorr, selection=selection, name='')
 
     log10_A = parameter.Uniform(-20, -11)
@@ -88,9 +89,6 @@ def QuickCW(chain_params, psrs, noise_json=None, use_legacy_equad=False,amplitud
 
     p_phase = parameter.Uniform(0, 2*np.pi)
     p_dist = parameter.Normal(0, 1)
-
-    #log10_h = parameter.Uniform(-18, -11)('0_log10_h')
-    #log10_h = parameter.LinearExp(-18, -11)('0_log10_h')
 
     if amplitude_prior=='detection':
         log10_h = parameter.Uniform(-18, -11)('0_log10_h')
@@ -137,7 +135,6 @@ def QuickCW(chain_params, psrs, noise_json=None, use_legacy_equad=False,amplitud
     if chain_params.verbosity>0:
         print("List of parameters in the model with their priors:")
         print(pta.params)
-
 
     #get max toa which is needed to mae sure the initial parameters don't result in an already merged system
     max_toa = np.max(psrs[0].toas)
