@@ -1,0 +1,650 @@
+"""C 2021 Bence Becsy
+MCMC for CW fast likelihood (w/ Neil Cornish and Matthew Digman)
+Helpers for MCMC; extrinsic blocks and parallel tempering"""
+
+from time import perf_counter
+import numpy as np
+#np.seterr(all='raise')
+#make sure to use the right threading layer
+
+from numba import njit,prange
+from numba.typed import List
+from numpy.random import uniform
+
+import CWFastPrior
+from QuickCorrectionUtils import check_merged,correct_extrinsic,correct_intrinsic
+import const_mcmc as cm
+import CWFastLikelihoodNumba
+from QuickFisherHelpers import get_fishers
+from QuickMTHelpers import do_intrinsic_update_mt,add_rn_eig_jump
+from OutputUtils import print_acceptance_progress,output_hdf5_loop,output_hdf5_end
+
+################################################################################
+#
+#UPDATE INTRINSIC PARAMETERS AND RECALCULATE FILTERS
+#
+################################################################################
+#version using multiple try mcmc (based on Table 6 of https://vixra.org/pdf/1712.0244v3.pdf)
+
+###############################################################################
+#
+#REGULAR MCMC JUMP ROUTINE (JUMPING ALONG EIGENDIRECTIONS)
+#
+################################################################################
+@njit(parallel=True)
+def do_extrinsic_block(n_chain, samples, itrb, Ts, x0s, FLIs, FPI, n_par_tot, log_likelihood, n_int_block, fisher_diag, a_yes, a_no):
+    """do blocks of just the extrinsic parameters, which should be very fast"""
+    n_par_ext = x0s[0].idx_cw_ext.size
+    for k in range(0,n_int_block,2):
+        for j in prange(0,n_chain):
+            samples_current = samples[j,itrb+k,:]
+
+            if k%10==0:  # every 10th k (so every 5th jump) do a prior draw
+                new_point = np.copy(samples_current)
+                jump_idx = x0s[j].idx_cw_ext
+                for ii, idx in enumerate(jump_idx):
+                    new_point[idx] = uniform(FPI.cw_ext_lows[ii], FPI.cw_ext_highs[ii])
+            else:
+                jump = np.zeros(n_par_tot)
+                jump_idx = x0s[j].idx_cw_ext
+                jump[jump_idx] = 2.38/np.sqrt(n_par_ext)*np.sqrt(Ts[j])*fisher_diag[j][jump_idx]*np.random.normal(0.,1.,n_par_ext)
+                new_point = samples_current + jump
+
+            new_point = correct_extrinsic(new_point,x0s[j])
+
+            x0s[j].update_params(new_point)
+
+            log_L = FLIs[j].get_lnlikelihood(x0s[j])
+            log_acc_ratio = log_L/Ts[j]
+            log_acc_ratio += CWFastPrior.get_lnprior_helper(new_point, FPI.uniform_par_ids, FPI.uniform_lows, FPI.uniform_highs,\
+                                                                       FPI.lin_exp_par_ids, FPI.lin_exp_lows, FPI.lin_exp_highs,\
+                                                                       FPI.normal_par_ids, FPI.normal_mus, FPI.normal_sigs,\
+                                                                       FPI.global_common)
+            log_acc_ratio += -log_likelihood[j,itrb+k]/Ts[j]
+            log_acc_ratio += -CWFastPrior.get_lnprior_helper(samples_current, FPI.uniform_par_ids, FPI.uniform_lows, FPI.uniform_highs,\
+                                                                              FPI.lin_exp_par_ids, FPI.lin_exp_lows, FPI.lin_exp_highs,\
+                                                                              FPI.normal_par_ids, FPI.normal_mus, FPI.normal_sigs,\
+                                                                              FPI.global_common)
+
+            acc_decide = np.log(uniform(0.0, 1.0, 1))
+            if acc_decide<=log_acc_ratio:
+                samples[j,itrb+k+1,:] = new_point
+                log_likelihood[j,itrb+k+1] = log_L
+                a_yes[cm.idx_full,j] += 1
+            else:
+                samples[j,itrb+k+1,:] = samples[j,itrb+k,:]
+                log_likelihood[j,itrb+k+1] = log_likelihood[j,itrb+k]
+                a_no[cm.idx_full,j] += 1
+
+                x0s[j].update_params(samples_current)
+
+        do_pt_swap(n_chain, samples, itrb+k+1, Ts, a_yes, a_no, x0s, FLIs, log_likelihood,fisher_diag)
+
+
+################################################################################
+#
+#PARALLEL TEMPERING SWAP JUMP ROUTINE
+#
+################################################################################
+@njit()
+def do_pt_swap(n_chain, samples, itrb, Ts, a_yes, a_no, x0s, FLIs, log_likelihood,fisher_diag):
+    """do the parallel tempering swap"""
+    #print("PT")
+
+    #print("PT")
+
+    #set up map to help keep track of swaps
+    swap_map = list(range(n_chain))
+
+    #get log_Ls from all the chains
+    log_Ls = []
+    for j in range(n_chain):
+        log_Ls.append(log_likelihood[j,itrb])
+
+    #loop through and propose a swap at each chain (starting from hottest chain and going down in T) and keep track of results in swap_map
+    #for swap_chain in reversed(range(n_chain-1)):
+    for swap_chain in range(n_chain-2, -1, -1):  # same as reversed(range(n_chain-1)) but supported in numba
+        assert swap_map[swap_chain] == swap_chain
+        log_acc_ratio = -log_Ls[swap_map[swap_chain]] / Ts[swap_chain]
+        log_acc_ratio += -log_Ls[swap_map[swap_chain+1]] / Ts[swap_chain+1]
+        log_acc_ratio += log_Ls[swap_map[swap_chain+1]] / Ts[swap_chain]
+        log_acc_ratio += log_Ls[swap_map[swap_chain]] / Ts[swap_chain+1]
+
+        acc_decide = np.log(uniform(0.0, 1.0, 1))
+        if acc_decide<=log_acc_ratio:# and do_PT:
+            swap_map[swap_chain], swap_map[swap_chain+1] = swap_map[swap_chain+1], swap_map[swap_chain]
+            a_yes[cm.idx_PT,swap_chain] += 1
+            #a_yes[0,swap_chain]+=1
+        else:
+            a_no[cm.idx_PT,swap_chain] += 1
+            #a_no[0,swap_chain]+=1
+
+    #loop through the chains and record the new samples and log_Ls
+    FLIs_new = []
+    x0s_new = []
+    fisher_diag_new = np.zeros_like(fisher_diag)
+    for j in range(n_chain):
+        samples[j,itrb+1,:] = samples[swap_map[j],itrb,:]
+        fisher_diag_new[j,:] = fisher_diag[swap_map[j],:]
+        log_likelihood[j,itrb+1] = log_likelihood[swap_map[j],itrb]
+        FLIs_new.append(FLIs[swap_map[j]])
+        x0s_new.append(x0s[swap_map[j]])
+
+    fisher_diag[:] = fisher_diag_new
+    FLIs[:] = List(FLIs_new)
+    x0s[:] = List(x0s_new)
+
+def add_rn_eig_starting_point(samples,par_names,x0_swap,flm,FLI_swap,chain_params,Npsr,FPI):
+    """add a fisher eig jump to the starting point of each chain based only on the fisher matrix at the first point"""
+    eig_rn0,_,_ = get_fishers(samples[0:1],par_names,x0_swap,flm, FLI_swap,\
+                              get_diag=False,get_rn_block=True,get_common=False,get_intrinsic_diag=False)
+    scaling = 0.*2.38/np.sqrt(2*Npsr/2)
+    for j in range(0,chain_params.n_chain):
+        scale_eig0 = scaling*eig_rn0[0,:,0,:]
+        scale_eig1 = scaling*eig_rn0[0,:,1,:]
+        samples[j,0] = add_rn_eig_jump(scale_eig0,scale_eig1,samples[j,0],samples[0,0,x0_swap.idx_rn],x0_swap.idx_rn,Npsr)
+        #correct intrinsic just in case
+        samples[j,0] = correct_intrinsic(samples[j,0],x0_swap,chain_params.freq_bounds,FPI.cut_par_ids, FPI.cut_lows, FPI.cut_highs)
+    return samples
+
+
+def initialize_de_buffer(sample0,n_par_tot,par_names,chain_params,x0_swap,FPI,eig_rn):
+    """set up differential evolution"""
+    de_history = np.zeros((chain_params.n_chain, chain_params.de_history_size, n_par_tot))
+
+    #initialize the rn parameters to the starting point plus a fisher matrix jump
+    idx_rn = x0_swap.idx_rn
+    scaling = 2.38/np.sqrt(2*x0_swap.Npsr/2)
+    rn_base = sample0[idx_rn]
+
+    for j in range(chain_params.n_chain):
+        scale_eig0 = scaling*np.sqrt(chain_params.Ts[j])*eig_rn[j,:,0,:]
+        scale_eig1 = scaling*np.sqrt(chain_params.Ts[j])*eig_rn[j,:,1,:]
+
+        for i in range(chain_params.de_history_size):
+            new_point = CWFastPrior.get_sample_full(len(par_names),FPI)
+
+            #reset the red noise parameters to be a fisher matrix jump off of the starting values
+            new_point = add_rn_eig_jump(scale_eig0,scale_eig1,new_point,rn_base,idx_rn,x0_swap.Npsr)
+
+            #do corrections just in case
+            x0_swap.update_params(new_point)
+            new_point = correct_intrinsic(new_point,x0_swap,chain_params.freq_bounds,FPI.cut_par_ids, FPI.cut_lows, FPI.cut_highs)
+            new_point = correct_extrinsic(new_point,x0_swap)
+            de_history[j,i,:] = new_point
+    return de_history
+
+def initialize_sample_helper(chain_params,n_par_tot,Npsr,max_toa,par_names,par_names_cw_ext,par_names_cw_int,FPI,pta,noisedict):
+    """initialize starting samples for each chain to a random point"""
+    samples = np.zeros((chain_params.n_chain, chain_params.save_every_n+1, n_par_tot))
+    for j in range(chain_params.n_chain):
+        #samples[j,0,:] = np.array([par.sample() for par in pta.params])
+        acceptable_initial_samples = False
+        itr_accept = 0
+        while not acceptable_initial_samples:
+            if itr_accept >= 10:
+                raise RuntimeError('failed to find acceptable initial sample')
+            #samples[j,0,:] = np.array([CWFastPrior.get_sample_helper(i, FPI.uniform_par_ids, FPI.uniform_lows, FPI.uniform_highs,
+            #                                                            FPI.lin_exp_par_ids, FPI.lin_exp_lows, FPI.lin_exp_highs,
+            #                                                            FPI.normal_par_ids, FPI.normal_mus, FPI.normal_sigs) for i in range(len(par_names))])
+            samples[j,0,:] = CWFastPrior.get_sample_full(len(par_names),FPI)
+            #do correct intrinsic and correct extrinsic just in case
+            if itr_accept == 0 and j==0:
+                x0_swap = CWFastLikelihoodNumba.CWInfo(Npsr,samples[j,0],par_names,par_names_cw_ext,par_names_cw_int)
+            else:
+                x0_swap.update_params(samples[j,0,:])
+
+            for psr in pta.pulsars:
+                #samples[j,0,par_names.index(psr + "_cw0_p_dist")] = 0.0
+                #samples[j,0,par_names.index(psr + "_red_noise_gamma")] = noisedict[psr + "_red_noise_gamma"]
+                #samples[j,0,par_names.index(psr + "_red_noise_log10_A")] = noisedict[psr + "_red_noise_log10_A"]
+                if (psr + "_red_noise_gamma") in noisedict.keys():
+                    samples[j,0,par_names.index(psr + "_red_noise_gamma")] = noisedict[psr + "_red_noise_gamma"]
+                else:
+                    print("No value found in noisedict for: " + psr + "_red_noise_gamma")
+                    print("Using a random draw from the prior as a first sample instead")
+                if (psr + "_red_noise_log10_A") in noisedict.keys():
+                    samples[j,0,par_names.index(psr + "_red_noise_log10_A")] = noisedict[psr + "_red_noise_log10_A"]
+                else:
+                    print("No value found in noisedict for: " + psr + "_red_noise_log10_A")
+                    print("Using a random draw from the prior as a first sample instead")
+
+            samples[j,0,:] = correct_intrinsic(samples[j,0,:],x0_swap,chain_params.freq_bounds,FPI.cut_par_ids, FPI.cut_lows, FPI.cut_highs)
+            samples[j,0,:] = correct_extrinsic(samples[j,0,:],x0_swap)
+            #check the maximum toa is not such that the source has already merged, and if so draw new parameters to avoid starting from nan likelihood
+            acceptable_initial_samples = not check_merged(samples[j,0,par_names.index("0_log10_fgw")],samples[j,0,par_names.index("0_log10_mc")],max_toa)
+            itr_accept += 1
+
+    return samples
+
+def get_param_names(pta):
+    """get the name Lists for various parameters"""
+    par_names = List(pta.param_names)
+    par_names_cw = List(['0_cos_gwtheta', '0_cos_inc', '0_gwphi', '0_log10_fgw', '0_log10_h',
+                         '0_log10_mc', '0_phase0', '0_psi'])
+    par_names_cw_ext = List(['0_cos_inc', '0_log10_h', '0_phase0', '0_psi'])
+    par_names_cw_int = List(['0_cos_gwtheta', '0_gwphi', '0_log10_fgw', '0_log10_mc'])
+
+    par_names_noise = []
+
+    par_inds_cw_p_phase_ext = np.zeros(len(pta.pulsars),dtype=np.int64)
+    par_inds_cw_p_dist_int = np.zeros(len(pta.pulsars),dtype=np.int64)
+
+    for i,psr in enumerate(pta.pulsars):
+        par_inds_cw_p_dist_int[i] = len(par_names_cw)
+        par_names_cw.append(psr + "_cw0_p_dist")
+        par_inds_cw_p_phase_ext[i] = len(par_names_cw)
+        par_names_cw.append(psr + "_cw0_p_phase")
+        par_names_cw_ext.append(psr + "_cw0_p_phase")
+        par_names_cw_int.append(psr + "_cw0_p_dist")
+        par_names_noise.append(psr + "_red_noise_gamma")
+        par_names_noise.append(psr + "_red_noise_log10_A")
+
+    return par_names,par_names_cw,par_names_cw_int,par_names_cw_ext,par_names_noise
+
+class ChainParams():
+    """store basic parameters the govern the evolution of the mcmc chain"""
+    def __init__(self,T_max,n_chain,n_int_block=1000,n_update_fisher=100_000,\
+                      save_every_n=10_000,fisher_eig_downsample=10,T_ladder=None,\
+                      includeCW=True,verbosity=1,\
+                      freq_bounds=np.array([3.5e-9, 1e-7],dtype=np.float64),\
+                      de_history_size=10_000,thin_de=1000,log_fishers=False):
+        assert n_int_block%2==0 and n_int_block>=4  # need to have n_int block>=4 a multiple of 2
+        #in order to always do at least n*(1 extrinsic+1 pt swap)+(1 intrinsic+1 pt swaps)
+        assert save_every_n%n_int_block == 0  # or we won't save
+        assert n_update_fisher%n_int_block == 0  # or we won't update fisher
+        self.n_chain = n_chain
+        self.n_int_block = n_int_block
+        self.n_update_fisher = n_update_fisher
+        self.save_every_n = save_every_n
+        #multiplier for how much less to do more expensive updates to fisher eigendirections for red noise and common parameters compared to diagonal elements
+        self.fisher_eig_downsample = fisher_eig_downsample
+        self.n_update_fisher_eig = self.n_update_fisher*self.fisher_eig_downsample
+        self.T_max = T_max
+        self.T_ladder = T_ladder
+        self.includeCW = includeCW
+        self.verbosity = verbosity
+        self.freq_bounds = freq_bounds
+        self.de_history_size = de_history_size
+        self.thin_de = thin_de
+        self.log_fishers = log_fishers
+
+        if T_ladder is None:
+            #using geometric spacing
+            c = self.T_max**(1./(self.n_chain-1))
+            self.Ts = c**np.arange(self.n_chain)
+            print("Using {0} temperature chains with a geometric spacing of {1:.3f}.\nTemperature ladder is:\n".format(self.n_chain,c),self.Ts)
+        else:
+            self.Ts = np.array(T_ladder)
+            self.n_chain = self.Ts.size
+            print("Using {0} temperature chains with custom spacing: ".format(self.n_chain),self.Ts)
+
+class EvolveParams():
+    """store the set of parameters which are allowed to change between calls to advance_N_blocks"""
+    def __init__(self,n_block_status_update,savefile=None,thin=100,samples_precision=np.single,save_first_n_chains=1):
+        self.n_block_status_update = n_block_status_update
+        self.savefile = savefile
+        self.thin = thin
+        self.samples_precision = samples_precision
+        self.save_first_n_chains = save_first_n_chains
+
+
+class MCMCChain():
+    """store the miscellaneous objects needed to manage the mcmc chain"""
+    def __init__(self,chain_params,psrs,pta,max_toa,noisedict,ti):
+        #set up fast likelihoods
+        self.chain_params = chain_params
+        self.ti = ti
+        self.includeCW = self.chain_params.includeCW
+        self.max_toa = max_toa
+        self.n_chain = self.chain_params.n_chain
+        self.pta = pta
+        #gte parameter names
+        self.par_names,self.par_names_cw,self.par_names_cw_int,self.par_names_cw_ext,self.par_names_noise = get_param_names(self.pta)
+        self.n_par_tot = len(self.par_names)
+        self.n_int_block = self.chain_params.n_int_block
+        self.n_update_fisher = self.chain_params.n_update_fisher
+        self.psrs = psrs
+        self.Npsr = len(self.pta.pulsars)
+        self.ti = ti
+        self.noisedict = noisedict
+        self.verbosity = self.chain_params.verbosity
+        self.itri = 0
+
+        self.fisher_diag_logs = []
+        self.fisher_eig_logs = []
+        self.fisher_common_logs = []
+
+
+        self.FPI = CWFastPrior.get_FastPriorInfo(self.pta,self.psrs,self.par_names_cw_ext)
+        if self.verbosity>0:
+            print('uniform',self.FPI.uniform_par_ids)
+            print('normal ',self.FPI.normal_par_ids)
+            print('lin exp',self.FPI.lin_exp_par_ids)
+
+        #assert np.all(FPI.cw_ext_lows==cw_ext_lows)
+        #assert np.all(FPI.cw_ext_highs==cw_ext_highs)
+        print(self.FPI.cw_ext_lows)
+        print(self.FPI.cw_ext_highs)
+
+        #set up samples array
+        t1 = perf_counter()
+        print("Setting up first sample at %8.3fs..."%(t1-self.ti))
+        self.samples = initialize_sample_helper(self.chain_params,self.n_par_tot,self.Npsr,self.max_toa,self.par_names,self.par_names_cw_ext,self.par_names_cw_int,self.FPI,self.pta,self.noisedict)
+
+
+        print("log_prior="+str(CWFastPrior.get_lnprior(self.samples[0,0,:], self.FPI)))
+
+        #set up log_likelihood array
+        self.log_likelihood = np.zeros((self.n_chain,self.chain_params.save_every_n+1))
+
+        t1 = perf_counter()
+        print("Creating Shared Info Objects at %8.3fs"%(t1-ti))
+        self.x0_swap = CWFastLikelihoodNumba.CWInfo(self.Npsr,self.samples[0,0],self.par_names,self.par_names_cw_ext,self.par_names_cw_int)
+        self.samples[:,0,self.x0_swap.idx_dists] = 0.
+
+        self.flm = CWFastLikelihoodNumba.FastLikeMaster(self.psrs,self.pta,dict(zip(self.par_names, self.samples[0, 0, :])),self.x0_swap,includeCW=self.includeCW)
+        self.FLI_swap = self.flm.get_new_FastLike(self.x0_swap, dict(zip(self.par_names, self.samples[0, 0, :])))
+
+        #add a random fisher eigenvalue jump to the starting point for the j>0 chains to get more diversity in the initial fisher matrices
+        self.samples = add_rn_eig_starting_point(self.samples,self.par_names,self.x0_swap,self.flm,self.FLI_swap,self.chain_params,self.Npsr,self.FPI)
+
+        self.x0s = List([])
+        self.FLIs  = List([])
+        for j in range(self.n_chain):
+            self.x0s.append( CWFastLikelihoodNumba.CWInfo(self.Npsr,self.samples[j,0],self.par_names,self.par_names_cw_ext,self.par_names_cw_int))
+            self.FLIs.append(self.flm.get_new_FastLike(self.x0s[j], dict(zip(self.par_names, self.samples[j, 0, :]))))
+
+        #make extra x0s to help parallelizing MTMCMC updates
+        self.x0_extras = List([])
+        for k in range(cm.n_x0_extra):
+            self.x0_extras.append(CWFastLikelihoodNumba.CWInfo(len(self.pta.pulsars),self.samples[0,0],self.par_names,self.par_names_cw_ext,self.par_names_cw_int))
+
+        t1 = perf_counter()
+        print("Finished Creating Shared Info Objects at %8.3fs"%(t1-self.ti))
+
+        t1 = perf_counter()
+        print("Geting Starting Fishers at %8.3fs"%(t1-self.ti))
+        #get only the starting point so we can add a fisher red noise jump to the others
+        self.samples_sel = np.zeros((self.n_chain,1,self.samples.shape[2]))
+        self.samples_sel[:,0,:] = self.samples[:,0,:]
+        self.eig_rn,self.fisher_diag,self.eig_common = get_fishers(self.samples_sel,self.par_names,self.x0_swap, self.flm, self.FLI_swap,\
+                                                                   get_diag=True,get_rn_block=True,get_common=True,get_intrinsic_diag=True)
+
+        self.fisher_diag_next = np.zeros_like(self.fisher_diag)
+        self.fisher_diag_next2 = np.zeros_like(self.fisher_diag)
+        self.eig_rn_next = np.zeros_like(self.eig_rn)
+        self.eig_common_next = np.zeros_like(self.eig_common)
+        #chose the indices of parameters where fisher matrix diagonals will next be computed so they can be stored before they are erased if n_update_fisher is larger than n_int_block
+        self.samples_sel_next = np.zeros((self.n_chain,1,self.samples.shape[2]))
+        self.idx_fisher_sel_next = np.random.randint(0,self.n_update_fisher,self.n_chain)#np.zeros(self.n_chain,dtype=np.int64)
+
+        #chose the indices of parameters where fisher matrix eigenvalues will next be computed
+        self.samples_sel_next_eig = np.zeros((self.n_chain,1,self.samples.shape[2]))
+        self.idx_fisher_sel_next_eig = np.random.randint(0,self.chain_params.n_update_fisher_eig,self.n_chain)#np.zeros(self.n_chain,dtype=np.int64)
+
+        self.fisher_eig_logs.append(self.eig_rn.copy())
+        self.fisher_diag_logs.append(self.fisher_diag.copy())
+        self.fisher_common_logs.append(self.eig_common.copy())
+        t1 = perf_counter()
+        print("Finished Getting Starting Fishers at %8.3fs"%(t1-self.ti))
+
+
+        self.de_history = initialize_de_buffer(self.samples[0,0],self.n_par_tot,self.par_names,self.chain_params,self.x0_swap,self.FPI,self.eig_rn)
+        self.x0_swap.update_params(self.samples[0,0])
+
+        t1 = perf_counter()
+        print("Finished Setting up Differential Evolution Buffer at %8.3fs"%(t1-self.ti))
+
+        self.a_yes = np.zeros((26,self.n_chain),dtype=np.int64)
+        self.a_no = np.zeros((26,self.n_chain),dtype=np.int64)
+
+        with np.errstate(invalid='ignore'):
+            self.acc_fraction = self.a_yes/(self.a_no+self.a_yes)
+
+        #printing info about initial parameters
+        for j in range(self.n_chain):
+            print("chain #"+str(j))
+            self.log_likelihood[j,0] = self.FLIs[j].get_lnlikelihood(self.x0s[j])
+            print("log_likelihood="+str(self.log_likelihood[j,0]))
+            print("log_prior_old="+str(self.pta.get_lnprior(self.samples[j,0,:])))
+            print("log_prior_new="+str(CWFastPrior.get_lnprior(self.samples[j,0,:],self.FPI)))
+            print("Initial samples:")
+            print(self.samples[j,0,:])
+
+        #for j in range(self.n_chain):
+        #    print("j="+str(j))
+        #    print(self.samples[j,0,:])
+        #    #log_likelihood[j,0] = pta.get_lnlikelihood(samples[j,0,:])
+        #    self.log_likelihood[j,0] = self.FLIs[j].get_lnlikelihood(self.x0s[j])
+        #    print("log_likelihood="+str(self.log_likelihood[j,0]))
+        #    print("log_prior="+str(CWFastPrior.get_lnprior(self.samples[j,0,:], self.FPI)))
+
+        self.validate_consistent(0)  # check things were initialized as expected
+
+        self.best_logL = self.log_likelihood[0,0]
+        self.tf_init = perf_counter()
+        print("finished initialization steps in %8.3fs"%(self.tf_init-self.ti))
+        self.ti_loop = perf_counter()
+        self.tf1_loop = perf_counter()
+
+    def advance_block(self):
+        """advance the state of the mcmc chain by 1 entire block, updating fisher matrices and differential evolution as necessary"""
+        itrn = self.itri*self.n_int_block  # index overall
+        itrb = itrn%self.chain_params.save_every_n  # index within the block of saved values
+        self.validate_consistent(itrb)  # check FLIs and x0s appear to have internally consistent parameters
+        #always do pt steps in extrinsic
+        do_extrinsic_block(self.n_chain, self.samples, itrb, self.chain_params.Ts, self.x0s, self.FLIs, self.FPI, self.n_par_tot, self.log_likelihood, self.n_int_block-2, self.fisher_diag, self.a_yes, self.a_no)
+
+        self.update_fishers_partial(itrn,itrn+self.n_int_block-1)
+
+        #update intrinsic parameters once a block
+        self.FLI_swap = do_intrinsic_update_mt(self, itrb+self.n_int_block-2)
+        self.validate_consistent(itrb+self.n_int_block-1)  # check FLIs and x0s appear to have internally consistent parameters
+
+        do_pt_swap(self.n_chain, self.samples, itrb+self.n_int_block-1, self.chain_params.Ts, self.a_yes,self.a_no, self.x0s, self.FLIs, self.log_likelihood, self.fisher_diag)
+        self.update_fishers_partial(itrn+self.n_int_block-1,itrn+self.n_int_block+1)
+
+        self.update_de_history(itrn) #update de history array
+
+        self.update_fishers(itrn) #do fisher updates as necessary
+
+
+        #update acceptance rate
+        with np.errstate(invalid='ignore'):
+            self.acc_fraction = self.a_yes/(self.a_no+self.a_yes)
+
+        if self.itri == 0:
+            self.tf1_loop = perf_counter()
+
+        #update best ever found likelihood
+        self.best_logL = max(self.best_logL,np.max(self.log_likelihood[0,:]))
+        self.itri += 1
+
+        if itrn>self.chain_params.save_every_n and np.any(np.diff(self.log_likelihood[:,:itrb+self.n_int_block],axis=1)<-300.):
+            assert False
+
+    def update_de_history(self,itrn):
+        """update de history array"""
+        for j in range(self.n_chain):
+            n_de_update= self.n_int_block//self.chain_params.thin_de
+            for itrd in range(0,n_de_update):
+                itrbd = itrn%self.chain_params.save_every_n+itrd*self.chain_params.thin_de
+                assert not np.all(self.samples[j,itrbd,:]==0.)
+                self.de_history[j,(self.itri*n_de_update+itrd)%self.chain_params.de_history_size] = self.samples[j,itrbd,:]
+
+    def update_fishers_partial(self,itrn1,itrn2):
+        """handle fisher matrix update logic, itrn1 and itrn2 must be ranges over which no changes in the total set of intrinsic parameters occur
+        so that we can skip the intrinsic update"""
+        #put each new fisher matrix into action as soon as possible after it is available, also breaks up any special behavior at common reset points
+        #note that the random shuffling in update_fishers also makes it so that there is a finite probability any particular fisher matrix is kept for more than 1 block
+        itrb1 = itrn1%self.chain_params.save_every_n
+        itrb2 = itrb1-1+(itrn2-itrn1)
+        assert itrb2<self.samples.shape[1]
+
+        self.validate_consistent(itrb2)
+
+        for eig_sel in range(0,2):
+            for j in range(self.n_chain):
+                if eig_sel:
+                    idx_loc = self.idx_fisher_sel_next_eig[j]
+                else:
+                    idx_loc = self.idx_fisher_sel_next[j]
+                idx_loc_mod = idx_loc%self.chain_params.save_every_n
+
+                #need to handle the specific case where the chosen sample is the very last one in a block to be saved
+                #because the samples array actually has size save_every_n+1, not save_every_n
+                #alternatively, could just let the next loop around handle this case, but this gets the new fisher 1 block sooner
+                if itrn1!=idx_loc and idx_loc_mod==0:
+                    idx_loc_mod = self.chain_params.save_every_n
+
+                if itrn1 <= idx_loc < itrn2:
+                    #find the posterior sample we need to calculate the fisher matrices at
+                    sample_need = self.samples[0:1,idx_loc_mod:idx_loc_mod+1,:]
+                    #find the FLI with the right intrinsic parameters
+                    found_match = False
+                    for j2 in range(self.n_chain):
+                        sample_loc =  self.samples[j2:j2+1,itrb2:itrb2+1,:]
+                        if itrb2<self.samples.shape[1]-1:
+                            assert np.all(self.samples[j2:j2+1,itrb2+1:itrb2+2,:]==0.)
+
+                        if np.all(sample_need[:,:,self.x0_swap.idx_int] == sample_loc[:,:,self.x0_swap.idx_int]):
+                            #print("start found",j,j2,itrn1,itrn2,idx_loc,idx_end_mod,eig_sel)
+                            #print(sample_loc[0,0,self.x0_swap.idx_cw_int])
+                            found_match = True
+                            if eig_sel:
+                                #the intrinsic and rn all match, so we should be able to evaluate the fisher diagonals from this FLI without a full intrinsic update on FLI_swap
+                                self.x0_swap.update_params(sample_need[0,0,:])
+                                eig_rn_loc,fisher_diag_loc,eig_common_loc = get_fishers(sample_need,self.par_names, self.x0_swap, self.flm, self.FLIs[j2],\
+                                                                                        get_diag=True,get_common=True,get_rn_block=True,get_intrinsic_diag=True,start_safe=True)
+                                self.eig_rn[j] = eig_rn_loc[0]
+                                self.eig_common[j] = eig_common_loc[0]
+                                self.fisher_diag[j] = fisher_diag_loc[0]
+                                continue
+                            else:
+                                #the intrinsic and rn all match, so we should be able to evaluate the fisher diagonals from this FLI without a full intrinsic update on FLI_swap
+                                self.x0_swap.update_params(sample_need[0,0,:])
+                                _,fisher_diag_loc,_ = get_fishers(sample_need, self.par_names, self.x0_swap, self.flm, self.FLIs[j2],\
+                                                                  get_diag=True,get_common=False,get_rn_block=False,get_intrinsic_diag=False,start_safe=True)
+                                #assign the extrinsic parameters to the next diagonal
+                                self.fisher_diag[j,self.x0_swap.idx_cw_ext] = fisher_diag_loc[0,self.x0_swap.idx_cw_ext]
+                                continue
+                    assert found_match
+        self.validate_consistent(itrb2)
+
+
+    def validate_consistent(self,itrb,full_validate=False):
+        for j3 in range(self.n_chain):
+            #print('j2',j3)
+            #print(self.FLIs[j3].get_lnlikelihood(self.x0s[j3]),self.log_likelihood[j3,itrb])
+            self.FLIs[j3].validate_consistent(self.x0s[j3])
+            self.x0s[j3].validate_consistent(self.samples[j3,itrb])
+            assert self.FLIs[j3].get_lnlikelihood(self.x0s[j3]) == self.log_likelihood[j3,itrb]
+            if full_validate:
+                self.x0_swap.update_params(self.samples[j3,itrb])
+                self.flm.recompute_FastLike(self.FLI_swap,self.x0_swap,dict(zip(self.par_names, self.samples[j3,itrb])))
+                self.FLI_swap.validate_consistent(self.x0s[j3])
+                self.FLI_swap.validate_consistent(self.x0_swap)
+                self.x0_swap.validate_consistent(self.samples[j3,itrb])
+                assert self.FLI_swap.logdet_base == self.FLIs[j3].logdet_base
+                assert self.FLI_swap.logdet == self.FLIs[j3].logdet
+                assert self.FLI_swap.resres == self.FLIs[j3].resres
+                assert np.all(self.FLI_swap.logdet_array == self.FLIs[j3].logdet_array)
+                assert np.all(self.FLI_swap.resres_array == self.FLIs[j3].resres_array)
+                assert np.all(self.FLI_swap.MMs == self.FLIs[j3].MMs)
+                assert np.all(self.FLI_swap.NN == self.FLIs[j3].NN)
+                for itrp in range(self.Npsr):
+                    assert np.all(self.FLI_swap.chol_Sigmas[itrp] == self.FLIs[j3].chol_Sigmas[itrp])
+
+
+    def update_fishers(self,itrn):
+        """handle fisher matrix update logic"""
+        #choose which parameter indexes to get for future fisher matrix evaluation points
+        #the actual fisher update logic is done as soon as possible in update_fishers_partial
+        for j in range(self.n_chain):
+            if itrn <= self.idx_fisher_sel_next[j] < itrn+self.n_int_block:
+                self.samples_sel_next[j,0,:] = self.samples[0,self.idx_fisher_sel_next[j]%self.chain_params.save_every_n,:]
+
+            if itrn <= self.idx_fisher_sel_next_eig[j] < itrn+self.n_int_block:
+                self.samples_sel_next_eig[j,0,:] = self.samples[0,self.idx_fisher_sel_next_eig[j]%self.chain_params.save_every_n,:]
+
+
+        if itrn%self.n_update_fisher==0 and self.itri!=0:
+            #prevent a terrible red noise fisher matrix from messing up one temperature for a very long time
+            #by randomly shuffling the fisher matrices between chains whenever we do diagonal updates
+            shuffle_idx = np.random.permutation(np.arange(0,self.n_chain))
+            self.eig_rn[:] = self.eig_rn[shuffle_idx]
+            self.eig_common[:] = self.eig_common[shuffle_idx]
+            self.fisher_diag[:] = self.fisher_diag[shuffle_idx]
+
+            #compute fisher matrix at random recent points in the posterior
+            for j in range(self.n_chain):
+                #eigenvalue update takes precedence over diagonal update parameters as it happens less frequently
+                if itrn%self.chain_params.n_update_fisher_eig == 0:
+                    assert not np.all(self.samples_sel_next_eig[j,0,:]==0.)
+                    self.samples_sel[j] = self.samples_sel_next_eig[j,0,:]
+                    #choose the next point to select
+                    self.idx_fisher_sel_next_eig[j] = itrn+self.n_int_block+np.random.randint(0,self.chain_params.n_update_fisher_eig)
+                    self.samples_sel_next_eig[j] = 0.
+                else:
+                    assert not np.all(self.samples_sel_next[j,0,:]==0.)
+                    #load in the previous selected point
+                    self.samples_sel[j,0,:] = self.samples_sel_next[j,0,:]
+
+                #choose the next point to select
+                self.idx_fisher_sel_next[j] = itrn+self.n_int_block+np.random.randint(0,self.n_update_fisher)
+                self.samples_sel_next[j,0,:] = 0.
+
+            if self.chain_params.log_fishers:
+                #optionally log the old fisher matrices for diagnostic purposes, they dont really take much memory
+                if itrn%self.chain_params.n_update_fisher_eig == 0:
+                    self.fisher_diag_logs.append(self.fisher_diag.copy())
+                    self.fisher_eig_logs.append(self.eig_rn.copy())
+                    self.fisher_common_logs.append(self.eig_common.copy())
+                else:
+                    #update only the extrinsic fisher diagonals in this case
+                    self.fisher_diag_logs.append(self.fisher_diag.copy())
+
+        itrb = itrn%self.chain_params.save_every_n+self.n_int_block
+        self.validate_consistent(itrb)  # check FLIs and x0s appear to have internally consistent parameters
+
+
+    def do_status_update(self,itrn,N_blocks):
+        """print a status update"""
+        t_itr = perf_counter()
+        print_acceptance_progress(itrn,N_blocks*self.n_int_block,self.n_int_block,self.a_yes,self.a_no,t_itr,self.ti_loop,self.tf1_loop,self.chain_params.Ts, self.verbosity)
+        print("New log_L=%+12.3f Best log_L=%+12.3f"%(self.FLIs[0].get_lnlikelihood(self.x0s[0]),self.best_logL))#,FLIs[0].resres,FLIs[0].logdet,FLIs[0].pos,FLIs[0].pdist,FLIs[0].NN,FLIs[0].MMs)))
+
+    def output_and_wrap_state(self,evolve_params,itrn,N_blocks):
+        """wrap the samples around to the first element and save the old ones to the hdf5 file"""
+        output_hdf5_loop(itrn,self.chain_params,evolve_params,self.samples,self.log_likelihood,self.acc_fraction,self.fisher_diag,self.par_names,N_blocks*self.n_int_block,self.verbosity)
+
+        #clear out log_likelihood and samples arrays
+        samples_now = self.samples[:,-1,:]
+        log_likelihood_now = self.log_likelihood[:,-1]
+        self.samples = np.zeros((self.n_chain, self.chain_params.save_every_n+1, self.n_par_tot))
+        self.log_likelihood = np.zeros((self.n_chain,self.chain_params.save_every_n+1))
+        self.samples[:,0,:] = samples_now
+        self.log_likelihood[:,0] = log_likelihood_now
+
+    def advance_N_blocks(self,evolve_params,N_blocks):
+        """advance the state of the MCMC system by N_blocks of size"""
+        assert evolve_params.save_first_n_chains <= self.n_chain #or we would try to save more chains than we have
+
+        t1 = perf_counter()
+        print("Entering Loop Body at %8.3fs"%(t1-self.ti))
+        for i in range(N_blocks):
+            itrn = i*self.n_int_block #index overall
+            itrb = itrn%self.chain_params.save_every_n #index within the block of saved values
+            if itrb==0 and i!=0:
+                self.output_and_wrap_state(evolve_params,itrn,N_blocks)
+            if i%evolve_params.n_block_status_update==0:
+                self.do_status_update(itrn,N_blocks)
+
+            #advance the block state
+            self.advance_block()
+
+        output_hdf5_end(self.chain_params,evolve_params,self.samples,self.log_likelihood,self.acc_fraction,self.fisher_diag,self.par_names,self.verbosity)
+        tf = perf_counter()
+        print('whole function time = %8.3f s'%(tf-self.ti))
+        print('loop time = %8.3f s'%(tf-self.ti_loop))
