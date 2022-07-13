@@ -6,7 +6,7 @@
 enterprise
 enterprise_extensions
 numba
-numba_stats
+h5py
 ```
 
 Using `conda`, we can set up a new clean environment with these as follows. Create new `conda` environment:
@@ -28,10 +28,6 @@ pip install git+https://github.com/nanograv/enterprise_extensions@master
 Install `numba`:
 ```
 conda install numba
-```
-Install v1.0.1 of `numba_stats` (make sure to use this because the latest release v1.1.0 breaks things):
-```
-pip install numba-stats==1.0.1
 ```
 At this point `h5py` might already be installed. If not, install it with:
 ```
