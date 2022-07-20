@@ -42,12 +42,13 @@ def do_intrinsic_update_mt(mcc, itrb):
         mcc.x0s[j].validate_consistent(samples_current)
         mcc.x0s[j].update_params(samples_current)
 
-        total_weight = cm.dist_jump_weight + cm.rn_jump_weight + cm.gwb_jump_weight + cm.common_jump_weight + cm.all_jump_weight
-        which_jump = np.random.choice(5, p=[cm.dist_jump_weight/total_weight,
-                                            cm.rn_jump_weight/total_weight,
-                                            cm.gwb_jump_weight/total_weight,
-                                            cm.common_jump_weight/total_weight,
-                                            cm.all_jump_weight/total_weight])
+        total_weight = (mcc.chain_params.dist_jump_weight + mcc.chain_params.rn_jump_weight + mcc.chain_params.gwb_jump_weight +
+                        mcc.chain_params.common_jump_weight + mcc.chain_params.all_jump_weight)
+        which_jump = np.random.choice(5, p=[mcc.chain_params.dist_jump_weight/total_weight,
+                                            mcc.chain_params.rn_jump_weight/total_weight,
+                                            mcc.chain_params.gwb_jump_weight/total_weight,
+                                            mcc.chain_params.common_jump_weight/total_weight,
+                                            mcc.chain_params.all_jump_weight/total_weight])
 
         #replace checking which_jump==1 etc with indicator values for desired behavior so that more jump types can be added in the future
         recompute_rn = False
@@ -106,18 +107,18 @@ def do_intrinsic_update_mt(mcc, itrb):
 
         #decide what kind of jump we do
         if recompute_rn or recompute_gwb:  # RN or GWB jump --> don't do prior draws, only fisher and DE
-            total_type_weight = cm.de_prob + cm.fisher_prob
+            total_type_weight = mcc.chain_params.de_prob + mcc.chain_params.fisher_prob
             which_jump_type = np.random.choice(3, p=[0.,
-                                                 cm.de_prob/total_type_weight,
-                                                 cm.fisher_prob/total_type_weight])
+                                                 mcc.chain_params.de_prob/total_type_weight,
+                                                 mcc.chain_params.fisher_prob/total_type_weight])
         else:
             if j==(mcc.n_chain-1):  # hottest chain and not RN --> only do prior draws
                 which_jump_type = 0
             else:  # not hottest chain and not RN --> choose jump type based in default probabilities of them
-                total_type_weight = cm.prior_draw_prob + cm.de_prob + cm.fisher_prob
-                which_jump_type = np.random.choice(3, p=[cm.prior_draw_prob/total_type_weight,
-                                                         cm.de_prob/total_type_weight,
-                                                         cm.fisher_prob/total_type_weight])
+                total_type_weight = mcc.chain_params.prior_draw_prob + mcc.chain_params.de_prob + mcc.chain_params.fisher_prob
+                which_jump_type = np.random.choice(3, p=[mcc.chain_params.prior_draw_prob/total_type_weight,
+                                                         mcc.chain_params.de_prob/total_type_weight,
+                                                         mcc.chain_params.fisher_prob/total_type_weight])
         if which_jump_type==0:  # do prior draw
             new_point = CWFastPrior.get_sample_idxs(samples_current.copy(),idx_choose,mcc.FPI)
         elif which_jump_type==1:  # do differential evolution step

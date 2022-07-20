@@ -244,7 +244,9 @@ class ChainParams():
                        includeCW=True, verbosity=1,\
                        freq_bounds=np.array([3.5e-9, 1e-7], dtype=np.float64),\
                        de_history_size=10_000, thin_de=1000, log_fishers=False,\
-                       savefile=None, thin=100, samples_precision=np.single, save_first_n_chains=1):
+                       savefile=None, thin=100, samples_precision=np.single, save_first_n_chains=1,\
+                       prior_draw_prob=0.1, de_prob=0.6, fisher_prob=0.3,\
+                       dist_jump_weight=0.2, rn_jump_weight=0.3, gwb_jump_weight=0.1, common_jump_weight=0.2, all_jump_weight=0.2):
         assert n_int_block%2==0 and n_int_block>=4  # need to have n_int block>=4 a multiple of 2
         #in order to always do at least n*(1 extrinsic+1 pt swap)+(1 intrinsic+1 pt swaps)
         assert save_every_n%n_int_block == 0  # or we won't save
@@ -281,15 +283,18 @@ class ChainParams():
         self.thin = thin
         self.samples_precision = samples_precision
         self.save_first_n_chains = save_first_n_chains
+        
+        #jump type probabilities
+        self.prior_draw_prob = prior_draw_prob
+        self.de_prob = de_prob
+        self.fisher_prob = fisher_prob
 
-    def update_parameters(self, n_block_status_update, savefile=None, thin=100, samples_precision=np.single, save_first_n_chains=1):
-        """Method to update parameters that are allowed to change during the run"""
-        print("Updating some parameters in ChainParams object...")
-        self.n_block_status_update = n_block_status_update
-        self.savefile = savefile
-        self.thin = thin
-        self.samples_precision = samples_precision
-        self.save_first_n_chains = save_first_n_chains
+        #jump parameter set probabilities
+        self.dist_jump_weight = dist_jump_weight
+        self.rn_jump_weight = rn_jump_weight
+        self.gwb_jump_weight = gwb_jump_weight
+        self.common_jump_weight = common_jump_weight
+        self.all_jump_weight = all_jump_weight
 
 
 class MCMCChain():
@@ -429,10 +434,6 @@ class MCMCChain():
         print("finished initialization steps in %8.3fs"%(self.tf_init-self.ti))
         self.ti_loop = perf_counter()
         self.tf1_loop = perf_counter()
-
-    def update_chain_params(self, n_block_status_update, savefile=None, thin=100, samples_precision=np.single, save_first_n_chains=1):
-        """Method to update some parameters of chain_param object"""
-        self.chain_params.update_parameters(n_block_status_update, savefile=savefile, thin=thin, samples_precision=samples_precision, save_first_n_chains=save_first_n_chains)
 
     def advance_block(self):
         """advance the state of the mcmc chain by 1 entire block, updating fisher matrices and differential evolution as necessary"""

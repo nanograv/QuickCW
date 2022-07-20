@@ -38,25 +38,6 @@ n_noise_main = 10
 idx_PT = -2
 idx_full = -1
 
-#jump type probabilities
-prior_draw_prob = 0.1
-de_prob = 0.6
-fisher_prob = 0.3
-#prior_draw_prob = 1.
-#de_prob = 0.
-#fisher_prob = 0.
-
-#jump parameter set probabilities
-dist_jump_weight = 0.2
-rn_jump_weight = 0.3
-gwb_jump_weight = 0.1
-common_jump_weight = 0.2
-all_jump_weight = 0.2
-#dist_jump_weight = 0.
-#rn_jump_weight = 0.
-#common_jump_weight = 1.
-#all_jump_weight = 0.
-
 #differential evolution parameters
 sigma_de = 0.1
 

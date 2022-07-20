@@ -70,12 +70,14 @@ chain_params = ChainParams(T_max,n_chain, n_block_status_update,
                            save_every_n=save_every_n, #number of iterations between saving intermediate results (needs to be intiger multiple of n_int_block)
                            fisher_eig_downsample=fisher_eig_downsample, #multiplier for how much less to do more expensive updates to fisher eigendirections for red noise and common parameters compared to diagonal elements
                            savefile = savefile,#hdf5 file to save to, will not save at all if None
-                           thin=100)  #thinning, i.e. save every `thin`th sample to file (increase to higher than one to keep file sizes small)
+                           thin=100,  #thinning, i.e. save every `thin`th sample to file (increase to higher than one to keep file sizes small)
+                           prior_draw_prob=0.1, de_prob=0.6, fisher_prob=0.3, #probability of different jump types
+                           dist_jump_weight=0.2, rn_jump_weight=0.3, gwb_jump_weight=0.1, common_jump_weight=0.2, all_jump_weight=0.2) #probability of updating different groups of parameters
 
 pta,mcc = QuickCW.QuickCW(chain_params, psrs, noise_json=noisefile)
 
 #Some parameters in chain_params can be updated later if needed
-mcc.update_chain_params(n_block_status_update, thin=1_000)
+mcc.chain_params.thin = 1_000
 
 #Do the main MCMC iteration
 mcc.advance_N_blocks(N_blocks)
