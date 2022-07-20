@@ -5,19 +5,22 @@ import numpy as np
 import h5py
 
 row_labels = ['dist-prior-noproj','dist-prior-proj','dist-DE-noproj','dist-DE-proj','dist-fisher-noproj','dist-fisher-proj',\
-        'RN-prior-noproj','RN-prior-proj','RN-DE-noproj','RN-DE-proj','RN-fisher-noproj','RN-fisher-proj',\
-        'common-prior-noproj','common-prior-proj','common-DE-noproj','common-DE-proj','common-fisher-noproj','common-fisher-proj',\
-        'all-prior-noproj','all-prior-proj','all-DE-noproj','all-DE-proj','all-fisher-noproj','all-fisher-proj',\
-        'PT','proj']
+              'RN-prior-noproj','RN-prior-proj','RN-DE-noproj','RN-DE-proj','RN-fisher-noproj','RN-fisher-proj',\
+              'GWB-prior-noproj','GWB-prior-proj','GWB-DE-noproj','GWB-DE-proj','GWB-fisher-noproj','GWB-fisher-proj',\
+              'common-prior-noproj','common-prior-proj','common-DE-noproj','common-DE-proj','common-fisher-noproj','common-fisher-proj',\
+              'all-prior-noproj','all-prior-proj','all-DE-noproj','all-DE-proj','all-fisher-noproj','all-fisher-proj',\
+              'PT','proj']
 display_names ={'dist-prior-noproj':'Dist Prior','dist-DE-noproj':'Dist DE','dist-fisher-noproj':'Dist Fisher',\
-        'RN-prior-noproj':'RN Prior','RN-DE-noproj':'RN DE','RN-fisher-noproj':'RN Fisher',\
-        'common-prior-noproj':'Common Prior','common-DE-noproj':'Common DE','common-fisher-noproj':'Common Fisher',\
-        'all-prior-noproj':'All Prior','all-DE-noproj':'All DE','all-fisher-noproj':'All Fisher',\
-        'dist-prior-proj':'Dist Prior','dist-DE-proj':'Dist DE','dist-fisher-proj':'Dist Fisher',\
-        'RN-prior-proj':'RN Prior','RN-DE-proj':'RN DE','RN-fisher-proj':'RN Fisher',\
-        'common-prior-proj':'Common Prior','common-DE-proj':'Common DE','common-fisher-proj':'Common Fisher',\
-        'all-prior-proj':'All Prior','all-DE-proj':'All DE','all-fisher-proj':'All Fisher',\
-        'PT':'PT','proj':'proj'}
+                'RN-prior-noproj':'RN Prior','RN-DE-noproj':'RN DE','RN-fisher-noproj':'RN Fisher',\
+                'GWB-prior-noproj':'GWB Prior','GWB-DE-noproj':'GWB DE','GWB-fisher-noproj':'GWB Fisher',\
+                'common-prior-noproj':'Common Prior','common-DE-noproj':'Common DE','common-fisher-noproj':'Common Fisher',\
+                'all-prior-noproj':'All Prior','all-DE-noproj':'All DE','all-fisher-noproj':'All Fisher',\
+                'dist-prior-proj':'Dist Prior','dist-DE-proj':'Dist DE','dist-fisher-proj':'Dist Fisher',\
+                'RN-prior-proj':'RN Prior','RN-DE-proj':'RN DE','RN-fisher-proj':'RN Fisher',\
+                'GWB-prior-proj':'GWB Prior','GWB-DE-proj':'GWB DE','GWB-fisher-proj':'GWB Fisher',\
+                'common-prior-proj':'Common Prior','common-DE-proj':'Common DE','common-fisher-proj':'Common Fisher',\
+                'all-prior-proj':'All Prior','all-DE-proj':'All DE','all-fisher-proj':'All Fisher',\
+                'PT':'PT','proj':'proj'}
 
 def print_acceptance_progress(itrn,N,n_int_block,a_yes,a_no,t_itr,ti_loop,tf1_loop,Ts,verbosity):
     """print the acceptance fraction"""
@@ -62,7 +65,7 @@ def print_acceptance_progress(itrn,N,n_int_block,a_yes,a_no,t_itr,ti_loop,tf1_lo
             else:
                 str_build += " %8.7f "%acc_fraction[itrp,itrc]
 
-        if ('RN-prior' in label or 'all-prior' in label) and np.all(np.isnan(acc_fraction[itrp])):
+        if ('RN-prior' in label or 'GWB-prior' in label or 'all-prior' in label) and np.all(np.isnan(acc_fraction[itrp])):
             continue
         if '-noproj' not in label:
             str_proj_rows.append(str_build)

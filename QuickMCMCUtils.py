@@ -225,15 +225,10 @@ def get_param_names(pta):
     par_names_cw_ext = List(['0_cos_inc', '0_log10_h', '0_phase0', '0_psi'])
     par_names_cw_int = List(['0_cos_gwtheta', '0_gwphi', '0_log10_fgw', '0_log10_mc'])
 
-    par_names_noise = []
-
-    par_inds_cw_p_phase_ext = np.zeros(len(pta.pulsars),dtype=np.int64)
-    par_inds_cw_p_dist_int = np.zeros(len(pta.pulsars),dtype=np.int64)
+    par_names_noise = ['gwb_gamma', 'gwb_log10_A']
 
     for i,psr in enumerate(pta.pulsars):
-        par_inds_cw_p_dist_int[i] = len(par_names_cw)
         par_names_cw.append(psr + "_cw0_p_dist")
-        par_inds_cw_p_phase_ext[i] = len(par_names_cw)
         par_names_cw.append(psr + "_cw0_p_phase")
         par_names_cw_ext.append(psr + "_cw0_p_phase")
         par_names_cw_int.append(psr + "_cw0_p_dist")
@@ -396,8 +391,8 @@ class MCMCChain():
         t1 = perf_counter()
         print("Finished Setting up Differential Evolution Buffer at %8.3fs"%(t1-self.ti))
 
-        self.a_yes = np.zeros((26,self.n_chain),dtype=np.int64)
-        self.a_no = np.zeros((26,self.n_chain),dtype=np.int64)
+        self.a_yes = np.zeros((32,self.n_chain),dtype=np.int64)
+        self.a_no = np.zeros((32,self.n_chain),dtype=np.int64)
 
         with np.errstate(invalid='ignore'):
             self.acc_fraction = self.a_yes/(self.a_no+self.a_yes)
@@ -614,6 +609,10 @@ class MCMCChain():
         t_itr = perf_counter()
         print_acceptance_progress(itrn,N_blocks*self.n_int_block,self.n_int_block,self.a_yes,self.a_no,t_itr,self.ti_loop,self.tf1_loop,self.chain_params.Ts, self.verbosity)
         print("New log_L=%+12.3f Best log_L=%+12.3f"%(self.FLIs[0].get_lnlikelihood(self.x0s[0]),self.best_logL))#,FLIs[0].resres,FLIs[0].logdet,FLIs[0].pos,FLIs[0].pdist,FLIs[0].NN,FLIs[0].MMs)))
+        #itrb = itrn%self.chain_params.save_every_n #index within the block of saved values
+        #print(itrb)
+        #print(self.samples[0,itrb,:])
+        #print("Old log_L=%+12.3f"%(self.pta.get_lnlikelihood(self.samples[0,itrb,:])))
 
     def output_and_wrap_state(self,evolve_params,itrn,N_blocks):
         """wrap the samples around to the first element and save the old ones to the hdf5 file"""

@@ -397,9 +397,11 @@ def safe_reset_swap(FLI_swap,x0_swap,params_old,FLI_mem0):
     FLI_swap.cos_gwtheta = x0_swap.cos_gwtheta
     FLI_swap.gwphi = x0_swap.gwphi
     FLI_swap.log10_fgw = x0_swap.log10_fgw
-    FLI_swap.log10_mc = x0_swap.log10_mc#
-    FLI_swap.rn_log10_As = x0_swap.rn_log10_As.copy()
+    FLI_swap.log10_mc = x0_swap.log10_mc
+    FLI_swap.gwb_gamma = x0_swap.gwb_gamma
+    FLI_swap.gwb_log10_A = x0_swap.gwb_log10_A
     FLI_swap.rn_gammas = x0_swap.rn_gammas.copy()
+    FLI_swap.rn_log10_As = x0_swap.rn_log10_As.copy()
     FLI_swap.cw_p_dists = x0_swap.cw_p_dists.copy()
 
     FLI_swap.MMs[:] = MMs0

@@ -42,13 +42,16 @@ def do_intrinsic_update_mt(mcc, itrb):
         mcc.x0s[j].validate_consistent(samples_current)
         mcc.x0s[j].update_params(samples_current)
 
-        total_weight = cm.dist_jump_weight + cm.rn_jump_weight + cm.common_jump_weight+cm.all_jump_weight
-        which_jump = np.random.choice(4, p=[cm.dist_jump_weight/total_weight,
+        total_weight = cm.dist_jump_weight + cm.rn_jump_weight + cm.gwb_jump_weight + cm.common_jump_weight + cm.all_jump_weight
+        which_jump = np.random.choice(5, p=[cm.dist_jump_weight/total_weight,
                                             cm.rn_jump_weight/total_weight,
-                                            cm.common_jump_weight/total_weight,cm.all_jump_weight/total_weight])
+                                            cm.gwb_jump_weight/total_weight,
+                                            cm.common_jump_weight/total_weight,
+                                            cm.all_jump_weight/total_weight])
 
         #replace checking which_jump==1 etc with indicator values for desired behavior so that more jump types can be added in the future
         recompute_rn = False
+        recompute_gwb = False
         recompute_int = False
         recompute_dist = False
         all_eigs = False
@@ -71,28 +74,38 @@ def do_intrinsic_update_mt(mcc, itrb):
             idx_choose = np.concatenate((mcc.x0s[j].idx_rn_gammas,mcc.x0s[j].idx_rn_log10_As))
             scaling = 2.38*np.sqrt(Ts[j])/np.sqrt(n_jump_loc/2)
             #scaling = 1/np.sqrt(n_jump_loc)
-        elif which_jump==2:  # update common intrinsic parameters (chirp mass, frequency, sky location[2])
+        elif which_jump==2:  # update common RN
+            recompute_gwb = True
+            n_jump_loc = 2
+            idx_choose = np.array([mcc.x0s[j].idx_gwb_gamma, mcc.x0s[j].idx_gwb_log10_A])
+            scaling = 2.38*np.sqrt(Ts[j])/np.sqrt(n_jump_loc/2)
+            #scaling = 1/np.sqrt(n_jump_loc)
+        elif which_jump==3:  # update common intrinsic parameters (chirp mass, frequency, sky location[2])
             recompute_int = True
             n_jump_loc = 4 #  2+cm.n_dist_extra
             idx_choose = mcc.x0s[j].idx_cw_int[:4]  # np.array([par_names.index(par_names_cw_int[itrk]) for itrk in range(4)])
             scaling = 2.38*np.sqrt(Ts[j])/np.sqrt(n_jump_loc)
             #scaling = 1.0
             #scaling = 0.5
-        elif which_jump==3: # do every possible jump
+        elif which_jump==4: # do every possible jump
             #including this ensures any point in parameter space has some finite probability density to be reached in a single jump
             recompute_rn = True
+            recompute_gwb = True
             recompute_int = True
             recompute_dist = True
             all_eigs = True
-            n_jump_loc = cm.n_dist_main+2*Npsr+4
+            n_jump_loc = cm.n_dist_main+2*Npsr+4+2 #distance+RN+common_pars+crn
             idx_choose_psr = list(range(Npsr))
-            idx_choose = np.concatenate((mcc.x0s[j].idx_cw_int[:4],mcc.x0s[j].idx_dists[idx_choose_psr],mcc.x0s[j].idx_rn_gammas,mcc.x0s[j].idx_rn_log10_As))
+            idx_choose = np.concatenate((mcc.x0s[j].idx_cw_int[:4],
+                                         mcc.x0s[j].idx_dists[idx_choose_psr],
+                                         mcc.x0s[j].idx_rn_gammas, mcc.x0s[j].idx_rn_log10_As,
+                                         [mcc.x0s[j].idx_gwb_gamma, mcc.x0s[j].idx_gwb_log10_A]))
             scaling = 2.38*np.sqrt(Ts[j])/np.sqrt(n_jump_loc)
         else:
             raise ValueError('jump index unrecognized',which_jump)
 
         #decide what kind of jump we do
-        if recompute_rn:  # RN jump --> don't do prior draws, only fisher and DE
+        if recompute_rn or recompute_gwb:  # RN or GWB jump --> don't do prior draws, only fisher and DE
             total_type_weight = cm.de_prob + cm.fisher_prob
             which_jump_type = np.random.choice(3, p=[0.,
                                                  cm.de_prob/total_type_weight,
@@ -139,6 +152,11 @@ def do_intrinsic_update_mt(mcc, itrb):
                 scale_eig1 = scaling*mcc.eig_rn[j,:,1,:]
                 new_point = add_rn_eig_jump(scale_eig0,scale_eig1,new_point,new_point[mcc.x0s[j].idx_rn],mcc.x0s[j].idx_rn,Npsr,all_eigs=all_eigs)
 
+            if recompute_gwb: # use diagonal fishers
+                idx_loc = np.array([mcc.x0s[j].idx_gwb_gamma, mcc.x0s[j].idx_gwb_log10_A])
+                fisher_diag_loc = scaling * mcc.fisher_diag[j][idx_loc]
+                jump[idx_loc] += fisher_diag_loc*np.random.normal(0.,1.,idx_loc.size)
+
             if recompute_int:  # use common parameter eigenvectors
                 if all_eigs:
                     #allows attempting all of the eigenvalue jumps simultaneously
@@ -163,7 +181,7 @@ def do_intrinsic_update_mt(mcc, itrb):
         new_point = correct_intrinsic(new_point,mcc.x0s[j],mcc.chain_params.freq_bounds,mcc.FPI.cut_par_ids, mcc.FPI.cut_lows, mcc.FPI.cut_highs)
 
         #more thorough jump types take precedence
-        if recompute_rn:  # update per psr RN
+        if recompute_rn or recompute_gwb:  # update per psr RN or GWB
             mcc.x0s[j].update_params(new_point)
             mcc.flm.recompute_FastLike(mcc.FLI_swap,mcc.x0s[j],dict(zip(mcc.par_names, new_point)))
             mcc.FLI_swap.validate_consistent(mcc.x0s[j])
@@ -200,7 +218,7 @@ def do_intrinsic_update_mt(mcc, itrb):
             mcc.x0s[j].validate_consistent(samples_current)
             mcc.FLIs[j].validate_consistent(mcc.x0s[j])
         else:
-            log_acc_ratio,chosen_trial,sample_choose,log_L_choose = do_mt_step(mcc,j,itrb,new_point,samples_current,FLI_mem_save,recompute_rn)
+            log_acc_ratio,chosen_trial,sample_choose,log_L_choose = do_mt_step(mcc,j,itrb,new_point,samples_current,FLI_mem_save,recompute_rn or recompute_gwb)
             if np.isfinite(log_acc_ratio):
                 log_acc_decide = np.log(uniform(1.e-304, 1.0))
             else:
@@ -212,7 +230,7 @@ def do_intrinsic_update_mt(mcc, itrb):
 
             mcc.samples[j,itrb+1,:] = sample_choose
 
-            if recompute_rn:
+            if recompute_rn or recompute_gwb:
                 #swap the temporary FLI for the old one
                 FLI_temp = mcc.FLIs[j]
                 mcc.FLIs[j] = mcc.FLI_swap
@@ -250,7 +268,7 @@ def do_intrinsic_update_mt(mcc, itrb):
             mcc.x0s[j].update_params(samples_current)
 
             #print('2',mcc.FLIs[j].get_lnlikelihood(mcc.x0s[j]))
-            if not recompute_rn:
+            if not recompute_rn and not recompute_gwb:
                 #don't needs to do anything if which_jump==1 because we didn't update FLIs[j] at all,
                 #and FLI_swap will just be completely overwritten next time it is used
 

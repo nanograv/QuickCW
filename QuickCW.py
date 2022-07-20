@@ -36,17 +36,11 @@ from QuickMCMCUtils import MCMCChain
 #
 ################################################################################
 #@profile
-def QuickCW(chain_params, psrs, noise_json=None, use_legacy_equad=False,amplitude_prior='UL'):
+def QuickCW(chain_params, psrs, noise_json=None, use_legacy_equad=False, amplitude_prior='UL'):
     """Set up all essential objects for QuickCW to do MCMC iterations"""
     print("Began Main Loop")
 
     ti = perf_counter()
-
-    #use PTA used in current CW search
-    #were Tspan, tmin, tmax needed? never used
-    #tmin = [p.toas.min() for p in psrs]
-    #tmax = [p.toas.max() for p in psrs]
-    #Tspan = np.max(tmax) - np.min(tmin)
 
     efac = parameter.Constant()
     equad = parameter.Constant()
@@ -103,19 +97,21 @@ def QuickCW(chain_params, psrs, noise_json=None, use_legacy_equad=False,amplitud
                                    psi=psi, cos_inc=cos_inc, tref=cm.tref)
     cw = deterministic.CWSignal(cw_wf, psrTerm=True, name='cw0')
 
-    #log10_Agw = parameter.Constant(-16.27)('gwb_log10_A')
-    #gamma_gw = parameter.Constant(6.6)('gwb_gamma')
-    #cpl = utils.powerlaw(log10_A=log10_Agw, gamma=gamma_gw)
-    #were crn, cpl, gamma_gw, log10_Agw needed? they were never used
-    #crn = gp_signals.FourierBasisGP(cpl, components=5, Tspan=Tspan,
-    #                                        name='gw')
+    tmin = [p.toas.min() for p in psrs]
+    tmax = [p.toas.max() for p in psrs]
+    Tspan = np.max(tmax) - np.min(tmin)
+
+    log10_Agw = parameter.Uniform(-20,-11)('gwb_log10_A')
+    gamma_gw = parameter.Uniform(0,7)('gwb_gamma')
+    cpl = utils.powerlaw(log10_A=log10_Agw, gamma=gamma_gw)
+    crn = gp_signals.FourierBasisGP(cpl, components=5, Tspan=Tspan, name='gw')
 
     tm = gp_signals.TimingModel()
 
     if use_legacy_equad:
-        s = ef + eq + ec + rn + cw + tm
+        s = ef + eq + ec + rn + crn + cw + tm
     else:
-        s = efq + ec + rn + cw + tm
+        s = efq +     ec + rn + crn + cw + tm
 
     models = [s(psr) for psr in psrs]
 
