@@ -72,12 +72,13 @@ chain_params = ChainParams(T_max,n_chain, n_block_status_update,
                            savefile = savefile,#hdf5 file to save to, will not save at all if None
                            thin=100,  #thinning, i.e. save every `thin`th sample to file (increase to higher than one to keep file sizes small)
                            prior_draw_prob=0.1, de_prob=0.6, fisher_prob=0.3, #probability of different jump types
-                           dist_jump_weight=0.2, rn_jump_weight=0.3, gwb_jump_weight=0.1, common_jump_weight=0.2, all_jump_weight=0.2) #probability of updating different groups of parameters
+                           dist_jump_weight=0.2, rn_jump_weight=0.3, gwb_jump_weight=0.1, common_jump_weight=0.2, all_jump_weight=0.2, #probability of updating different groups of parameters
+                           fix_rn=False, zero_rn=False, fix_gwb=False, zero_gwb=False) #switches to turn off GWB or RN jumps and keep them fixed and to set them to practically zero (gamma=0.0, log10_A=-20)
 
 pta,mcc = QuickCW.QuickCW(chain_params, psrs, noise_json=noisefile)
 
 #Some parameters in chain_params can be updated later if needed
-mcc.chain_params.thin = 1_000
+mcc.chain_params.thin = 10
 
 #Do the main MCMC iteration
 mcc.advance_N_blocks(N_blocks)

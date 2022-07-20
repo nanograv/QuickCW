@@ -195,19 +195,41 @@ def initialize_sample_helper(chain_params,n_par_tot,Npsr,max_toa,par_names,par_n
                 x0_swap.update_params(samples[j,0,:])
 
             for psr in pta.pulsars:
-                #samples[j,0,par_names.index(psr + "_cw0_p_dist")] = 0.0
-                #samples[j,0,par_names.index(psr + "_red_noise_gamma")] = noisedict[psr + "_red_noise_gamma"]
-                #samples[j,0,par_names.index(psr + "_red_noise_log10_A")] = noisedict[psr + "_red_noise_log10_A"]
-                if (psr + "_red_noise_gamma") in noisedict.keys():
+                if chain_params.zero_rn:
+                    print("zero_rn=True --> Setting " + psr + "_red_noise_gamma=0.0")
+                    samples[j,0,par_names.index(psr + "_red_noise_gamma")] = 0.0
+                elif (psr + "_red_noise_gamma") in noisedict.keys():
                     samples[j,0,par_names.index(psr + "_red_noise_gamma")] = noisedict[psr + "_red_noise_gamma"]
                 else:
                     print("No value found in noisedict for: " + psr + "_red_noise_gamma")
                     print("Using a random draw from the prior as a first sample instead")
-                if (psr + "_red_noise_log10_A") in noisedict.keys():
+                
+                if chain_params.zero_rn:
+                    print("zero_rn=True --> Setting " + psr + "_red_noise_log10_A=-20.0")
+                    samples[j,0,par_names.index(psr + "_red_noise_log10_A")] = -20.0
+                elif (psr + "_red_noise_log10_A") in noisedict.keys():
                     samples[j,0,par_names.index(psr + "_red_noise_log10_A")] = noisedict[psr + "_red_noise_log10_A"]
                 else:
                     print("No value found in noisedict for: " + psr + "_red_noise_log10_A")
                     print("Using a random draw from the prior as a first sample instead")
+
+            if chain_params.zero_gwb:
+                print("zero_gwb=True --> Setting gwb_gamma=0.0")
+                samples[j,0,par_names.index("gwb_gamma")] = 0.0
+            elif "gwb_gamma" in noisedict.keys():
+                samples[j,0,par_names.index("gwb_gamma")] = noisedict["gwb_gamma"]
+            else:
+                print("No value found in noisedict for: gwb_gamma")
+                print("Using a random draw from the prior as a first sample instead")
+            
+            if chain_params.zero_gwb:
+                print("zero_gwb=True --> Setting gwb_log10_A=-20.0")
+                samples[j,0,par_names.index("gwb_log10_A")] = -20.0
+            elif "gwb_log10_A" in noisedict.keys():
+                samples[j,0,par_names.index("gwb_log10_A")] = noisedict["gwb_log10_A"]
+            else:
+                print("No value found in noisedict for: gwb_log10_A")
+                print("Using a random draw from the prior as a first sample instead")
 
             samples[j,0,:] = correct_intrinsic(samples[j,0,:],x0_swap,chain_params.freq_bounds,FPI.cut_par_ids, FPI.cut_lows, FPI.cut_highs)
             samples[j,0,:] = correct_extrinsic(samples[j,0,:],x0_swap)
@@ -246,7 +268,8 @@ class ChainParams():
                        de_history_size=10_000, thin_de=1000, log_fishers=False,\
                        savefile=None, thin=100, samples_precision=np.single, save_first_n_chains=1,\
                        prior_draw_prob=0.1, de_prob=0.6, fisher_prob=0.3,\
-                       dist_jump_weight=0.2, rn_jump_weight=0.3, gwb_jump_weight=0.1, common_jump_weight=0.2, all_jump_weight=0.2):
+                       dist_jump_weight=0.2, rn_jump_weight=0.3, gwb_jump_weight=0.1, common_jump_weight=0.2, all_jump_weight=0.2,
+                       fix_rn=False, zero_rn=False, fix_gwb=False, zero_gwb=False):
         assert n_int_block%2==0 and n_int_block>=4  # need to have n_int block>=4 a multiple of 2
         #in order to always do at least n*(1 extrinsic+1 pt swap)+(1 intrinsic+1 pt swaps)
         assert save_every_n%n_int_block == 0  # or we won't save
@@ -289,12 +312,40 @@ class ChainParams():
         self.de_prob = de_prob
         self.fisher_prob = fisher_prob
 
+        #rn switches
+        self.zero_rn = zero_rn
+        #also fix rn if it's set to be zero
+        if self.zero_rn:
+            self.fix_rn = True
+        else:
+            self.fix_rn = fix_rn
+
+        #gwb switches
+        self.zero_gwb = zero_gwb
+        #also fix gwb if it's set to be zero
+        if self.zero_gwb:
+            self.fix_gwb = True
+        else:
+            self.fix_gwb = fix_gwb
+
         #jump parameter set probabilities
         self.dist_jump_weight = dist_jump_weight
-        self.rn_jump_weight = rn_jump_weight
-        self.gwb_jump_weight = gwb_jump_weight
         self.common_jump_weight = common_jump_weight
-        self.all_jump_weight = all_jump_weight
+        if self.fix_rn:
+            print("Overwrite rn_jump_weight to 0, due to fix_rn=True.")
+            self.rn_jump_weight = 0.0
+        else:
+            self.rn_jump_weight = rn_jump_weight
+        if self.fix_gwb:
+            print("Overwrite gwb_jump_weight to 0, due to fix_gwb=True.")
+            self.gwb_jump_weight = 0.0
+        else:
+            self.gwb_jump_weight = gwb_jump_weight
+        if self.fix_gwb or self.fix_rn:
+            print("Overwrite all_jump_weight to 0, due to either fix_rn or fix_gwb being True.")
+            self.all_jump_weight = 0.0
+        else:
+            self.all_jump_weight = all_jump_weight
 
 
 class MCMCChain():
