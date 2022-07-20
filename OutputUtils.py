@@ -83,15 +83,15 @@ def print_acceptance_progress(itrn,N,n_int_block,a_yes,a_no,t_itr,ti_loop,tf1_lo
             print(str_build)
 
 
-def output_hdf5_loop(itrn,chain_params,evolve_params,samples,log_likelihood,acc_fraction,fisher_diag,par_names,N,verbosity):
+def output_hdf5_loop(itrn,chain_params,samples,log_likelihood,acc_fraction,fisher_diag,par_names,N,verbosity):
     """output to hdf5 at loop iteration"""
     n_chain = chain_params.n_chain
     save_every_n = chain_params.save_every_n
     Ts = chain_params.Ts
-    savefile = evolve_params.savefile
-    save_first_n_chains = evolve_params.save_first_n_chains
-    samples_precision = evolve_params.samples_precision
-    thin = evolve_params.thin
+    savefile = chain_params.savefile
+    save_first_n_chains = chain_params.save_first_n_chains
+    samples_precision = chain_params.samples_precision
+    thin = chain_params.thin
     if savefile is not None:
         if itrn>save_every_n:
             if verbosity>1:
@@ -118,12 +118,12 @@ def output_hdf5_loop(itrn,chain_params,evolve_params,samples,log_likelihood,acc_
                 f.create_dataset('T-ladder', data=Ts)
                 f.create_dataset('samples_freq', data=samples[:,:-1:thin,par_names.index('0_log10_fgw')], dtype=samples_precision, compression="gzip", chunks=True, maxshape=(n_chain,int(N/thin)))
 
-def output_hdf5_end(chain_params,evolve_params,samples,log_likelihood,acc_fraction,fisher_diag,par_names,verbosity):
+def output_hdf5_end(chain_params,samples,log_likelihood,acc_fraction,fisher_diag,par_names,verbosity):
     """output to hdf5 file at end of body of loop"""
     Ts = chain_params.Ts
-    savefile = evolve_params.savefile
-    save_first_n_chains = evolve_params.save_first_n_chains
-    thin = evolve_params.thin
+    savefile = chain_params.savefile
+    save_first_n_chains = chain_params.save_first_n_chains
+    thin = chain_params.thin
     if savefile is not None:
         if verbosity>1:
             print("Append to HDF5 file...")

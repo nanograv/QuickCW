@@ -239,11 +239,12 @@ def get_param_names(pta):
 
 class ChainParams():
     """store basic parameters the govern the evolution of the mcmc chain"""
-    def __init__(self,T_max,n_chain,n_int_block=1000,n_update_fisher=100_000,\
-                      save_every_n=10_000,fisher_eig_downsample=10,T_ladder=None,\
-                      includeCW=True,verbosity=1,\
-                      freq_bounds=np.array([3.5e-9, 1e-7],dtype=np.float64),\
-                      de_history_size=10_000,thin_de=1000,log_fishers=False):
+    def __init__(self, T_max, n_chain, n_block_status_update, n_int_block=1000, n_update_fisher=100_000,\
+                       save_every_n=10_000, fisher_eig_downsample=10, T_ladder=None,\
+                       includeCW=True, verbosity=1,\
+                       freq_bounds=np.array([3.5e-9, 1e-7], dtype=np.float64),\
+                       de_history_size=10_000, thin_de=1000, log_fishers=False,\
+                       savefile=None, thin=100, samples_precision=np.single, save_first_n_chains=1):
         assert n_int_block%2==0 and n_int_block>=4  # need to have n_int block>=4 a multiple of 2
         #in order to always do at least n*(1 extrinsic+1 pt swap)+(1 intrinsic+1 pt swaps)
         assert save_every_n%n_int_block == 0  # or we won't save
@@ -274,9 +275,16 @@ class ChainParams():
             self.n_chain = self.Ts.size
             print("Using {0} temperature chains with custom spacing: ".format(self.n_chain),self.Ts)
 
-class EvolveParams():
-    """store the set of parameters which are allowed to change between calls to advance_N_blocks"""
-    def __init__(self,n_block_status_update,savefile=None,thin=100,samples_precision=np.single,save_first_n_chains=1):
+        #store the set of parameters which are allowed to change between calls to advance_N_blocks
+        self.n_block_status_update = n_block_status_update
+        self.savefile = savefile
+        self.thin = thin
+        self.samples_precision = samples_precision
+        self.save_first_n_chains = save_first_n_chains
+
+    def update_parameters(self, n_block_status_update, savefile=None, thin=100, samples_precision=np.single, save_first_n_chains=1):
+        """Method to update parameters that are allowed to change during the run"""
+        print("Updating some parameters in ChainParams object...")
         self.n_block_status_update = n_block_status_update
         self.savefile = savefile
         self.thin = thin
@@ -301,7 +309,6 @@ class MCMCChain():
         self.n_update_fisher = self.chain_params.n_update_fisher
         self.psrs = psrs
         self.Npsr = len(self.pta.pulsars)
-        self.ti = ti
         self.noisedict = noisedict
         self.verbosity = self.chain_params.verbosity
         self.itri = 0
@@ -422,6 +429,10 @@ class MCMCChain():
         print("finished initialization steps in %8.3fs"%(self.tf_init-self.ti))
         self.ti_loop = perf_counter()
         self.tf1_loop = perf_counter()
+
+    def update_chain_params(self, n_block_status_update, savefile=None, thin=100, samples_precision=np.single, save_first_n_chains=1):
+        """Method to update some parameters of chain_param object"""
+        self.chain_params.update_parameters(n_block_status_update, savefile=savefile, thin=thin, samples_precision=samples_precision, save_first_n_chains=save_first_n_chains)
 
     def advance_block(self):
         """advance the state of the mcmc chain by 1 entire block, updating fisher matrices and differential evolution as necessary"""
@@ -614,9 +625,9 @@ class MCMCChain():
         #print(self.samples[0,itrb,:])
         #print("Old log_L=%+12.3f"%(self.pta.get_lnlikelihood(self.samples[0,itrb,:])))
 
-    def output_and_wrap_state(self,evolve_params,itrn,N_blocks):
+    def output_and_wrap_state(self,itrn,N_blocks):
         """wrap the samples around to the first element and save the old ones to the hdf5 file"""
-        output_hdf5_loop(itrn,self.chain_params,evolve_params,self.samples,self.log_likelihood,self.acc_fraction,self.fisher_diag,self.par_names,N_blocks*self.n_int_block,self.verbosity)
+        output_hdf5_loop(itrn,self.chain_params,self.samples,self.log_likelihood,self.acc_fraction,self.fisher_diag,self.par_names,N_blocks*self.n_int_block,self.verbosity)
 
         #clear out log_likelihood and samples arrays
         samples_now = self.samples[:,-1,:]
@@ -626,9 +637,9 @@ class MCMCChain():
         self.samples[:,0,:] = samples_now
         self.log_likelihood[:,0] = log_likelihood_now
 
-    def advance_N_blocks(self,evolve_params,N_blocks):
+    def advance_N_blocks(self,N_blocks):
         """advance the state of the MCMC system by N_blocks of size"""
-        assert evolve_params.save_first_n_chains <= self.n_chain #or we would try to save more chains than we have
+        assert self.chain_params.save_first_n_chains <= self.n_chain #or we would try to save more chains than we have
 
         t1 = perf_counter()
         print("Entering Loop Body at %8.3fs"%(t1-self.ti))
@@ -636,14 +647,14 @@ class MCMCChain():
             itrn = i*self.n_int_block #index overall
             itrb = itrn%self.chain_params.save_every_n #index within the block of saved values
             if itrb==0 and i!=0:
-                self.output_and_wrap_state(evolve_params,itrn,N_blocks)
-            if i%evolve_params.n_block_status_update==0:
+                self.output_and_wrap_state(itrn,N_blocks)
+            if i%self.chain_params.n_block_status_update==0:
                 self.do_status_update(itrn,N_blocks)
 
             #advance the block state
             self.advance_block()
 
-        output_hdf5_end(self.chain_params,evolve_params,self.samples,self.log_likelihood,self.acc_fraction,self.fisher_diag,self.par_names,self.verbosity)
+        output_hdf5_end(self.chain_params,self.samples,self.log_likelihood,self.acc_fraction,self.fisher_diag,self.par_names,self.verbosity)
         tf = perf_counter()
         print('whole function time = %8.3f s'%(tf-self.ti))
         print('loop time = %8.3f s'%(tf-self.ti_loop))

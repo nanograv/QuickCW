@@ -26,7 +26,7 @@ from enterprise_extensions import deterministic
 #import json
 
 import QuickCW
-from QuickMCMCUtils import ChainParams,EvolveParams
+from QuickMCMCUtils import ChainParams
 #import CWFastLikelihoodNumba
 
 #make sure this points to the pickled pulsars you want to analyze
@@ -64,17 +64,18 @@ savefile = 'results/quickCW_test16.h5'
 #savefile = None
 
 #Setup and start MCMC
-#object containing common parameters for the mcmc chain which cannot change for the lifetime of the chain object
-chain_params = ChainParams(T_max,n_chain,
+#object containing common parameters for the mcmc chain
+chain_params = ChainParams(T_max,n_chain, n_block_status_update,
                            n_int_block=n_int_block, #number of iterations in a block (which has one shape update and the rest are projection updates)
                            save_every_n=save_every_n, #number of iterations between saving intermediate results (needs to be intiger multiple of n_int_block)
-                           fisher_eig_downsample=fisher_eig_downsample) #multiplier for how much less to do more expensive updates to fisher eigendirections for red noise and common parameters compared to diagonal elements
-#separate object for parameters which are allowed to change between calls to advance_N_blocks
-evolve_params = EvolveParams(n_block_status_update,\
-                     savefile = savefile,#hdf5 file to save to, will not save at all if None
-                     thin=100)  #thinning, i.e. save every `thin`th sample to file (increase to higher than one to keep file sizes small)
+                           fisher_eig_downsample=fisher_eig_downsample, #multiplier for how much less to do more expensive updates to fisher eigendirections for red noise and common parameters compared to diagonal elements
+                           savefile = savefile,#hdf5 file to save to, will not save at all if None
+                           thin=100)  #thinning, i.e. save every `thin`th sample to file (increase to higher than one to keep file sizes small)
 
 pta,mcc = QuickCW.QuickCW(chain_params, psrs, noise_json=noisefile)
 
+#Some parameters in chain_params can be updated later if needed
+mcc.update_chain_params(n_block_status_update, thin=1_000)
+
 #Do the main MCMC iteration
-mcc.advance_N_blocks(evolve_params,N_blocks)
+mcc.advance_N_blocks(N_blocks)
