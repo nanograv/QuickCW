@@ -78,6 +78,7 @@ def QuickCW(chain_params, psrs, noise_json=None, use_legacy_equad=False, amplitu
 
     #set lower frequency bound to 1/Tspan if it's nan
     if np.isnan(chain_params.freq_bounds[0]):
+        print('Found lower frequency bound of nan - Setting it to 1/T.')
         chain_params.freq_bounds[0] = 1/Tspan
     log10_fgw = parameter.Uniform(np.log10(chain_params.freq_bounds[0]), np.log10(chain_params.freq_bounds[1]))('0_log10_fgw')
 
