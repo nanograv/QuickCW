@@ -142,7 +142,7 @@ def add_rn_eig_starting_point(samples,par_names,x0_swap,flm,FLI_swap,chain_param
     for j in range(0,chain_params.n_chain):
         scale_eig0 = scaling*eig_rn0[0,:,0,:]
         scale_eig1 = scaling*eig_rn0[0,:,1,:]
-        samples[j,0] = add_rn_eig_jump(scale_eig0,scale_eig1,samples[j,0],samples[0,0,x0_swap.idx_rn],x0_swap.idx_rn,Npsr)
+        samples[j,0] = add_rn_eig_jump(scale_eig0,scale_eig1,samples[j,0],samples[j,0,x0_swap.idx_rn],x0_swap.idx_rn,Npsr)
         #correct intrinsic just in case
         samples[j,0] = correct_intrinsic(samples[j,0],x0_swap,chain_params.freq_bounds,FPI.cut_par_ids, FPI.cut_lows, FPI.cut_highs)
     return samples
@@ -203,6 +203,7 @@ def initialize_sample_helper(chain_params,n_par_tot,Npsr,max_toa,par_names,par_n
                 else:
                     print("No value found in noisedict for: " + psr + "_red_noise_gamma")
                     print("Using a random draw from the prior as a first sample instead")
+                    print(samples[j,0,par_names.index(psr + "_red_noise_gamma")])
                 
                 if chain_params.zero_rn:
                     print("zero_rn=True --> Setting " + psr + "_red_noise_log10_A=-20.0")
@@ -211,7 +212,8 @@ def initialize_sample_helper(chain_params,n_par_tot,Npsr,max_toa,par_names,par_n
                     samples[j,0,par_names.index(psr + "_red_noise_log10_A")] = noisedict[psr + "_red_noise_log10_A"]
                 else:
                     print("No value found in noisedict for: " + psr + "_red_noise_log10_A")
-                    print("Using a random draw from the prior as a first sample instead")
+                    print("Setting it to a low value of -19 to help convergence of insignificant RN")
+                    samples[j,0,par_names.index(psr + "_red_noise_log10_A")] = -19.0
 
             if chain_params.zero_gwb:
                 print("zero_gwb=True --> Setting gwb_gamma=0.0")
@@ -229,7 +231,8 @@ def initialize_sample_helper(chain_params,n_par_tot,Npsr,max_toa,par_names,par_n
                 samples[j,0,par_names.index("gwb_log10_A")] = noisedict["gwb_log10_A"]
             else:
                 print("No value found in noisedict for: gwb_log10_A")
-                print("Using a random draw from the prior as a first sample instead")
+                print("Setting it to a low value of -19 to help convergence of insignificant RN")
+                samples[j,0,par_names.index("gwb_log10_A")] = -19.0
 
             samples[j,0,:] = correct_intrinsic(samples[j,0,:],x0_swap,chain_params.freq_bounds,FPI.cut_par_ids, FPI.cut_lows, FPI.cut_highs)
             samples[j,0,:] = correct_extrinsic(samples[j,0,:],x0_swap)
