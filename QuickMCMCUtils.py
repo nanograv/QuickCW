@@ -264,7 +264,7 @@ class ChainParams():
     def __init__(self, T_max, n_chain, n_block_status_update, n_int_block=1000, n_update_fisher=100_000,\
                        save_every_n=10_000, fisher_eig_downsample=10, T_ladder=None,\
                        includeCW=True, verbosity=1,\
-                       freq_bounds=np.array([3.5e-9, 1e-7], dtype=np.float64),\
+                       freq_bounds=np.array([np.nan, 1e-7], dtype=np.float64),\
                        de_history_size=10_000, thin_de=1000, log_fishers=False,\
                        savefile=None, thin=100, samples_precision=np.single, save_first_n_chains=1,\
                        prior_draw_prob=0.1, de_prob=0.6, fisher_prob=0.3,\

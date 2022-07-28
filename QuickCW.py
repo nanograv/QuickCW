@@ -42,6 +42,11 @@ def QuickCW(chain_params, psrs, noise_json=None, use_legacy_equad=False, amplitu
 
     ti = perf_counter()
 
+    #Get observing timespan
+    tmin = [p.toas.min() for p in psrs]
+    tmax = [p.toas.max() for p in psrs]
+    Tspan = np.max(tmax) - np.min(tmin)
+
     efac = parameter.Constant()
     equad = parameter.Constant()
     ecorr = parameter.Constant()
@@ -71,6 +76,9 @@ def QuickCW(chain_params, psrs, noise_json=None, use_legacy_equad=False, amplitu
     cos_gwtheta = parameter.Uniform(-1,1)('0_cos_gwtheta')
     gwphi = parameter.Uniform(0,2*np.pi)('0_gwphi')
 
+    #set lower frequency bound to 1/Tspan if it's nan
+    if np.isnan(chain_params.freq_bounds[0]):
+        chain_params.freq_bounds[0] = 1/Tspan
     log10_fgw = parameter.Uniform(np.log10(chain_params.freq_bounds[0]), np.log10(chain_params.freq_bounds[1]))('0_log10_fgw')
 
     m_max = 10
@@ -96,10 +104,6 @@ def QuickCW(chain_params, psrs, noise_json=None, use_legacy_equad=False, amplitu
                                    p_phase=p_phase, p_dist=p_dist, evolve=True,
                                    psi=psi, cos_inc=cos_inc, tref=cm.tref)
     cw = deterministic.CWSignal(cw_wf, psrTerm=True, name='cw0')
-
-    tmin = [p.toas.min() for p in psrs]
-    tmax = [p.toas.max() for p in psrs]
-    Tspan = np.max(tmax) - np.min(tmin)
 
     log10_Agw = parameter.Uniform(-20,-11)('gwb_log10_A')
     gamma_gw = parameter.Uniform(0,7)('gwb_gamma')
