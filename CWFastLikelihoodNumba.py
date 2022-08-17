@@ -14,7 +14,7 @@ import const_mcmc as cm
 
 class FastLikeMaster:
     """class to store pta things so they do not have to be recomputed when red noise is recomputed"""
-    def __init__(self,psrs,pta,params,x0,includeCW=True):
+    def __init__(self,psrs,pta,params,x0,includeCW=True,prior_recovery=False):
         """
         get Class for generating the fast CW likelihood.
         :param pta: `enterprise` pta object.
@@ -26,6 +26,9 @@ class FastLikeMaster:
 
         #include switch to easily turn off CW for TD Bayes factor calculation
         self.includeCW = includeCW
+
+        #include switch to get constant log_likelihoods for prior recovery tests
+        self.prior_recovery = prior_recovery
 
         #put the positions into an array
         self.pos = np.zeros((self.Npsr,3))
@@ -84,7 +87,7 @@ class FastLikeMaster:
             phiinvs.append(np.ones(self.TNvs[i].shape[1]))
 
         FLI = FastLikeInfo(self.logdet,self.pos,self.pdist,self.toas,self.Nvecs,self.Nrs,self.max_toa,x0,
-                           self.Npsr,self.isqrNvecs,self.TNvs,self.dotTNrs,chol_Sigmas,phiinvs,self.includeCW)
+                           self.Npsr,self.isqrNvecs,self.TNvs,self.dotTNrs,chol_Sigmas,phiinvs,self.includeCW,self.prior_recovery)
         return self.recompute_FastLike(FLI,x0,params)
     #@profile
     def recompute_FastLike(self,FLI,x0,params, chol_update=False,mask=None):
@@ -298,76 +301,79 @@ class CWInfo:
         return True
 
 @njit()
-def get_lnlikelihood_helper(x0,resres,logdet,pos,pdist,NN,MMs,includeCW=True):
+def get_lnlikelihood_helper(x0,resres,logdet,pos,pdist,NN,MMs,includeCW=True,prior_recovery=False):
     """jittable helper for calculating the log likelihood in CWFastLikelihood"""
-    fgw = 10.**x0.log10_fgw
-    amp = 10.**x0.log10_h / (2*np.pi*fgw)
-    mc = 10.**x0.log10_mc * const.Tsun
+    if prior_recovery:
+        return 0.0
+    else:
+        fgw = 10.**x0.log10_fgw
+        amp = 10.**x0.log10_h / (2*np.pi*fgw)
+        mc = 10.**x0.log10_mc * const.Tsun
 
 
-    sin_gwtheta = np.sqrt(1-x0.cos_gwtheta**2)
-    sin_gwphi = np.sin(x0.gwphi)
-    cos_gwphi = np.cos(x0.gwphi)
+        sin_gwtheta = np.sqrt(1-x0.cos_gwtheta**2)
+        sin_gwphi = np.sin(x0.gwphi)
+        cos_gwphi = np.cos(x0.gwphi)
 
-    m = np.array([sin_gwphi, -cos_gwphi, 0.0])
-    n = np.array([-x0.cos_gwtheta * cos_gwphi, -x0.cos_gwtheta * sin_gwphi, sin_gwtheta])
-    omhat = np.array([-sin_gwtheta * cos_gwphi, -sin_gwtheta * sin_gwphi, -x0.cos_gwtheta])
-    sigma = np.zeros(4)
+        m = np.array([sin_gwphi, -cos_gwphi, 0.0])
+        n = np.array([-x0.cos_gwtheta * cos_gwphi, -x0.cos_gwtheta * sin_gwphi, sin_gwtheta])
+        omhat = np.array([-sin_gwtheta * cos_gwphi, -sin_gwtheta * sin_gwphi, -x0.cos_gwtheta])
+        sigma = np.zeros(4)
 
-    cos_phase0 = np.cos(x0.phase0)
-    sin_phase0 = np.sin(x0.phase0)
-    sin_2psi = np.sin(2*x0.psi)
-    cos_2psi = np.cos(2*x0.psi)
+        cos_phase0 = np.cos(x0.phase0)
+        sin_phase0 = np.sin(x0.phase0)
+        sin_2psi = np.sin(2*x0.psi)
+        cos_2psi = np.cos(2*x0.psi)
 
-    log_L = -0.5*resres -0.5*logdet
+        log_L = -0.5*resres -0.5*logdet
 
-    if includeCW:
-        for i in prange(0,x0.Npsr):
-            m_pos = 0.
-            n_pos = 0.
-            cosMu = 0.
-            for j in range(0,3):
-                m_pos += m[j]*pos[i,j]
-                n_pos += n[j]*pos[i,j]
-                cosMu -= omhat[j]*pos[i,j]
-            #m_pos = np.dot(m, pos[i])
-            #n_pos = np.dot(n, pos[i])
-            #cosMu = -np.dot(omhat, pos[i])
+        if includeCW:
+            for i in prange(0,x0.Npsr):
+                m_pos = 0.
+                n_pos = 0.
+                cosMu = 0.
+                for j in range(0,3):
+                    m_pos += m[j]*pos[i,j]
+                    n_pos += n[j]*pos[i,j]
+                    cosMu -= omhat[j]*pos[i,j]
+                #m_pos = np.dot(m, pos[i])
+                #n_pos = np.dot(n, pos[i])
+                #cosMu = -np.dot(omhat, pos[i])
 
-            F_p = 0.5 * (m_pos ** 2 - n_pos ** 2) / (1 - cosMu)
-            F_c = (m_pos * n_pos) / (1 - cosMu)
+                F_p = 0.5 * (m_pos ** 2 - n_pos ** 2) / (1 - cosMu)
+                F_c = (m_pos * n_pos) / (1 - cosMu)
 
-            p_dist = (pdist[i,0] + pdist[i,1]*x0.cw_p_dists[i])*(const.kpc/const.c)
+                p_dist = (pdist[i,0] + pdist[i,1]*x0.cw_p_dists[i])*(const.kpc/const.c)
 
-            w0 = np.pi * fgw
-            omega_p0 = w0 *(1 + 256/5 * mc**(5/3) * w0**(8/3) * p_dist*(1-cosMu))**(-3/8)
+                w0 = np.pi * fgw
+                omega_p0 = w0 *(1 + 256/5 * mc**(5/3) * w0**(8/3) * p_dist*(1-cosMu))**(-3/8)
 
-            amp_psr = amp * (w0/omega_p0)**(1.0/3.0)
-            phase0_psr = x0.cw_p_phases[i]
+                amp_psr = amp * (w0/omega_p0)**(1.0/3.0)
+                phase0_psr = x0.cw_p_phases[i]
 
-            cos_phase0_psr = np.cos(x0.phase0+phase0_psr*2.0)
-            sin_phase0_psr = np.sin(x0.phase0+phase0_psr*2.0)
+                cos_phase0_psr = np.cos(x0.phase0+phase0_psr*2.0)
+                sin_phase0_psr = np.sin(x0.phase0+phase0_psr*2.0)
 
-            sigma[0] =  amp*(   cos_phase0 * (1+x0.cos_inc**2) * (-cos_2psi * F_p + sin_2psi * F_c) +    #Earth term sine
-                              2*sin_phase0 *     x0.cos_inc    * (+sin_2psi * F_p + cos_2psi * F_c)   )
-            sigma[1] =  amp*(   sin_phase0 * (1+x0.cos_inc**2) * (-cos_2psi * F_p + sin_2psi * F_c) +    #Earth term cosine
-                              2*cos_phase0 *     x0.cos_inc    * (-sin_2psi * F_p - cos_2psi * F_c)   )
-            sigma[2] =  -amp_psr*(   cos_phase0_psr * (1+x0.cos_inc**2) * (-cos_2psi * F_p + sin_2psi * F_c) +    #Pulsar term sine
-                              2*sin_phase0_psr *     x0.cos_inc    * (+sin_2psi * F_p + cos_2psi * F_c)   )
-            sigma[3] =  -amp_psr*(   sin_phase0_psr * (1+x0.cos_inc**2) * (-cos_2psi * F_p + sin_2psi * F_c) +    #Pulsar term cosine
-                              2*cos_phase0_psr *     x0.cos_inc    * (-sin_2psi * F_p - cos_2psi * F_c)   )
+                sigma[0] =  amp*(   cos_phase0 * (1+x0.cos_inc**2) * (-cos_2psi * F_p + sin_2psi * F_c) +    #Earth term sine
+                                  2*sin_phase0 *     x0.cos_inc    * (+sin_2psi * F_p + cos_2psi * F_c)   )
+                sigma[1] =  amp*(   sin_phase0 * (1+x0.cos_inc**2) * (-cos_2psi * F_p + sin_2psi * F_c) +    #Earth term cosine
+                                  2*cos_phase0 *     x0.cos_inc    * (-sin_2psi * F_p - cos_2psi * F_c)   )
+                sigma[2] =  -amp_psr*(   cos_phase0_psr * (1+x0.cos_inc**2) * (-cos_2psi * F_p + sin_2psi * F_c) +    #Pulsar term sine
+                                  2*sin_phase0_psr *     x0.cos_inc    * (+sin_2psi * F_p + cos_2psi * F_c)   )
+                sigma[3] =  -amp_psr*(   sin_phase0_psr * (1+x0.cos_inc**2) * (-cos_2psi * F_p + sin_2psi * F_c) +    #Pulsar term cosine
+                                  2*cos_phase0_psr *     x0.cos_inc    * (-sin_2psi * F_p - cos_2psi * F_c)   )
 
-            for j in range(0,4):
-                log_L += sigma[j]*NN[i,j]
+                for j in range(0,4):
+                    log_L += sigma[j]*NN[i,j]
 
-            prodMMPart = 0.
-            for j in range(0,4):
-                for k in range(0,4):
-                    prodMMPart += sigma[j]*MMs[i,j,k]*sigma[k]
+                prodMMPart = 0.
+                for j in range(0,4):
+                    for k in range(0,4):
+                        prodMMPart += sigma[j]*MMs[i,j,k]*sigma[k]
 
-            log_L -= prodMMPart/2#np.dot(sigma,np.dot(MMs[i],sigma))/2
+                log_L -= prodMMPart/2#np.dot(sigma,np.dot(MMs[i],sigma))/2
 
-    return log_L
+        return log_L
 
 @njit()
 def get_hess_fisher_phase_helper(x0,pos,pdist,NN,MMs,psr_idx):
@@ -889,10 +895,10 @@ def update_intrinsic_params(x0,isqNvecs,Nrs,pos,pdist,toas,NN,MMs,SigmaTNrProds,
            ('MMs',nb.float64[:,:,::1]),('NN',nb.float64[:,::1]),\
            ('cos_gwtheta',nb.float64),('gwphi',nb.float64),('log10_fgw',nb.float64),('log10_mc',nb.float64),('cw_p_dists',nb.float64[:]),\
            ('gwb_gamma',nb.float64),('gwb_log10_A',nb.float64),('rn_gammas',nb.float64[:]),('rn_log10_As',nb.float64[:]),
-           ('includeCW',nb.boolean)])
+           ('includeCW',nb.boolean),('prior_recovery',nb.boolean)])
 class FastLikeInfo:
     """simple jitclass to store the various elements of fast likelihood calculation in a way that can be accessed quickly from a numba environment"""
-    def __init__(self,logdet_base,pos,pdist,toas,Nvecs,Nrs,max_toa,x0,Npsr,isqNvecs,TNvs,dotTNrs,chol_Sigmas,phiinvs,includeCW=True):
+    def __init__(self,logdet_base,pos,pdist,toas,Nvecs,Nrs,max_toa,x0,Npsr,isqNvecs,TNvs,dotTNrs,chol_Sigmas,phiinvs,includeCW=True,prior_recovery=False):
         self.resres = 0. #compute internally
         self.logdet = 0.
         self.resres_array = np.zeros(Npsr)
@@ -923,6 +929,7 @@ class FastLikeInfo:
         self.update_intrinsic_params(x0)
         
         self.includeCW=includeCW
+        self.prior_recovery=prior_recovery
 
     def get_lnlikelihood(self,x0):
         """wrapper to get the log likelihood"""
@@ -936,7 +943,7 @@ class FastLikeInfo:
         assert self.log10_fgw==x0.log10_fgw
         assert self.log10_mc==x0.log10_mc
 
-        return get_lnlikelihood_helper(x0,self.resres,self.logdet,self.pos,self.pdist,self.NN,self.MMs,includeCW=self.includeCW)
+        return get_lnlikelihood_helper(x0,self.resres,self.logdet,self.pos,self.pdist,self.NN,self.MMs,includeCW=self.includeCW,prior_recovery=self.prior_recovery)
 
     def update_pulsar_distance(self,x0,psr_idx):
         """recalculate MM and NN only for the affected pulsar if we only change a single pulsar distance"""

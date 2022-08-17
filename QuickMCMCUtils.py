@@ -266,7 +266,7 @@ class ChainParams():
     """store basic parameters the govern the evolution of the mcmc chain"""
     def __init__(self, T_max, n_chain, n_block_status_update, n_int_block=1000, n_update_fisher=100_000,\
                        save_every_n=10_000, fisher_eig_downsample=10, T_ladder=None,\
-                       includeCW=True, verbosity=1,\
+                       includeCW=True, prior_recovery=False, verbosity=1,\
                        freq_bounds=np.array([np.nan, 1e-7], dtype=np.float64), gwb_comps=14,\
                        de_history_size=10_000, thin_de=1000, log_fishers=False,\
                        savefile=None, thin=100, samples_precision=np.single, save_first_n_chains=1,\
@@ -287,6 +287,7 @@ class ChainParams():
         self.T_max = T_max
         self.T_ladder = T_ladder
         self.includeCW = includeCW
+        self.prior_recovery = prior_recovery
         self.verbosity = verbosity
         self.freq_bounds = freq_bounds
         self.gwb_comps = gwb_comps
@@ -359,6 +360,7 @@ class MCMCChain():
         self.chain_params = chain_params
         self.ti = ti
         self.includeCW = self.chain_params.includeCW
+        self.prior_recovery = self.chain_params.prior_recovery
         self.max_toa = max_toa
         self.n_chain = self.chain_params.n_chain
         self.pta = pta
@@ -405,7 +407,8 @@ class MCMCChain():
         self.x0_swap = CWFastLikelihoodNumba.CWInfo(self.Npsr,self.samples[0,0],self.par_names,self.par_names_cw_ext,self.par_names_cw_int)
         self.samples[:,0,self.x0_swap.idx_dists] = 0.
 
-        self.flm = CWFastLikelihoodNumba.FastLikeMaster(self.psrs,self.pta,dict(zip(self.par_names, self.samples[0, 0, :])),self.x0_swap,includeCW=self.includeCW)
+        self.flm = CWFastLikelihoodNumba.FastLikeMaster(self.psrs,self.pta,dict(zip(self.par_names, self.samples[0, 0, :])),self.x0_swap,
+                                                        includeCW=self.includeCW,prior_recovery=self.prior_recovery)
         self.FLI_swap = self.flm.get_new_FastLike(self.x0_swap, dict(zip(self.par_names, self.samples[0, 0, :])))
 
         #add a random fisher eigenvalue jump to the starting point for the j>0 chains to get more diversity in the initial fisher matrices
