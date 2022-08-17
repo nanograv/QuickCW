@@ -109,7 +109,7 @@ def QuickCW(chain_params, psrs, noise_json=None, use_legacy_equad=False, amplitu
     log10_Agw = parameter.Uniform(-20,-11)('gwb_log10_A')
     gamma_gw = parameter.Uniform(0,7)('gwb_gamma')
     cpl = utils.powerlaw(log10_A=log10_Agw, gamma=gamma_gw)
-    crn = gp_signals.FourierBasisGP(cpl, components=5, Tspan=Tspan, name='gw')
+    crn = gp_signals.FourierBasisGP(cpl, components=chain_params.gwb_comps, Tspan=Tspan, name='gw')
 
     tm = gp_signals.TimingModel()
 
