@@ -44,6 +44,7 @@ sigma_de = 0.1
 #multiple try MCMC parameters
 n_x0_extra = config.NUMBA_NUM_THREADS
 n_multi_try = 2000#3_000
+#n_multi_try = 1
 
 if n_multi_try < n_x0_extra:
     print("Reset n_x0_extra from "+str(n_x0_extra)+" to "+str(n_multi_try)+" in order to not exceed n_multi_try")

@@ -336,6 +336,7 @@ def do_mt_step(mcc,j,itrb,new_point,samples_current,FLI_mem_save,recompute_rn,lo
     else:
         FLI_use = mcc.FLIs[j]
     mt_weights, log_Ls, log_mt_norm_shift = get_mt_weights(mcc.x0_extras, FLI_use, Ts[j],log_posterior_old,tries,log_prior_news)
+    #if j==0: print(mt_weights)
 
     #not sure why but still can get nans here...
     assert np.all(np.isfinite(mt_weights))
@@ -444,8 +445,10 @@ def set_params(sample_set,jumps,fisher_mask,random_draws_from_prior,x0):
 
     #copy in intrinsic parameters
     #ref_tries[:] = sample_set
-    ref_tries[:,x0.idx_cw_int] = sample_set[x0.idx_cw_int]
-    ref_tries[:,x0.idx_rn] = sample_set[x0.idx_rn]
+    #ref_tries[:,x0.idx_cw_int] = sample_set[x0.idx_cw_int]
+    #ref_tries[:,x0.idx_rn] = sample_set[x0.idx_rn]
+    #ref_tries[:,x0.idx_gwb] = sample_set[x0.idx_gwb]
+    ref_tries[:,x0.idx_int] = sample_set[x0.idx_int]
 
     ref_tries[:,x0.idx_cw_ext[fisher_mask]] = sample_set[x0.idx_cw_ext[fisher_mask]]+jumps
     ref_tries[:,x0.idx_cw_ext[~fisher_mask]] = random_draws_from_prior

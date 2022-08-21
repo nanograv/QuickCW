@@ -226,7 +226,7 @@ def create_Sigma(phiinv_loc,TNT,Sigma):
            ('idx_dists',nb.int64[:]),('idx_phases',nb.int64[:]),('idx_rn_gammas',nb.int64[:]),('idx_rn_log10_As',nb.int64[:]),\
            ('idx_cos_gwtheta',nb.int64),('idx_cos_inc',nb.int64),('idx_gwphi',nb.int64),('idx_log10_fgw',nb.int64),('idx_log10_h',nb.int64),\
            ('idx_log10_mc',nb.int64),('idx_phase0',nb.int64),('idx_psi',nb.int64),('idx_gwb_gamma',nb.int64),('idx_gwb_log10_A',nb.int64),\
-           ('idx_rn',nb.int64[:]),('idx_int',nb.int64[:]),('idx_cw_ext',nb.int64[:]),('idx_cw_int',nb.int64[:])])
+           ('idx_rn',nb.int64[:]),('idx_gwb',nb.int64[:]),('idx_int',nb.int64[:]),('idx_cw_ext',nb.int64[:]),('idx_cw_int',nb.int64[:])])
 class CWInfo:
     """simple jitclass to store the various parmeters in a way that can be accessed quickly from a numba environment"""
     
@@ -242,6 +242,7 @@ class CWInfo:
 
         self.idx_gwb_gamma = par_names.index("gwb_gamma")
         self.idx_gwb_log10_A = par_names.index("gwb_log10_A")
+        self.idx_gwb = np.array([self.idx_gwb_gamma, self.idx_gwb_log10_A])
 
         self.idx_cos_inc = par_names.index("0_cos_inc")
         self.idx_log10_h = par_names.index("0_log10_h")
@@ -261,7 +262,7 @@ class CWInfo:
         for i,name_int in enumerate(par_names_cw_int):
             self.idx_cw_int[i] = par_names.index(name_int)
 
-        self.idx_int = np.concatenate((self.idx_rn,self.idx_cw_int))
+        self.idx_int = np.concatenate((self.idx_rn, self.idx_gwb, self.idx_cw_int))
 
 
         self.update_params(params_in)
