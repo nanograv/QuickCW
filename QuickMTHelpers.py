@@ -121,6 +121,11 @@ def do_intrinsic_update_mt(mcc, itrb):
                                                          mcc.chain_params.fisher_prob/total_type_weight])
         if which_jump_type==0:  # do prior draw
             new_point = CWFastPrior.get_sample_idxs(samples_current.copy(),idx_choose,mcc.FPI)
+
+            log_prior_old = CWFastPrior.get_lnprior(samples_current, mcc.FPI)
+            log_prior_new = CWFastPrior.get_lnprior(new_point, mcc.FPI)
+            #backwards/forwards proposal ratio not necessarily 1 (e.g. for distances with non-flat priors)
+            log_proposal_ratio = log_prior_old - log_prior_new
         elif which_jump_type==1:  # do differential evolution step
             de_indices = np.random.choice(mcc.de_history.shape[1], size=2, replace=False)
             ndim = idx_choose.size
@@ -135,6 +140,9 @@ def do_intrinsic_update_mt(mcc, itrb):
             #new_point[idx_choose] += alpha0*(x1-x2)
             #new_point[idx_choose] += alpha0*(1+alpha)*(x1-x2)
 
+            #backwards/forwards proposal ratio is always one for Gaussian jumps
+            log_proposal_ratio = 0.0
+
             big_jump_decide = np.random.uniform(0.0, 1.0)
             if big_jump_decide<0.1: #do big jump
                 #new_point[idx_choose] += (1+alpha)*(x1-x2)
@@ -147,6 +155,9 @@ def do_intrinsic_update_mt(mcc, itrb):
             #jumps don't necessarily need to be mutually exclusive so use the indicator variables
             new_point = samples_current.copy()
             jump = np.zeros(mcc.n_par_tot)
+
+            #backwards/forwards proposal ratio is always one for Gaussian jumps
+            log_proposal_ratio = 0.0
 
             if recompute_rn:  # use RN eigenvectors
                 scale_eig0 = scaling*mcc.eig_rn[j,:,0,:]
@@ -219,7 +230,7 @@ def do_intrinsic_update_mt(mcc, itrb):
             mcc.x0s[j].validate_consistent(samples_current)
             mcc.FLIs[j].validate_consistent(mcc.x0s[j])
         else:
-            log_acc_ratio,chosen_trial,sample_choose,log_L_choose = do_mt_step(mcc,j,itrb,new_point,samples_current,FLI_mem_save,recompute_rn or recompute_gwb)
+            log_acc_ratio,chosen_trial,sample_choose,log_L_choose = do_mt_step(mcc,j,itrb,new_point,samples_current,FLI_mem_save,recompute_rn or recompute_gwb,log_proposal_ratio)
             if np.isfinite(log_acc_ratio):
                 log_acc_decide = np.log(uniform(1.e-304, 1.0))
             else:
@@ -286,7 +297,7 @@ def do_intrinsic_update_mt(mcc, itrb):
     return mcc.FLI_swap
 
 
-def do_mt_step(mcc,j,itrb,new_point,samples_current,FLI_mem_save,recompute_rn):
+def do_mt_step(mcc,j,itrb,new_point,samples_current,FLI_mem_save,recompute_rn,log_proposal_ratio):
     """compute the multiple tries and chose a sample"""
     Ts = mcc.chain_params.Ts
 
@@ -355,7 +366,7 @@ def do_mt_step(mcc,j,itrb,new_point,samples_current,FLI_mem_save,recompute_rn):
         ref_mt_weights,log_ref_mt_norm_shift = get_ref_mt_weights(mcc.x0_extras, mcc.FLIs[j], Ts[j],log_posterior_old,chosen_trial,ref_tries,log_prior_refs)
 
         #must undo the normalization shifts; they aren't needed in log space anyway
-        log_acc_ratio = np.log(np.sum(mt_weights))-np.log(np.sum(ref_mt_weights))+log_mt_norm_shift-log_ref_mt_norm_shift
+        log_acc_ratio = np.log(np.sum(mt_weights))-np.log(np.sum(ref_mt_weights))+log_mt_norm_shift-log_ref_mt_norm_shift+log_proposal_ratio
 
         sample_choose = tries[chosen_trial].copy()
 #        if chosen_trial==0:
