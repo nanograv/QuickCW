@@ -59,6 +59,11 @@ n_chain = 4
 #make sure this points to your white noise dictionary
 noisefile = 'data/quickCW_noisedict_kernel_ecorr.json'
 
+#make sure this points to the RN empirical distribution file you plan to use (or set to None to not use empirical distributions)
+rn_emp_dist_file = 'data/emp_dist.pkl'
+#rn_emp_dist_file = None
+
+
 #this is where results will be saved
 savefile = 'results/quickCW_test16.h5'
 #savefile = None
@@ -66,12 +71,14 @@ savefile = 'results/quickCW_test16.h5'
 #Setup and start MCMC
 #object containing common parameters for the mcmc chain
 chain_params = ChainParams(T_max,n_chain, n_block_status_update,
+                           freq_bounds=np.array([np.nan, 3e-7]), #prior bounds used on the GW frequency (a lower bound of np.nan is interpreted as 1/T_obs)
                            n_int_block=n_int_block, #number of iterations in a block (which has one shape update and the rest are projection updates)
                            save_every_n=save_every_n, #number of iterations between saving intermediate results (needs to be intiger multiple of n_int_block)
                            fisher_eig_downsample=fisher_eig_downsample, #multiplier for how much less to do more expensive updates to fisher eigendirections for red noise and common parameters compared to diagonal elements
+                           rn_emp_dist_file=rn_emp_dist_file, #RN empirical distribution file to use (no empirical distribution jumps attempted if set to None)
                            savefile = savefile,#hdf5 file to save to, will not save at all if None
                            thin=100,  #thinning, i.e. save every `thin`th sample to file (increase to higher than one to keep file sizes small)
-                           prior_draw_prob=0.1, de_prob=0.6, fisher_prob=0.3, #probability of different jump types
+                           prior_draw_prob=0.2, de_prob=0.6, fisher_prob=0.3, #probability of different jump types
                            dist_jump_weight=0.2, rn_jump_weight=0.3, gwb_jump_weight=0.1, common_jump_weight=0.2, all_jump_weight=0.2, #probability of updating different groups of parameters
                            fix_rn=False, zero_rn=False, fix_gwb=False, zero_gwb=False) #switches to turn off GWB or RN jumps and keep them fixed and to set them to practically zero (gamma=0.0, log10_A=-20)
 

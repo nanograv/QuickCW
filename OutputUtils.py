@@ -11,12 +11,12 @@ row_labels = ['dist-prior-noproj','dist-prior-proj','dist-DE-noproj','dist-DE-pr
               'all-prior-noproj','all-prior-proj','all-DE-noproj','all-DE-proj','all-fisher-noproj','all-fisher-proj',\
               'PT','proj']
 display_names ={'dist-prior-noproj':'Dist Prior','dist-DE-noproj':'Dist DE','dist-fisher-noproj':'Dist Fisher',\
-                'RN-prior-noproj':'RN Prior','RN-DE-noproj':'RN DE','RN-fisher-noproj':'RN Fisher',\
+                'RN-prior-noproj':'RN Emp Dist','RN-DE-noproj':'RN DE','RN-fisher-noproj':'RN Fisher',\
                 'GWB-prior-noproj':'GWB Prior','GWB-DE-noproj':'GWB DE','GWB-fisher-noproj':'GWB Fisher',\
                 'common-prior-noproj':'Common Prior','common-DE-noproj':'Common DE','common-fisher-noproj':'Common Fisher',\
                 'all-prior-noproj':'All Prior','all-DE-noproj':'All DE','all-fisher-noproj':'All Fisher',\
                 'dist-prior-proj':'Dist Prior','dist-DE-proj':'Dist DE','dist-fisher-proj':'Dist Fisher',\
-                'RN-prior-proj':'RN Prior','RN-DE-proj':'RN DE','RN-fisher-proj':'RN Fisher',\
+                'RN-prior-proj':'RN Emp Dist','RN-DE-proj':'RN DE','RN-fisher-proj':'RN Fisher',\
                 'GWB-prior-proj':'GWB Prior','GWB-DE-proj':'GWB DE','GWB-fisher-proj':'GWB Fisher',\
                 'common-prior-proj':'Common Prior','common-DE-proj':'Common DE','common-fisher-proj':'Common Fisher',\
                 'all-prior-proj':'All Prior','all-DE-proj':'All DE','all-fisher-proj':'All Fisher',\

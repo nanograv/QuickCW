@@ -106,7 +106,7 @@ def do_intrinsic_update_mt(mcc, itrb):
             raise ValueError('jump index unrecognized',which_jump)
 
         #decide what kind of jump we do
-        if recompute_rn or recompute_gwb:  # RN or GWB jump --> don't do prior draws, only fisher and DE
+        if (recompute_rn and mcc.rn_emp_dist is None) or recompute_gwb:  # RN or GWB jump --> don't do prior draws, only fisher and DE
             total_type_weight = mcc.chain_params.de_prob + mcc.chain_params.fisher_prob
             which_jump_type = np.random.choice(3, p=[0.,
                                                  mcc.chain_params.de_prob/total_type_weight,
@@ -119,13 +119,27 @@ def do_intrinsic_update_mt(mcc, itrb):
                 which_jump_type = np.random.choice(3, p=[mcc.chain_params.prior_draw_prob/total_type_weight,
                                                          mcc.chain_params.de_prob/total_type_weight,
                                                          mcc.chain_params.fisher_prob/total_type_weight])
-        if which_jump_type==0:  # do prior draw
-            new_point = CWFastPrior.get_sample_idxs(samples_current.copy(),idx_choose,mcc.FPI)
+        if which_jump_type==0:  # do prior draw (or empirical distribution in case of RN)
+            if which_jump==1: # updateing RN --> do empirical distribution step
+                new_point = samples_current.copy()
 
-            log_prior_old = CWFastPrior.get_lnprior(samples_current, mcc.FPI)
-            log_prior_new = CWFastPrior.get_lnprior(new_point, mcc.FPI)
-            #backwards/forwards proposal ratio not necessarily 1 (e.g. for distances with non-flat priors)
-            log_proposal_ratio = log_prior_old - log_prior_new
+                log_proposal_ratio = 0.0
+                for psr_idx in idx_choose_psr:
+                    rn_draw = mcc.rn_emp_dist[psr_idx].draw()
+                    new_point[mcc.x0s[j].idx_rn_log10_As[psr_idx]] = rn_draw[0]
+                    new_point[mcc.x0s[j].idx_rn_gammas[psr_idx]] = rn_draw[1]
+                    
+                    log_proposal_ratio += mcc.rn_emp_dist[psr_idx].logprob(np.array([samples_current[mcc.x0s[j].idx_rn_log10_As[psr_idx]],
+                                                                                     samples_current[mcc.x0s[j].idx_rn_gammas[psr_idx]]]))
+                    log_proposal_ratio +=-mcc.rn_emp_dist[psr_idx].logprob(rn_draw)
+            
+            else: # other parameter --> do actual prior draw
+                new_point = CWFastPrior.get_sample_idxs(samples_current.copy(),idx_choose,mcc.FPI)
+
+                log_prior_old = CWFastPrior.get_lnprior(samples_current, mcc.FPI)
+                log_prior_new = CWFastPrior.get_lnprior(new_point, mcc.FPI)
+                #backwards/forwards proposal ratio not necessarily 1 (e.g. for distances with non-flat priors)
+                log_proposal_ratio = log_prior_old - log_prior_new
         elif which_jump_type==1:  # do differential evolution step
             de_indices = np.random.choice(mcc.de_history.shape[1], size=2, replace=False)
             ndim = idx_choose.size

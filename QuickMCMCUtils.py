@@ -11,6 +11,8 @@ from numba import njit,prange
 from numba.typed import List
 from numpy.random import uniform
 
+import pickle
+
 import CWFastPrior
 from QuickCorrectionUtils import check_merged,correct_extrinsic,correct_intrinsic
 import const_mcmc as cm
@@ -271,7 +273,8 @@ class ChainParams():
                        de_history_size=10_000, thin_de=1000, log_fishers=False,\
                        savefile=None, thin=100, samples_precision=np.single, save_first_n_chains=1,\
                        prior_draw_prob=0.1, de_prob=0.6, fisher_prob=0.3,\
-                       dist_jump_weight=0.2, rn_jump_weight=0.3, gwb_jump_weight=0.1, common_jump_weight=0.2, all_jump_weight=0.2,
+                       rn_emp_dist_file=None,\
+                       dist_jump_weight=0.2, rn_jump_weight=0.3, gwb_jump_weight=0.1, common_jump_weight=0.2, all_jump_weight=0.2,\
                        fix_rn=False, zero_rn=False, fix_gwb=False, zero_gwb=False):
         assert n_int_block%2==0 and n_int_block>=4  # need to have n_int block>=4 a multiple of 2
         #in order to always do at least n*(1 extrinsic+1 pt swap)+(1 intrinsic+1 pt swaps)
@@ -294,6 +297,7 @@ class ChainParams():
         self.de_history_size = de_history_size
         self.thin_de = thin_de
         self.log_fishers = log_fishers
+        self.rn_emp_dist_file = rn_emp_dist_file
 
         if T_ladder is None:
             #using geometric spacing
@@ -390,6 +394,14 @@ class MCMCChain():
         #assert np.all(FPI.cw_ext_highs==cw_ext_highs)
         print(self.FPI.cw_ext_lows)
         print(self.FPI.cw_ext_highs)
+
+        #read in RN empirical distribution files if provided
+        if self.chain_params.rn_emp_dist_file is not None:
+            print("Reading in RN empirical distributions...")
+            with open(self.chain_params.rn_emp_dist_file, 'rb') as f:
+                self.rn_emp_dist = pickle.load(f)
+        else:
+            self.rn_emp_dist = None
 
         #set up samples array
         t1 = perf_counter()
