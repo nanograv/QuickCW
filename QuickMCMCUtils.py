@@ -176,7 +176,7 @@ def initialize_de_buffer(sample0,n_par_tot,par_names,chain_params,x0_swap,FPI,ei
             de_history[j,i,:] = new_point
     return de_history
 
-def initialize_sample_helper(chain_params,n_par_tot,Npsr,max_toa,par_names,par_names_cw_ext,par_names_cw_int,FPI,pta,noisedict):
+def initialize_sample_helper(chain_params,n_par_tot,Npsr,max_toa,par_names,par_names_cw_ext,par_names_cw_int,FPI,pta,noisedict,rn_emp_dist):
     """initialize starting samples for each chain to a random point"""
     samples = np.zeros((chain_params.n_chain, chain_params.save_every_n+1, n_par_tot))
     for j in range(chain_params.n_chain):
@@ -200,6 +200,10 @@ def initialize_sample_helper(chain_params,n_par_tot,Npsr,max_toa,par_names,par_n
                 if chain_params.zero_rn:
                     print("zero_rn=True --> Setting " + psr + "_red_noise_gamma=0.0")
                     samples[j,0,par_names.index(psr + "_red_noise_gamma")] = 0.0
+                elif rn_emp_dist is not None:
+                    psr_idx = pta.pulsars.index(psr)
+                    samples[j,0,par_names.index(psr + "_red_noise_gamma")] = rn_emp_dist[psr_idx].draw()[1]
+                    print(samples[j,0,par_names.index(psr + "_red_noise_gamma")])
                 elif (psr + "_red_noise_gamma") in noisedict.keys():
                     samples[j,0,par_names.index(psr + "_red_noise_gamma")] = noisedict[psr + "_red_noise_gamma"]
                 else:
@@ -210,6 +214,10 @@ def initialize_sample_helper(chain_params,n_par_tot,Npsr,max_toa,par_names,par_n
                 if chain_params.zero_rn:
                     print("zero_rn=True --> Setting " + psr + "_red_noise_log10_A=-20.0")
                     samples[j,0,par_names.index(psr + "_red_noise_log10_A")] = -20.0
+                elif rn_emp_dist is not None:
+                    psr_idx = pta.pulsars.index(psr)
+                    samples[j,0,par_names.index(psr + "_red_noise_log10_A")] = rn_emp_dist[psr_idx].draw()[0]
+                    print(samples[j,0,par_names.index(psr + "_red_noise_log10_A")])
                 elif (psr + "_red_noise_log10_A") in noisedict.keys():
                     samples[j,0,par_names.index(psr + "_red_noise_log10_A")] = noisedict[psr + "_red_noise_log10_A"]
                 else:
@@ -406,7 +414,7 @@ class MCMCChain():
         #set up samples array
         t1 = perf_counter()
         print("Setting up first sample at %8.3fs..."%(t1-self.ti))
-        self.samples = initialize_sample_helper(self.chain_params,self.n_par_tot,self.Npsr,self.max_toa,self.par_names,self.par_names_cw_ext,self.par_names_cw_int,self.FPI,self.pta,self.noisedict)
+        self.samples = initialize_sample_helper(self.chain_params,self.n_par_tot,self.Npsr,self.max_toa,self.par_names,self.par_names_cw_ext,self.par_names_cw_int,self.FPI,self.pta,self.noisedict, self.rn_emp_dist)
 
 
         print("log_prior="+str(CWFastPrior.get_lnprior(self.samples[0,0,:], self.FPI)))
