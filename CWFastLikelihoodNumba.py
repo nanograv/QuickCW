@@ -124,6 +124,7 @@ class FastLikeMaster:
                     continue
 
                 phiinv_loc,logdetphi_loc = pls_temp[i]
+
                 FLI.phiinvs[i][:] = phiinv_loc
                 if phiinv_loc.ndim == 1:
                     #Sigma_alt = self.TNTs[i]+np.diag(phiinv_loc)

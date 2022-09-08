@@ -32,7 +32,7 @@ n_phase_extra = 16
 n_dist_extra = 4
 n_dist_main = 16
 
-n_noise_main = 10
+n_noise_emp_dist = 1#30#67#1
 
 #indexes of summary variables
 idx_PT = -2

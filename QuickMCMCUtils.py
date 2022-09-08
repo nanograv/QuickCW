@@ -203,7 +203,7 @@ def initialize_sample_helper(chain_params,n_par_tot,Npsr,max_toa,par_names,par_n
                 elif rn_emp_dist is not None:
                     psr_idx = pta.pulsars.index(psr)
                     samples[j,0,par_names.index(psr + "_red_noise_gamma")] = rn_emp_dist[psr_idx].draw()[1]
-                    print(samples[j,0,par_names.index(psr + "_red_noise_gamma")])
+                    #print(samples[j,0,par_names.index(psr + "_red_noise_gamma")])
                 elif (psr + "_red_noise_gamma") in noisedict.keys():
                     samples[j,0,par_names.index(psr + "_red_noise_gamma")] = noisedict[psr + "_red_noise_gamma"]
                 else:
@@ -217,7 +217,7 @@ def initialize_sample_helper(chain_params,n_par_tot,Npsr,max_toa,par_names,par_n
                 elif rn_emp_dist is not None:
                     psr_idx = pta.pulsars.index(psr)
                     samples[j,0,par_names.index(psr + "_red_noise_log10_A")] = rn_emp_dist[psr_idx].draw()[0]
-                    print(samples[j,0,par_names.index(psr + "_red_noise_log10_A")])
+                    #print(samples[j,0,par_names.index(psr + "_red_noise_log10_A")])
                 elif (psr + "_red_noise_log10_A") in noisedict.keys():
                     samples[j,0,par_names.index(psr + "_red_noise_log10_A")] = noisedict[psr + "_red_noise_log10_A"]
                 else:
@@ -547,6 +547,8 @@ class MCMCChain():
         self.itri += 1
 
         if itrn>self.chain_params.save_every_n and np.any(np.diff(self.log_likelihood[:,:itrb+self.n_int_block],axis=1)<-300.):
+            #print(np.diff(self.log_likelihood[:,:itrb+self.n_int_block],axis=1))
+            #print(np.min(np.diff(self.log_likelihood[:,:itrb+self.n_int_block],axis=1)))
             assert False
 
     def update_de_history(self,itrn):

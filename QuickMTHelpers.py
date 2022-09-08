@@ -67,10 +67,8 @@ def do_intrinsic_update_mt(mcc, itrb):
             #scaling = 1.0
             #scaling = 0.5
         elif which_jump==1:  # update per psr RN
-            #n_jump_loc = cm.n_noise_main*2 #2 parameters per pulsar
             recompute_rn = True
             n_jump_loc = 2*Npsr
-            #idx_choose_psr = np.random.randint(0,mcc.x0s[j].Npsr,cm.n_noise_main)
             idx_choose_psr = list(range(Npsr))
             idx_choose = np.concatenate((mcc.x0s[j].idx_rn_gammas,mcc.x0s[j].idx_rn_log10_As))
             scaling = 2.38*np.sqrt(Ts[j])/np.sqrt(n_jump_loc/2)
@@ -123,6 +121,11 @@ def do_intrinsic_update_mt(mcc, itrb):
             if which_jump==1: # updateing RN --> do empirical distribution step
                 new_point = samples_current.copy()
 
+                #overwrite the list of pulsars to update,
+                #because we might want to update fewer pulsars when using empirical distributions
+                #to help acceptence despite the penalty factors
+                idx_choose_psr = np.random.randint(0,mcc.x0s[j].Npsr,cm.n_noise_emp_dist)
+
                 log_proposal_ratio = 0.0
                 for psr_idx in idx_choose_psr:
                     rn_draw = mcc.rn_emp_dist[psr_idx].draw()
@@ -132,6 +135,8 @@ def do_intrinsic_update_mt(mcc, itrb):
                     log_proposal_ratio += mcc.rn_emp_dist[psr_idx].logprob(np.array([samples_current[mcc.x0s[j].idx_rn_log10_As[psr_idx]],
                                                                                      samples_current[mcc.x0s[j].idx_rn_gammas[psr_idx]]]))
                     log_proposal_ratio +=-mcc.rn_emp_dist[psr_idx].logprob(rn_draw)
+                #if j==0: print("RNEmpDist--psr_idx="+str(psr_idx))
+                #if j==0: print("RNEmpDist--log_prop_ratio="+str(log_proposal_ratio))
             
             else: # other parameter --> do actual prior draw
                 new_point = CWFastPrior.get_sample_idxs(samples_current.copy(),idx_choose,mcc.FPI)
@@ -208,8 +213,19 @@ def do_intrinsic_update_mt(mcc, itrb):
 
         #more thorough jump types take precedence
         if recompute_rn or recompute_gwb:  # update per psr RN or GWB
+            mask = None
+            if recompute_rn: #if rn update, set up mask to only update pulsars we need to update
+                mask = np.ones(mcc.x0s[j].Npsr,dtype=np.bool_)
+                mask[idx_choose_psr] = False
+                #print(mask)
+
+            #make sure FLI_swap corresponds to current chain and sample so that we can partially modify it
+            safe_reset_swap(mcc.FLI_swap,mcc.x0s[j],samples_current,FLI_mem_save)
+            for ii in range(mcc.x0s[j].Npsr):
+                mcc.FLI_swap.chol_Sigmas[ii][:] = mcc.FLIs[j].chol_Sigmas[ii]
+            
             mcc.x0s[j].update_params(new_point)
-            mcc.flm.recompute_FastLike(mcc.FLI_swap,mcc.x0s[j],dict(zip(mcc.par_names, new_point)))
+            mcc.flm.recompute_FastLike(mcc.FLI_swap,mcc.x0s[j],dict(zip(mcc.par_names, new_point)), mask=mask)
             mcc.FLI_swap.validate_consistent(mcc.x0s[j])
         elif recompute_int:  # update common intrinsic parameters (chirp mass, frequency, sky location[2])
             mcc.x0s[j].update_params(new_point)
@@ -249,6 +265,15 @@ def do_intrinsic_update_mt(mcc, itrb):
                 log_acc_decide = np.log(uniform(1.e-304, 1.0))
             else:
                 log_acc_decide = 1.
+
+            #if j==0 and which_jump_type==0 and which_jump==1:
+            #    print("RNEmpDist--log_acc_ratio="+str(log_acc_ratio))
+            #    print("RNEmpDist--log_L_current="+str(mcc.log_likelihood[j,itrb]))
+            #    print("RNEmpDist--log_L_choose="+str(log_L_choose))
+            #    print("RNEmpDist--log_L_choose_from_pta="+str(mcc.pta.get_lnlikelihood(sample_choose)))
+            #    print(samples_current)
+            #    print(sample_choose)
+            #    print(sample_choose-samples_current)
 
         if log_acc_decide<=log_acc_ratio:
             #accepted
