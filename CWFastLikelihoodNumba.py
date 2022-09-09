@@ -149,7 +149,10 @@ class FastLikeMaster:
         #set logdet
         FLI.set_resres_logdet(FLI.resres_array,FLI.logdet_array,FLI.logdet_base)
 
-        FLI.update_intrinsic_params(x0)
+        #list of pulsars updated
+        psr_idxs = np.where(~mask)[0]
+    
+        FLI.update_red_noise(x0, psr_idxs)
 
         return FLI#FastLikeInfo(resres,logdet,self.pos,self.pdist,self.toas,invchol_Sigma_TNs,self.Nvecs,self.Nrs,self.max_toa,x0,self.Npsr,self.isqrNvecs,self.residuals)
 
@@ -1044,6 +1047,36 @@ class FastLikeInfo:
         self.log10_fgw = x0.log10_fgw
         self.log10_mc = x0.log10_mc
         self.cw_p_dists = x0.cw_p_dists.copy()
+
+    def update_red_noise(self,x0,psr_idxs):
+        """recalculate MM and NN only for the affected pulsars of red noise update - almost same as update_pulsar_distances but with different asserts and param updates"""
+        resres_temp = self.resres_array.copy()
+
+        update_intrinsic_params2(x0,self.isqNvecs,self.Nrs,self.pos,self.pdist,self.toas, self.NN, self.MMs,self.TNvs,self.chol_Sigmas,psr_idxs,resres_temp,self.dotTNrs)
+
+        self.set_resres_logdet(resres_temp,self.logdet_array,self.logdet_base)
+        #track the intrinsic parameters this was set at so we can throw in error if they are inconsistent with an input x0
+        self.gwb_gamma = x0.gwb_gamma
+        self.gwb_log10_A = x0.gwb_log10_A
+        self.rn_gammas = x0.rn_gammas.copy()
+        self.rn_log10_As = x0.rn_log10_As.copy()
+        self.cos_gwtheta = x0.cos_gwtheta
+        self.gwphi = x0.gwphi
+        self.log10_fgw = x0.log10_fgw
+        self.log10_mc = x0.log10_mc
+        self.cw_p_dists = x0.cw_p_dists.copy()
+
+        #assert self.cos_gwtheta==x0.cos_gwtheta
+        #assert self.gwphi==x0.gwphi
+        #assert self.log10_fgw==x0.log10_fgw
+        #assert self.log10_mc==x0.log10_mc
+        #assert self.gwb_gamma==x0.gwb_gamma
+        #assert self.gwb_log10_A==x0.gwb_log10_A
+        #assert np.all(self.cw_p_dists==x0.cw_p_dists)
+        #
+        #update_intrinsic_params2(x0,self.isqNvecs,self.Nrs,self.pos,self.pdist,self.toas, self.NN, self.MMs,self.TNvs,self.chol_Sigmas,psr_idxs,self.resres_array,self.dotTNrs)
+        #self.rn_gammas[:] = x0.rn_gammas.copy()
+        #self.rn_log10_As[:] = x0.rn_log10_As.copy()
 
     def validate_consistent(self,x0):
         """validate parameters are consistent with input x0"""
