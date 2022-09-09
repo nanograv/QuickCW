@@ -547,8 +547,10 @@ class MCMCChain():
         self.itri += 1
 
         if itrn>self.chain_params.save_every_n and np.any(np.diff(self.log_likelihood[:,:itrb+self.n_int_block],axis=1)<-300.):
-            #print(np.diff(self.log_likelihood[:,:itrb+self.n_int_block],axis=1))
-            #print(np.min(np.diff(self.log_likelihood[:,:itrb+self.n_int_block],axis=1)))
+            print(np.diff(self.log_likelihood[:,:itrb+self.n_int_block],axis=1))
+            print(np.diff(self.log_likelihood[:,:itrb+self.n_int_block],axis=1).shape)
+            print(np.min(np.diff(self.log_likelihood[:,:itrb+self.n_int_block],axis=1)))
+            print(np.where( np.diff(self.log_likelihood[:,:itrb+self.n_int_block],axis=1)<-300. ))
             assert False
 
     def update_de_history(self,itrn):

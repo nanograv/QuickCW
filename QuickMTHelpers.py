@@ -124,7 +124,7 @@ def do_intrinsic_update_mt(mcc, itrb):
                 #overwrite the list of pulsars to update,
                 #because we might want to update fewer pulsars when using empirical distributions
                 #to help acceptence despite the penalty factors
-                idx_choose_psr = np.random.randint(0,mcc.x0s[j].Npsr,cm.n_noise_emp_dist)
+                idx_choose_psr = np.random.choice(Npsr,cm.n_noise_emp_dist,replace=False)
 
                 log_proposal_ratio = 0.0
                 for psr_idx in idx_choose_psr:
@@ -135,8 +135,8 @@ def do_intrinsic_update_mt(mcc, itrb):
                     log_proposal_ratio += mcc.rn_emp_dist[psr_idx].logprob(np.array([samples_current[mcc.x0s[j].idx_rn_log10_As[psr_idx]],
                                                                                      samples_current[mcc.x0s[j].idx_rn_gammas[psr_idx]]]))
                     log_proposal_ratio +=-mcc.rn_emp_dist[psr_idx].logprob(rn_draw)
-                #if j==0: print("RNEmpDist--psr_idx="+str(psr_idx))
-                #if j==0: print("RNEmpDist--log_prop_ratio="+str(log_proposal_ratio))
+                    #if j==0: print("RNEmpDist--psr="+mcc.psrs[psr_idx].name)
+                    #if j==0: print("RNEmpDist--log_prop_ratio="+str(log_proposal_ratio))
             
             else: # other parameter --> do actual prior draw
                 new_point = CWFastPrior.get_sample_idxs(samples_current.copy(),idx_choose,mcc.FPI)
@@ -215,13 +215,13 @@ def do_intrinsic_update_mt(mcc, itrb):
         if recompute_rn or recompute_gwb:  # update per psr RN or GWB
             mask = None
             if recompute_rn: #if rn update, set up mask to only update pulsars we need to update
-                mask = np.ones(mcc.x0s[j].Npsr,dtype=np.bool_)
+                mask = np.ones(Npsr,dtype=np.bool_)
                 mask[idx_choose_psr] = False
                 #print(mask)
 
             #make sure FLI_swap corresponds to current chain and sample so that we can partially modify it
             safe_reset_swap(mcc.FLI_swap,mcc.x0s[j],samples_current,FLI_mem_save)
-            for ii in range(mcc.x0s[j].Npsr):
+            for ii in range(Npsr):
                 mcc.FLI_swap.chol_Sigmas[ii][:] = mcc.FLIs[j].chol_Sigmas[ii]
             
             mcc.x0s[j].update_params(new_point)
@@ -276,6 +276,7 @@ def do_intrinsic_update_mt(mcc, itrb):
             #    print(sample_choose-samples_current)
 
         if log_acc_decide<=log_acc_ratio:
+            #if j==0 and which_jump_type==0 and which_jump==1: print("Accepted")
             #accepted
             mcc.x0s[j].update_params(sample_choose)
 
@@ -304,6 +305,7 @@ def do_intrinsic_update_mt(mcc, itrb):
             mcc.a_yes[6*which_jump+2*which_jump_type+1,j] += 1
             #print('1',mcc.FLIs[j].get_lnlikelihood(mcc.x0s[j]))
         else:
+            #if j==0 and which_jump_type==0 and which_jump==1: print("Rejected")
             #rejected
             mcc.samples[j,itrb+1,:] = samples_current
 
