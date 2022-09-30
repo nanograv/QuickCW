@@ -104,19 +104,37 @@ def do_intrinsic_update_mt(mcc, itrb):
             raise ValueError('jump index unrecognized',which_jump)
 
         #decide what kind of jump we do
-        if (recompute_rn and mcc.rn_emp_dist is None) or recompute_gwb:  # RN or GWB jump --> don't do prior draws, only fisher and DE
-            total_type_weight = mcc.chain_params.de_prob + mcc.chain_params.fisher_prob
-            which_jump_type = np.random.choice(3, p=[0.,
-                                                 mcc.chain_params.de_prob/total_type_weight,
-                                                 mcc.chain_params.fisher_prob/total_type_weight])
-        else:
-            if j==(mcc.n_chain-1):  # hottest chain and not RN --> only do prior draws
-                which_jump_type = 0
-            else:  # not hottest chain and not RN --> choose jump type based in default probabilities of them
-                total_type_weight = mcc.chain_params.prior_draw_prob + mcc.chain_params.de_prob + mcc.chain_params.fisher_prob
-                which_jump_type = np.random.choice(3, p=[mcc.chain_params.prior_draw_prob/total_type_weight,
-                                                         mcc.chain_params.de_prob/total_type_weight,
-                                                         mcc.chain_params.fisher_prob/total_type_weight])
+        if recompute_rn:
+            if mcc.rn_emp_dist is None:  # RN jump w/o emp dist --> only do fisher
+                prior_draw_prob = 0
+                de_prob = 0
+                fisher_prob = mcc.chain_params.fisher_prob
+            else: # RN jump w/ emp dist --> do fisher and emp dist (called prior here)
+                prior_draw_prob = mcc.chain_params.prior_draw_prob
+                de_prob = 0
+                fisher_prob = mcc.chain_params.fisher_prob
+        elif recompute_gwb: # GWB --> do fisher and DE
+            prior_draw_prob = 0
+            de_prob = mcc.chain_params.de_prob
+            fisher_prob = mcc.chain_params.fisher_prob
+        elif j==(mcc.n_chain-1): #distance of common parameters and hottest chain --> only do prior draws
+            prior_draw_prob = mcc.chain_params.prior_draw_prob
+            de_prob = 0
+            fisher_prob = 0
+        elif which_jump!=3: #distance jump --> do prior draws and fisher
+            prior_draw_prob = mcc.chain_params.prior_draw_prob
+            de_prob = 0
+            fisher_prob = mcc.chain_params.fisher_prob
+        else: #common jump --> do everything
+            prior_draw_prob = mcc.chain_params.prior_draw_prob
+            de_prob = mcc.chain_params.de_prob
+            fisher_prob = mcc.chain_params.fisher_prob
+
+        total_type_weight = prior_draw_prob + de_prob + fisher_prob
+        which_jump_type = np.random.choice(3, p=[prior_draw_prob/total_type_weight,
+                                                 de_prob/total_type_weight,
+                                                 fisher_prob/total_type_weight])
+
         if which_jump_type==0:  # do prior draw (or empirical distribution in case of RN)
             if which_jump==1: # updateing RN --> do empirical distribution step
                 new_point = samples_current.copy()
