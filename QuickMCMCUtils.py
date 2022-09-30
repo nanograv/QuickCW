@@ -546,11 +546,13 @@ class MCMCChain():
         self.best_logL = max(self.best_logL,np.max(self.log_likelihood[0,:]))
         self.itri += 1
 
-        if itrn>self.chain_params.save_every_n and np.any(np.diff(self.log_likelihood[:,:itrb+self.n_int_block],axis=1)<-300.):
-            print(np.diff(self.log_likelihood[:,:itrb+self.n_int_block],axis=1))
-            print(np.diff(self.log_likelihood[:,:itrb+self.n_int_block],axis=1).shape)
-            print(np.min(np.diff(self.log_likelihood[:,:itrb+self.n_int_block],axis=1)))
-            print(np.where( np.diff(self.log_likelihood[:,:itrb+self.n_int_block],axis=1)<-300. ))
+        #check that there are no large decreases in log likelihood
+        #if itrn>self.chain_params.save_every_n and np.any(np.diff(self.log_likelihood[:,:itrb+self.n_int_block],axis=1)<-300.):
+        if itrn>self.chain_params.save_every_n and np.any(np.diff(self.log_likelihood[:,:itrb+self.n_int_block],axis=1)[:,::2].T<-300.*self.chain_params.Ts):    
+            print(np.diff(self.log_likelihood[:,:itrb+self.n_int_block],axis=1)[:,::2].T)
+            print(np.diff(self.log_likelihood[:,:itrb+self.n_int_block],axis=1)[:,::2].T.shape)
+            print(np.min(np.diff(self.log_likelihood[:,:itrb+self.n_int_block],axis=1)[:,::2].T))
+            print(np.where( np.diff(self.log_likelihood[:,:itrb+self.n_int_block],axis=1)[:,::2].T<-300.*self.chain_params.Ts ))
             assert False
 
     def update_de_history(self,itrn):
