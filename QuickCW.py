@@ -36,7 +36,7 @@ from QuickMCMCUtils import MCMCChain
 #
 ################################################################################
 #@profile
-def QuickCW(chain_params, psrs, noise_json=None, use_legacy_equad=False, amplitude_prior='UL'):
+def QuickCW(chain_params, psrs, noise_json=None, use_legacy_equad=False, include_ecorr=True, amplitude_prior='UL'):
     """Set up all essential objects for QuickCW to do MCMC iterations"""
     print("Began Main Loop")
 
@@ -62,8 +62,9 @@ def QuickCW(chain_params, psrs, noise_json=None, use_legacy_equad=False, amplitu
         efq = white_signals.MeasurementNoise(efac=efac, log10_t2equad=equad, selection=selection)
     #ec = white_signals.EcorrKernelNoise(log10_ecorr=ecorr, selection=selection)
     #ec = gp_signals.EcorrBasisModel(log10_ecorr=ecorr, selection=selection)
-    #give ecorr a name so that we can use the usual noisefiles created for Kernel ecorr
-    ec = gp_signals.EcorrBasisModel(log10_ecorr=ecorr, selection=selection, name='')
+    if include_ecorr:
+        #give ecorr a name so that we can use the usual noisefiles created for Kernel ecorr
+        ec = gp_signals.EcorrBasisModel(log10_ecorr=ecorr, selection=selection, name='')
 
     log10_A = parameter.Uniform(-20, -11)
     #log10_A = parameter.Uniform(-18, -11)
@@ -113,10 +114,16 @@ def QuickCW(chain_params, psrs, noise_json=None, use_legacy_equad=False, amplitu
 
     tm = gp_signals.TimingModel()
 
-    if use_legacy_equad:
-        s = ef + eq + ec + rn + crn + cw + tm
+    if include_ecorr:
+        if use_legacy_equad:
+            s = ef + eq + ec + rn + crn + cw + tm
+        else:
+            s = efq     + ec + rn + crn + cw + tm
     else:
-        s = efq +     ec + rn + crn + cw + tm
+        if use_legacy_equad:
+            s = ef + eq      + rn + crn + cw + tm
+        else:
+            s = efq          + rn + crn + cw + tm
 
     models = [s(psr) for psr in psrs]
 
