@@ -5,12 +5,11 @@ import numpy as np
 from numba import njit,prange
 from numpy.random import uniform
 
-import CWFastPrior
-import const_mcmc as cm
-from QuickCorrectionUtils import check_merged,correct_intrinsic,correct_extrinsic_array
-from QuickFisherHelpers import safe_reset_swap,get_FLI_mem
+import QuickCW.CWFastPrior
+import QuickCW.const_mcmc as cm
+from QuickCW.QuickCorrectionUtils import check_merged,correct_intrinsic,correct_extrinsic_array
+from QuickCW.QuickFisherHelpers import safe_reset_swap,get_FLI_mem
 from time import perf_counter
-
 
 ################################################################################
 #

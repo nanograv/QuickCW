@@ -27,8 +27,8 @@ from enterprise.signals import gp_signals
 
 from enterprise_extensions import deterministic
 
-import const_mcmc as cm
-from QuickMCMCUtils import MCMCChain
+import QuickCW.const_mcmc as cm
+from QuickCW.QuickMCMCUtils import MCMCChain
 
 ################################################################################
 #

@@ -39,15 +39,15 @@ from enterprise_extensions import deterministic
 
 import h5py
 
-import CWFastLikelihoodNumba
-import CWFastPrior
-import const_mcmc as cm
+import QuickCW.CWFastLikelihoodNumba
+import QuickCW.CWFastPrior
+import QuickCW.const_mcmc as cm
 
 import glob
 import json
 
-from QuickCW import do_intrinsic_update,do_extrinsic_block,FastPriorInfo,do_pt_swap,do_pt_swap_alt,summarize_a_ext,reflect_cosines,get_fisher_diagonal
-import CWFastLikelihoodNumba
+from QuickCW.QuickCW import do_intrinsic_update,do_extrinsic_block,FastPriorInfo,do_pt_swap,do_pt_swap_alt,summarize_a_ext,reflect_cosines,get_fisher_diagonal
+import QuickCW.CWFastLikelihoodNumba
 
 eps = {'0_cos_gwtheta':1.e-4,'0_cos_inc':1.e-4,'0_gwphi':1.e-4,'0_log10_fgw':1.e-5,'0_log10_h':1.e-5,'0_log10_mc':1.e-4,'0_phase0':1.e-4,'0_psi':1.e-4}
 ################################################################################

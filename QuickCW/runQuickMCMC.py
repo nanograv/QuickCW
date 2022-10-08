@@ -25,8 +25,8 @@ from enterprise_extensions import deterministic
 #import glob
 #import json
 
-import QuickCW
-from QuickMCMCUtils import ChainParams
+import QuickCW.QuickCW
+from QuickCW.QuickMCMCUtils import ChainParams
 #import CWFastLikelihoodNumba
 
 #make sure this points to the pickled pulsars you want to analyze

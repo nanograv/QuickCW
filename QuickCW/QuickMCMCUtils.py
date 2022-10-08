@@ -13,13 +13,13 @@ from numpy.random import uniform
 
 import pickle
 
-import CWFastPrior
-from QuickCorrectionUtils import check_merged,correct_extrinsic,correct_intrinsic
-import const_mcmc as cm
-import CWFastLikelihoodNumba
-from QuickFisherHelpers import get_fishers
-from QuickMTHelpers import do_intrinsic_update_mt,add_rn_eig_jump
-from OutputUtils import print_acceptance_progress,output_hdf5_loop,output_hdf5_end
+import QuickCW.CWFastPrior
+from QuickCW.QuickCorrectionUtils import check_merged,correct_extrinsic,correct_intrinsic
+import QuickCW.const_mcmc as cm
+import QuickCW.CWFastLikelihoodNumba
+from QuickCW.QuickFisherHelpers import get_fishers
+from QuickCW.QuickMTHelpers import do_intrinsic_update_mt,add_rn_eig_jump
+from QuickCW.OutputUtils import print_acceptance_progress,output_hdf5_loop,output_hdf5_end
 
 ################################################################################
 #

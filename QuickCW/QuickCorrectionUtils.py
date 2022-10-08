@@ -3,7 +3,7 @@ MCMC for CW fast likelihood (w/ Neil Cornish and Matthew Digman)
 utils for correcting parameters to nominal ranges"""
 import numpy as np
 from numba import njit
-import const_mcmc as cm
+import QuickCW.const_mcmc as cm
 import enterprise.constants as const
 
 @njit()
