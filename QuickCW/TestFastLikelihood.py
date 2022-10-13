@@ -35,7 +35,7 @@ import glob
 import json
 import time
 
-import QuickCW.CWFastLikelihoodNumba
+import QuickCW.CWFastLikelihoodNumba as CWFastLikelihoodNumba
 import QuickCW.const_mcmc as cm
 #####################################################################
 #
