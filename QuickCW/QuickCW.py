@@ -28,7 +28,7 @@ from enterprise.signals import gp_signals
 from enterprise_extensions import deterministic
 
 import QuickCW.const_mcmc as cm
-from QuickCW.QuickMCMCUtils import MCMCChain
+from QuickCW.QuickMCMCUtils import MCMCChain, ChainParams
 
 ################################################################################
 #
@@ -36,7 +36,11 @@ from QuickCW.QuickMCMCUtils import MCMCChain
 #
 ################################################################################
 #@profile
-def QuickCW(chain_params, psrs, noise_json=None, use_legacy_equad=False, include_ecorr=True, amplitude_prior='UL',gwb_gamma_prior=None):
+def QuickCW(chain_params: ChainParams, psrs:list, noise_json:str=None,
+            use_legacy_equad: bool=False, include_ecorr:bool=True,
+            amplitude_prior:str='UL',
+            gwb_gamma_prior:str=None,
+            return_only_pta:bool=False):
     """Set up all essential objects for QuickCW to do MCMC iterations"""
     print("Began Main Loop")
 
@@ -159,5 +163,6 @@ def QuickCW(chain_params, psrs, noise_json=None, use_legacy_equad=False, include
     #
     ##############################################################################
     mcc = MCMCChain(chain_params,psrs,pta,max_toa,noisedict,ti)
-
+    if return_only_pta:
+        return pta
     return pta,mcc

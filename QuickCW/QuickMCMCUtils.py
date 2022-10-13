@@ -44,7 +44,7 @@ def do_extrinsic_block(n_chain, samples, itrb, Ts, x0s, FLIs, FPI, n_par_tot, lo
     #    if Ts[j]>cm.proj_phase_saturate_temp:
     #        saturate_count[j] = x0s[j].Npsr-1
 
-    
+
 
     #for j in range(0,n_chain):
     #    for ii,idx in enumerate(x0s[j].idx_phases):
@@ -370,20 +370,25 @@ def get_param_names(pta):
 
 class ChainParams():
     """store basic parameters the govern the evolution of the mcmc chain"""
-    def __init__(self, T_max, n_chain, n_block_status_update, n_int_block=1000, n_update_fisher=100_000,\
-                       save_every_n=10_000, fisher_eig_downsample=10, T_ladder=None,\
-                       includeCW=True, prior_recovery=False, verbosity=1,\
-                       freq_bounds=np.array([np.nan, 1e-7], dtype=np.float64), gwb_comps=14,\
-                       de_history_size=5_000, thin_de=10_000, log_fishers=False,log_mean_likelihoods=True,\
-                       savefile=None, thin=100, samples_precision=np.single, save_first_n_chains=1,\
-                       prior_draw_prob=0.1, de_prob=0.6, fisher_prob=0.3,\
-                       rn_emp_dist_file=None,\
-                       dist_jump_weight=0.2, rn_jump_weight=0.3, gwb_jump_weight=0.1, common_jump_weight=0.2, all_jump_weight=0.2,\
-                       fix_rn=False, zero_rn=False, fix_gwb=False, zero_gwb=False):
-        assert n_int_block%2==0 and n_int_block>=4  # need to have n_int block>=4 a multiple of 2
-        #in order to always do at least n*(1 extrinsic+1 pt swap)+(1 intrinsic+1 pt swaps)
-        assert save_every_n%n_int_block == 0  # or we won't save
-        assert n_update_fisher%n_int_block == 0  # or we won't update fisher
+
+    def __init__(self, T_max: float, n_chain: int, n_block_status_update: int, n_int_block: int = 1000,
+                 n_update_fisher: int = 100_000, save_every_n: int = 10_000,
+                 fisher_eig_downsample: int = 10, T_ladder: list = None,
+                 includeCW: bool = True, prior_recovery: bool = False, verbosity: int = 1,
+                 freq_bounds: np.ndarray = np.array([np.nan, 1e-7], dtype=np.float64), gwb_comps: int = 14,
+                 de_history_size: int = 5_000, thin_de: int = 10_000, log_fishers: bool = False,
+                 savefile: str = None, thin: int = 100, samples_precision: type = np.single,
+                 save_first_n_chains: int = 1,
+                 prior_draw_prob: float = 0.1, de_prob: float = 0.6, fisher_prob: float = 0.3,
+                 rn_emp_dist_file: str = None,
+                 dist_jump_weight: float = 0.2, rn_jump_weight: float = 0.3, gwb_jump_weight: float = 0.1,
+                 common_jump_weight: float = 0.2,
+                 all_jump_weight: float = 0.2,
+                 fix_rn: bool = False, zero_rn: bool = False, fix_gwb: bool = False, zero_gwb: bool = False):
+        assert n_int_block % 2 == 0 and n_int_block >= 4  # need to have n_int block>=4 a multiple of 2
+        # in order to always do at least n*(1 extrinsic+1 pt swap)+(1 intrinsic+1 pt swaps)
+        assert save_every_n % n_int_block == 0  # or we won't save
+        assert n_update_fisher % n_int_block == 0  # or we won't update fisher
         self.n_chain = n_chain
         self.n_int_block = n_int_block
         self.n_update_fisher = n_update_fisher
