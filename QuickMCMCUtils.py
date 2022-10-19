@@ -37,11 +37,26 @@ from OutputUtils import print_acceptance_progress,output_hdf5_loop,output_hdf5_e
 def do_extrinsic_block(n_chain, samples, itrb, Ts, x0s, FLIs, FPI, n_par_tot, log_likelihood, n_int_block, fisher_diag, a_yes, a_no):
     """do blocks of just the extrinsic parameters, which should be very fast"""
     n_par_ext = x0s[0].idx_cw_ext.size
+
+    #treat all phases where fisher is saturated as 1 parameter for counting purposes in jump scaling
+    saturate_count = np.zeros(n_chain,dtype=np.int64)
+    for j in range(0,n_chain):
+        for ii,idx in enumerate(x0s[j].idx_phases):
+            if np.sqrt(Ts[j])*fisher_diag[j][idx]>=cm.sigma_cw0_p_phase_default:
+                saturate_count[j] += 1
+        #allow one saturated parameter without reducing jump size
+        if saturate_count[j] > 1:
+            saturate_count[j] -= 1
+
+    jump_scale_use = np.zeros(n_chain)
+    for j in range(n_chain):
+        jump_scale_use[j] = 2.38/np.sqrt(n_par_ext-saturate_count[j])*np.sqrt(Ts[j])
+
     for k in range(0,n_int_block,2):
         for j in prange(0,n_chain):
             samples_current = samples[j,itrb+k,:]
 
-            if k%10==0:  # every 10th k (so every 5th jump) do a prior draw
+            if k%10==0 or j==n_chain-1:  # every 10th k (so every 5th jump) do a prior draw
                 new_point = np.copy(samples_current)
                 jump_idx = x0s[j].idx_cw_ext
                 for ii, idx in enumerate(jump_idx):
@@ -49,7 +64,7 @@ def do_extrinsic_block(n_chain, samples, itrb, Ts, x0s, FLIs, FPI, n_par_tot, lo
             else:
                 jump = np.zeros(n_par_tot)
                 jump_idx = x0s[j].idx_cw_ext
-                jump[jump_idx] = 2.38/np.sqrt(n_par_ext)*np.sqrt(Ts[j])*fisher_diag[j][jump_idx]*np.random.normal(0.,1.,n_par_ext)
+                jump[jump_idx] = jump_scale_use[j]*fisher_diag[j][jump_idx]*np.random.normal(0.,1.,n_par_ext)
                 new_point = samples_current + jump
 
             new_point = correct_extrinsic(new_point,x0s[j])

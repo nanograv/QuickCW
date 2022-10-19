@@ -9,6 +9,7 @@ import CWFastPrior
 import const_mcmc as cm
 from QuickCorrectionUtils import check_merged,correct_intrinsic,correct_extrinsic_array
 from QuickFisherHelpers import safe_reset_swap,get_FLI_mem
+from time import perf_counter
 
 
 ################################################################################
@@ -57,6 +58,8 @@ def do_intrinsic_update_mt(mcc, itrb):
         recompute_dist = False
         all_eigs = False
 
+        fail_point = False
+
         if which_jump==0:  # update psr distances
             recompute_dist = True
             n_jump_loc = cm.n_dist_main
@@ -104,7 +107,7 @@ def do_intrinsic_update_mt(mcc, itrb):
             raise ValueError('jump index unrecognized',which_jump)
 
         #decide what kind of jump we do
-        if recompute_rn:
+        if recompute_rn and not recompute_gwb:
             if mcc.rn_emp_dist is None:  # RN jump w/o emp dist --> only do fisher
                 prior_draw_prob = 0
                 de_prob = 0
@@ -113,10 +116,20 @@ def do_intrinsic_update_mt(mcc, itrb):
                 prior_draw_prob = mcc.chain_params.prior_draw_prob
                 de_prob = 0
                 fisher_prob = mcc.chain_params.fisher_prob
-        elif recompute_gwb: # GWB --> do fisher and DE
+        elif recompute_gwb and not recompute_rn: # GWB --> do fisher and DE
             prior_draw_prob = 0
-            de_prob = mcc.chain_params.de_prob
+            if j==(mcc.n_chain-1): #never do DE on hottest chain
+                de_prob = 0.
+            else:
+                de_prob = mcc.chain_params.de_prob
             fisher_prob = mcc.chain_params.fisher_prob
+        elif recompute_gwb and recompute_rn: #all --> do fisher and de only
+                prior_draw_prob = 0#mcc.chain_params.prior_draw_prob
+                if j==(mcc.n_chain-1): #never do DE on hottest chain
+                    de_prob = 0.
+                else:
+                    de_prob = mcc.chain_params.de_prob
+                fisher_prob = mcc.chain_params.fisher_prob
         elif j==(mcc.n_chain-1): #distance of common parameters and hottest chain --> only do prior draws
             prior_draw_prob = mcc.chain_params.prior_draw_prob
             de_prob = 0
@@ -130,10 +143,32 @@ def do_intrinsic_update_mt(mcc, itrb):
             de_prob = mcc.chain_params.de_prob
             fisher_prob = mcc.chain_params.fisher_prob
 
+
         total_type_weight = prior_draw_prob + de_prob + fisher_prob
         which_jump_type = np.random.choice(3, p=[prior_draw_prob/total_type_weight,
                                                  de_prob/total_type_weight,
                                                  fisher_prob/total_type_weight])
+
+        if which_jump_type==1 and which_jump==4:
+            #force 'all' differential evolution jumps to be in both gwb and common parameters only
+            idx_choose = np.concatenate((mcc.x0s[j].idx_cw_int[:4],[mcc.x0s[j].idx_gwb_gamma, mcc.x0s[j].idx_gwb_log10_A]))
+            n_jump_loc = 6
+            scaling = 2.38*np.sqrt(Ts[j])/np.sqrt(n_jump_loc)
+            idx_choose_psr = []
+            recompute_int = True
+            recompute_gwb = True
+            recompute_rn = False
+            recompute_dist = False
+            all_eigs = False
+
+
+        if which_jump==0 and which_jump_type==0:
+            #prior draws in distance should scale up number of dimensions with temperature
+            n_dist_loc = min(Npsr,np.int64(cm.n_dist_main*mcc.chain_params.Ts[j]))
+            idx_choose_psr = np.random.choice(Npsr,n_dist_loc,replace=False)
+            idx_choose = mcc.x0s[j].idx_dists[idx_choose_psr]
+
+
 
         if which_jump_type==0:  # do prior draw (or empirical distribution in case of RN)
             if which_jump==1: # updateing RN --> do empirical distribution step
@@ -181,7 +216,7 @@ def do_intrinsic_update_mt(mcc, itrb):
             log_proposal_ratio = 0.0
 
             big_jump_decide = np.random.uniform(0.0, 1.0)
-            if big_jump_decide<0.1: #do big jump
+            if big_jump_decide<0.5: #do big jump
                 #new_point[idx_choose] += (1+alpha)*(x1-x2)
                 #TODO does this actually need to be scaled by a random amount?
                 new_point[idx_choose] += (x1-x2)
@@ -243,7 +278,38 @@ def do_intrinsic_update_mt(mcc, itrb):
                 mcc.FLI_swap.chol_Sigmas[ii][:] = mcc.FLIs[j].chol_Sigmas[ii]
             
             mcc.x0s[j].update_params(new_point)
-            mcc.flm.recompute_FastLike(mcc.FLI_swap,mcc.x0s[j],dict(zip(mcc.par_names, new_point)), mask=mask)
+            try:
+                mcc.flm.recompute_FastLike(mcc.FLI_swap,mcc.x0s[j],dict(zip(mcc.par_names, new_point)), mask=mask)
+            except np.linalg.LinAlgError:
+                print("failed to update parameters to requested point, rejecting proposal")
+                print("jump selections: ",which_jump,which_jump_type)
+                print("idx choose",idx_choose)
+                print("log proposal ratio",log_proposal_ratio)
+
+                if which_jump_type==1:
+                    print("de jump selections: ",de_indices,big_jump_decide,alpha0,alpha)
+                    print("de point 1",x1)
+                    print("de point 2",x2)
+                elif which_jump_type==2:
+                    print("fisher jump selections",jump)
+
+                t_err = perf_counter()
+                old_file = "err_state_old_"+str(t_err)+".npy"
+                new_file = "err_state_new_"+str(t_err)+".npy"
+                print("failure point:",new_point)
+                print("failure point output to:",new_file)
+                print("old point:",samples_current)
+                print("old point output to:",old_file)
+                np.save(new_file,new_point)
+                np.save(old_file,samples_current)
+                print("attempting recovery to old point")
+                mcc.x0s[j].update_params(samples_current)
+                safe_reset_swap(mcc.FLI_swap,mcc.x0s[j],samples_current,FLI_mem_save)
+                for ii in range(Npsr):
+                    mcc.FLI_swap.chol_Sigmas[ii][:] = mcc.FLIs[j].chol_Sigmas[ii]
+
+                fail_point = True
+
             mcc.FLI_swap.validate_consistent(mcc.x0s[j])
         elif recompute_int:  # update common intrinsic parameters (chirp mass, frequency, sky location[2])
             mcc.x0s[j].update_params(new_point)
@@ -264,7 +330,17 @@ def do_intrinsic_update_mt(mcc, itrb):
         #mc = 10.0**mcc.x0s[j].log10_mc# * const.Tsun
 
         #check the maximum toa is not such that the source has already merged, and if so automatically reject the proposal
-        if check_merged(mcc.x0s[j].log10_fgw,mcc.x0s[j].log10_mc,mcc.FLIs[j].max_toa):
+        if fail_point:
+            log_acc_ratio = -np.inf
+            log_acc_decide = 1.
+            log_L_choose = -np.inf
+            chosen_trial = -1
+            print("Rejected due to error in point")
+            mcc.x0s[j].update_params(samples_current)
+            safe_reset_swap(mcc.FLIs[j],mcc.x0s[j],samples_current,FLI_mem_save)
+            mcc.x0s[j].validate_consistent(samples_current)
+            mcc.FLIs[j].validate_consistent(mcc.x0s[j]) 
+        elif check_merged(mcc.x0s[j].log10_fgw,mcc.x0s[j].log10_mc,mcc.FLIs[j].max_toa):
             #set these so that the step is rejected
             #acc_ratio = -1
             #acc_decide = 0.
@@ -352,6 +428,10 @@ def do_intrinsic_update_mt(mcc, itrb):
         mcc.FLIs[j].validate_consistent(mcc.x0s[j])
         mcc.x0s[j].validate_consistent(mcc.samples[j,itrb+1,:])
         assert mcc.FLIs[j].get_lnlikelihood(mcc.x0s[j]) == mcc.log_likelihood[j,itrb+1]
+
+    if fail_point:
+        #something went wrong so do maximum thoroughness test of self consistency
+        mcc.validate_consistent(itrb+1,full_validate=True)
 
     return mcc.FLI_swap
 
