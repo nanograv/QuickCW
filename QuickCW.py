@@ -36,7 +36,7 @@ from QuickMCMCUtils import MCMCChain
 #
 ################################################################################
 #@profile
-def QuickCW(chain_params, psrs, noise_json=None, use_legacy_equad=False, include_ecorr=True, amplitude_prior='UL'):
+def QuickCW(chain_params, psrs, noise_json=None, use_legacy_equad=False, include_ecorr=True, amplitude_prior='UL',gwb_gamma_prior=None):
     """Set up all essential objects for QuickCW to do MCMC iterations"""
     print("Began Main Loop")
 
@@ -108,7 +108,11 @@ def QuickCW(chain_params, psrs, noise_json=None, use_legacy_equad=False, include
     cw = deterministic.CWSignal(cw_wf, psrTerm=True, name='cw0')
 
     log10_Agw = parameter.Uniform(-20,-11)('gwb_log10_A')
-    gamma_gw = parameter.Uniform(0,7)('gwb_gamma')
+
+    if gwb_gamma_prior is None:
+        gwb_gamma_prior = np.array([0,7])
+
+    gamma_gw = parameter.Uniform(gwb_gamma_prior[0],gwb_gamma_prior[1])('gwb_gamma')
     cpl = utils.powerlaw(log10_A=log10_Agw, gamma=gamma_gw)
     crn = gp_signals.FourierBasisGP(cpl, components=chain_params.gwb_comps, Tspan=Tspan, name='gw')
 

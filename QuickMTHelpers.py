@@ -59,34 +59,62 @@ def do_intrinsic_update_mt(mcc, itrb):
         all_eigs = False
 
         fail_point = False
+        merged_point = False
+
+        if which_jump == 2 and mcc.chain_params.do_gwb_common_override_switch and Ts[j]>mcc.chain_params.gwb_common_override_switch_temp:
+            #above a certain temperature switch from jumping in the 2d subspace of gwb common to the 6d subspace of all common
+            which_jump = 3
+
+        if which_jump == 0 and mcc.chain_params.do_dist_all_override_switch and Ts[j]>mcc.chain_params.dist_all_override_switch_temp:
+            #above a certain temperature switch from jumping in distance to everything
+            which_jump = 4
 
         if which_jump==0:  # update psr distances
             recompute_dist = True
-            n_jump_loc = cm.n_dist_main
-            idx_choose_psr = np.random.choice(Npsr,cm.n_dist_main,replace=False)
+            n_dist_loc = min(Npsr,mcc.chain_params.n_dist_main)#max(1,np.int64(cm.n_dist_main*mcc.chain_params.Ts[j])))
+            idx_choose_psr_dist = np.random.choice(Npsr,n_dist_loc,replace=False)
+            n_jump_loc = n_dist_loc
             #idx_choose_psr[0] = pta.pulsars.index(par_names_cw_int[jump_select][:-11])
-            idx_choose = mcc.x0s[j].idx_dists[idx_choose_psr]
+            idx_choose = mcc.x0s[j].idx_dists[idx_choose_psr_dist]
             scaling = 2.38*np.sqrt(Ts[j])/np.sqrt(n_jump_loc)
             #scaling = 1.0
             #scaling = 0.5
         elif which_jump==1:  # update per psr RN
             recompute_rn = True
+            all_eigs = True
             n_jump_loc = 2*Npsr
             idx_choose_psr = list(range(Npsr))
+            idx_choose_psr_dist = idx_choose_psr
             idx_choose = np.concatenate((mcc.x0s[j].idx_rn_gammas,mcc.x0s[j].idx_rn_log10_As))
-            scaling = 2.38*np.sqrt(Ts[j])/np.sqrt(n_jump_loc/2)
+            scaling = 2.38*np.sqrt(Ts[j])/np.sqrt(n_jump_loc)
             #scaling = 1/np.sqrt(n_jump_loc)
         elif which_jump==2:  # update common RN
             recompute_gwb = True
             n_jump_loc = 2
             idx_choose = np.array([mcc.x0s[j].idx_gwb_gamma, mcc.x0s[j].idx_gwb_log10_A])
+            idx_choose_psr_dist = list(range(Npsr)) #all pulsars need to be updated in everything here
             scaling = 2.38*np.sqrt(Ts[j])/np.sqrt(n_jump_loc/2)
             #scaling = 1/np.sqrt(n_jump_loc)
         elif which_jump==3:  # update common intrinsic parameters (chirp mass, frequency, sky location[2])
             recompute_int = True
-            n_jump_loc = 4 #  2+cm.n_dist_extra
-            idx_choose = mcc.x0s[j].idx_cw_int[:4]  # np.array([par_names.index(par_names_cw_int[itrk]) for itrk in range(4)])
-            scaling = 2.38*np.sqrt(Ts[j])/np.sqrt(n_jump_loc)
+            if mcc.chain_params.do_common_def_switch and Ts[j]>mcc.chain_params.common_def_switch_temp:
+                #switch to also jumping in gwb parameters above a certain temperature
+                #because otherwise acceptances can get too high
+                recompute_gwb = True
+                n_jump_loc = 6
+                idx_choose = np.concatenate((mcc.x0s[j].idx_cw_int[:4],mcc.x0s[j].idx_gwb))
+            else:
+                n_jump_loc = 4 #  2+mcc.chain_params.ndist_extra
+                idx_choose = mcc.x0s[j].idx_cw_int[:4]  # np.array([par_names.index(par_names_cw_int[itrk]) for itrk in range(4)])
+
+            #don't count parameters where jump sizes are probably saturated for the purposes of determining the appropriate jump sizing
+            saturated_idxs = np.sum((2.38*np.sqrt(Ts[j])*mcc.fisher_diag[j][idx_choose])>0.5)
+            if saturated_idxs==n_jump_loc:
+                saturated_idxs = n_jump_loc-1
+
+            scaling = 2.38*np.sqrt(Ts[j])/np.sqrt(n_jump_loc-saturated_idxs)
+            idx_choose_psr_dist = list(range(Npsr)) #all pulsars need to be updated in everything here
+            all_eigs = True
             #scaling = 1.0
             #scaling = 0.5
         elif which_jump==4: # do every possible jump
@@ -96,12 +124,21 @@ def do_intrinsic_update_mt(mcc, itrb):
             recompute_int = True
             recompute_dist = True
             all_eigs = True
-            n_jump_loc = cm.n_dist_main+2*Npsr+4+2 #distance+RN+common_pars+crn
+            n_dist_loc = min(Npsr,mcc.chain_params.n_dist_main)#max(1,np.int64(cm.n_dist_main*mcc.chain_params.Ts[j])))
+            idx_choose_psr_dist = np.random.choice(Npsr,n_dist_loc,replace=False)
             idx_choose_psr = list(range(Npsr))
+            #if (cm.do_dist_prior_switch and Ts[j]>cm.dist_prior_switch_temp):
+                #if high enough temperature, don't include distance jump in fishers, just let it use prior draw for those instead
+            n_jump_loc = 2*Npsr+4+2 #distance+RN+common_pars+crn
             idx_choose = np.concatenate((mcc.x0s[j].idx_cw_int[:4],
-                                         mcc.x0s[j].idx_dists[idx_choose_psr],
                                          mcc.x0s[j].idx_rn_gammas, mcc.x0s[j].idx_rn_log10_As,
                                          [mcc.x0s[j].idx_gwb_gamma, mcc.x0s[j].idx_gwb_log10_A]))
+            #else:
+            #    n_jump_loc = n_dist_loc+2*Npsr+4+2 #distance+RN+common_pars+crn
+            #    idx_choose = np.concatenate((mcc.x0s[j].idx_cw_int[:4],
+            #                                 mcc.x0s[j].idx_dists[idx_choose_psr_dist],
+            #                                 mcc.x0s[j].idx_rn_gammas, mcc.x0s[j].idx_rn_log10_As,
+            #                                 [mcc.x0s[j].idx_gwb_gamma, mcc.x0s[j].idx_gwb_log10_A]))
             scaling = 2.38*np.sqrt(Ts[j])/np.sqrt(n_jump_loc)
         else:
             raise ValueError('jump index unrecognized',which_jump)
@@ -116,26 +153,26 @@ def do_intrinsic_update_mt(mcc, itrb):
                 prior_draw_prob = mcc.chain_params.prior_draw_prob
                 de_prob = 0
                 fisher_prob = mcc.chain_params.fisher_prob
-        elif recompute_gwb and not recompute_rn: # GWB --> do fisher and DE
+        elif recompute_gwb and not recompute_rn and not recompute_int: # GWB --> do fisher and DE
             prior_draw_prob = 0
-            if j==(mcc.n_chain-1): #never do DE on hottest chain
-                de_prob = 0.
-            else:
-                de_prob = mcc.chain_params.de_prob
+            #if j==(mcc.n_chain-1): #never do DE on hottest chain
+            #    de_prob = 0.
+            #else:
+            de_prob = mcc.chain_params.de_prob
             fisher_prob = mcc.chain_params.fisher_prob
         elif recompute_gwb and recompute_rn: #all --> do fisher and de only
-                prior_draw_prob = 0#mcc.chain_params.prior_draw_prob
-                if j==(mcc.n_chain-1): #never do DE on hottest chain
-                    de_prob = 0.
-                else:
-                    de_prob = mcc.chain_params.de_prob
-                fisher_prob = mcc.chain_params.fisher_prob
-        elif j==(mcc.n_chain-1): #distance of common parameters and hottest chain --> only do prior draws
+            prior_draw_prob = 0#mcc.chain_params.prior_draw_prob
+            #if j==(mcc.n_chain-1): #never do DE on hottest chain
+            #    de_prob = 0.
+            #else:
+            de_prob = mcc.chain_params.de_prob
+            fisher_prob = mcc.chain_params.fisher_prob
+        elif False and j==(mcc.n_chain-1) and which_jump==3: #distance of common parameters and hottest chain --> only do prior draws
             prior_draw_prob = mcc.chain_params.prior_draw_prob
             de_prob = 0
             fisher_prob = 0
         elif which_jump!=3: #distance jump --> do prior draws and fisher
-            prior_draw_prob = mcc.chain_params.prior_draw_prob
+            prior_draw_prob = 0.#mcc.chain_params.prior_draw_prob
             de_prob = 0
             fisher_prob = mcc.chain_params.fisher_prob
         else: #common jump --> do everything
@@ -144,10 +181,25 @@ def do_intrinsic_update_mt(mcc, itrb):
             fisher_prob = mcc.chain_params.fisher_prob
 
 
+
         total_type_weight = prior_draw_prob + de_prob + fisher_prob
         which_jump_type = np.random.choice(3, p=[prior_draw_prob/total_type_weight,
                                                  de_prob/total_type_weight,
                                                  fisher_prob/total_type_weight])
+        dist_prior_force = False
+
+        #if which_jump_type==1 and which_jump==3:
+        #    #force common DE jumps to be in all
+        #    which_jump = 4
+        #    idx_choose = np.concatenate((mcc.x0s[j].idx_cw_int[:4],[mcc.x0s[j].idx_gwb_gamma, mcc.x0s[j].idx_gwb_log10_A]))
+        #    n_jump_loc = 6
+        #    scaling = 2.38*np.sqrt(Ts[j])/np.sqrt(n_jump_loc)
+        #    idx_choose_psr = []
+        #    idx_choose_psr_dist = []
+        #    recompute_int = True
+        #    recompute_gwb = True
+        #    recompute_rn = False
+        #    recompute_dist = False
 
         if which_jump_type==1 and which_jump==4:
             #force 'all' differential evolution jumps to be in both gwb and common parameters only
@@ -155,42 +207,68 @@ def do_intrinsic_update_mt(mcc, itrb):
             n_jump_loc = 6
             scaling = 2.38*np.sqrt(Ts[j])/np.sqrt(n_jump_loc)
             idx_choose_psr = []
+            idx_choose_psr_dist = []
             recompute_int = True
             recompute_gwb = True
             recompute_rn = False
             recompute_dist = False
-            all_eigs = False
 
+        #above some temperature, always include a full distance prior jump in common jumps
+        if which_jump!=0 and not (which_jump==4 and( which_jump_type==0 or which_jump_type==2)): #don't add distance prior to a type of jump that could already include it
+            if (mcc.chain_params.do_dist_prior_switch and Ts[j]>mcc.chain_params.dist_prior_switch_temp):
+                recompute_dist = True
+                #idx_choose_psr_dist = list(range(Npsr))
+                idx_choose_psr_dist = np.random.choice(Npsr,mcc.chain_params.n_dist_extra,replace=False)
+                if which_jump!=1:
+                    dist_prior_force = True
+                elif which_jump==1 and which_jump_type==0:
+                    dist_prior_force = True
+                else:
+                    idx_choose = np.concatenate((idx_choose,idx_choose_psr_dist))
 
-        if which_jump==0 and which_jump_type==0:
-            #prior draws in distance should scale up number of dimensions with temperature
-            n_dist_loc = min(Npsr,np.int64(cm.n_dist_main*mcc.chain_params.Ts[j]))
-            idx_choose_psr = np.random.choice(Npsr,n_dist_loc,replace=False)
-            idx_choose = mcc.x0s[j].idx_dists[idx_choose_psr]
-
-
+            #all_eigs = False
 
         if which_jump_type==0:  # do prior draw (or empirical distribution in case of RN)
             if which_jump==1: # updateing RN --> do empirical distribution step
-                new_point = samples_current.copy()
+                if dist_prior_force:
+                    #force the distances to be a prior draw
+                    idx_loc = mcc.x0s[j].idx_dists[idx_choose_psr_dist]
+
+                    new_point = CWFastPrior.get_sample_idxs(samples_current.copy(),idx_loc,mcc.FPI)
+
+                    log_prior_old = CWFastPrior.get_lnprior(samples_current, mcc.FPI)
+                    log_prior_new = CWFastPrior.get_lnprior(new_point, mcc.FPI)
+                    #backwards/forwards proposal ratio not necessarily 1 (e.g. for distances with non-flat priors)
+                    log_proposal_ratio = log_prior_old - log_prior_new
+                else:
+                    new_point = samples_current.copy()
+                    log_proposal_ratio = 0.
 
                 #overwrite the list of pulsars to update,
                 #because we might want to update fewer pulsars when using empirical distributions
                 #to help acceptence despite the penalty factors
-                idx_choose_psr = np.random.choice(Npsr,cm.n_noise_emp_dist,replace=False)
+                #scale number of dimensions by a factor related to the temperature if it goes to T>~50 to avoid under-aggressive jumps
+                n_noise_emp_dist_loc = max(min(Npsr,np.int64(mcc.chain_params.n_noise_emp_dist*(Ts[j]/400.+1))),1)
+                idx_choose_psr = np.random.choice(Npsr,n_noise_emp_dist_loc,replace=False)
 
-                log_proposal_ratio = 0.0
+                #log_proposal_ratio = 0.0
                 for psr_idx in idx_choose_psr:
-                    rn_draw = mcc.rn_emp_dist[psr_idx].draw()
+                    #use temperature adapted empirical distributions if possible
+                    if mcc.rn_emp_dist_adapt is None:
+                        rn_emp_dist_loc = mcc.rn_emp_dist
+                    else:
+                        rn_emp_dist_loc = mcc.rn_emp_dist_adapt[j]
+                    #rn_draw = mcc.rn_emp_dist[psr_idx].draw()
+                    rn_draw = rn_emp_dist_loc[psr_idx].draw()
                     new_point[mcc.x0s[j].idx_rn_log10_As[psr_idx]] = rn_draw[0]
                     new_point[mcc.x0s[j].idx_rn_gammas[psr_idx]] = rn_draw[1]
-                    
-                    log_proposal_ratio += mcc.rn_emp_dist[psr_idx].logprob(np.array([samples_current[mcc.x0s[j].idx_rn_log10_As[psr_idx]],
+
+                    log_proposal_ratio += rn_emp_dist_loc[psr_idx].logprob(np.array([samples_current[mcc.x0s[j].idx_rn_log10_As[psr_idx]],
                                                                                      samples_current[mcc.x0s[j].idx_rn_gammas[psr_idx]]]))
-                    log_proposal_ratio +=-mcc.rn_emp_dist[psr_idx].logprob(rn_draw)
+                    log_proposal_ratio +=-rn_emp_dist_loc[psr_idx].logprob(rn_draw)
                     #if j==0: print("RNEmpDist--psr="+mcc.psrs[psr_idx].name)
                     #if j==0: print("RNEmpDist--log_prop_ratio="+str(log_proposal_ratio))
-            
+
             else: # other parameter --> do actual prior draw
                 new_point = CWFastPrior.get_sample_idxs(samples_current.copy(),idx_choose,mcc.FPI)
 
@@ -216,7 +294,7 @@ def do_intrinsic_update_mt(mcc, itrb):
             log_proposal_ratio = 0.0
 
             big_jump_decide = np.random.uniform(0.0, 1.0)
-            if big_jump_decide<0.5: #do big jump
+            if big_jump_decide<mcc.chain_params.big_de_jump_prob: #do big jump
                 #new_point[idx_choose] += (1+alpha)*(x1-x2)
                 #TODO does this actually need to be scaled by a random amount?
                 new_point[idx_choose] += (x1-x2)
@@ -250,10 +328,13 @@ def do_intrinsic_update_mt(mcc, itrb):
                     which_eig = np.random.choice(4, size=1)
                     jump[mcc.x0s[j].idx_cw_int[:4]] += scaling*mcc.eig_common[j,which_eig,:].flatten()*np.random.normal(0., 1.)
 
-            if recompute_dist:  # use diagonal fishers
+            if recompute_dist and not dist_prior_force:  # use diagonal fishers
                 #fisher_diag_loc = scaling * np.sqrt(Ts[j])*fisher_diag[j][idx_choose]
-                idx_loc = mcc.x0s[j].idx_dists[idx_choose_psr]
+                idx_loc = mcc.x0s[j].idx_dists[idx_choose_psr_dist]
                 fisher_diag_loc = scaling * mcc.fisher_diag[j][idx_loc]
+                #fisher_diag_loc = np.sqrt(1./(1./fisher_diag_loc**2+idx_loc.size/2.38**2)) #smoothly saturate the jump sizes by adding the prior
+                fisher_diag_loc = np.sqrt(1./(1./fisher_diag_loc**2+n_jump_loc/2.38**2)) #smoothly saturate the jump sizes by adding the prior
+                #fisher_diag_loc[fisher_diag_loc>1.] = 1. #saturate the jump sizes by adding the prior
                 jump[idx_loc] += fisher_diag_loc*np.random.normal(0.,1.,idx_loc.size)
 
             new_point = new_point + jump
@@ -261,22 +342,48 @@ def do_intrinsic_update_mt(mcc, itrb):
         else:
             raise ValueError('jump type unrecognized',which_jump_type)
 
+        if dist_prior_force and which_jump_type!=0:
+            #force the distances to just be a prior draw, no matter what they were before
+            assert log_proposal_ratio==0.
+            idx_loc = mcc.x0s[j].idx_dists[idx_choose_psr_dist]
+
+            new_point_old = new_point.copy()
+            new_point = CWFastPrior.get_sample_idxs(new_point_old,idx_loc,mcc.FPI)
+
+            log_prior_old = CWFastPrior.get_lnprior(new_point_old, mcc.FPI)
+            log_prior_new = CWFastPrior.get_lnprior(new_point, mcc.FPI)
+            #backwards/forwards proposal ratio not necessarily 1 (e.g. for distances with non-flat priors)
+            log_proposal_ratio = log_prior_old - log_prior_new
+
         #TODO check wrapping is working right
         new_point = correct_intrinsic(new_point,mcc.x0s[j],mcc.chain_params.freq_bounds,mcc.FPI.cut_par_ids, mcc.FPI.cut_lows, mcc.FPI.cut_highs)
 
         #more thorough jump types take precedence
-        if recompute_rn or recompute_gwb:  # update per psr RN or GWB
-            mask = None
+        mask = None
+
+        if check_merged(new_point[mcc.x0s[j].idx_log10_fgw],new_point[mcc.x0s[j].idx_log10_mc],mcc.FLIs[j].max_toa):
+            #do not do anything if already merged
+            mcc.x0s[j].validate_consistent(samples_current)
+            mcc.FLIs[j].validate_consistent(mcc.x0s[j])
+            new_point = samples_current.copy()
+            merged_point = True
+        elif recompute_rn or recompute_gwb:  # update per psr RN or GWB
+            #TODO check_merged should be done before this
             if recompute_rn: #if rn update, set up mask to only update pulsars we need to update
                 mask = np.ones(Npsr,dtype=np.bool_)
                 mask[idx_choose_psr] = False
+                #don't necessarily need to update choleskys for distances
+                #if not in red noise mask but do need to update MM and NN so remove them from the mask
+                mask[idx_choose_psr_dist] = False
+
                 #print(mask)
 
             #make sure FLI_swap corresponds to current chain and sample so that we can partially modify it
             safe_reset_swap(mcc.FLI_swap,mcc.x0s[j],samples_current,FLI_mem_save)
             for ii in range(Npsr):
                 mcc.FLI_swap.chol_Sigmas[ii][:] = mcc.FLIs[j].chol_Sigmas[ii]
-            
+            assert mcc.FLI_swap.logdet == mcc.FLIs[j].logdet
+
             mcc.x0s[j].update_params(new_point)
             try:
                 mcc.flm.recompute_FastLike(mcc.FLI_swap,mcc.x0s[j],dict(zip(mcc.par_names, new_point)), mask=mask)
@@ -317,7 +424,7 @@ def do_intrinsic_update_mt(mcc, itrb):
             mcc.FLIs[j].validate_consistent(mcc.x0s[j])
         elif recompute_dist:  # update psr distances
             mcc.x0s[j].update_params(new_point)
-            mcc.FLIs[j].update_pulsar_distances(mcc.x0s[j], idx_choose_psr)
+            mcc.FLIs[j].update_pulsar_distances(mcc.x0s[j], idx_choose_psr_dist)
             mcc.FLIs[j].validate_consistent(mcc.x0s[j])
         else:
             raise ValueError('no recompute type selected')
@@ -339,8 +446,9 @@ def do_intrinsic_update_mt(mcc, itrb):
             mcc.x0s[j].update_params(samples_current)
             safe_reset_swap(mcc.FLIs[j],mcc.x0s[j],samples_current,FLI_mem_save)
             mcc.x0s[j].validate_consistent(samples_current)
-            mcc.FLIs[j].validate_consistent(mcc.x0s[j]) 
-        elif check_merged(mcc.x0s[j].log10_fgw,mcc.x0s[j].log10_mc,mcc.FLIs[j].max_toa):
+            mcc.FLIs[j].validate_consistent(mcc.x0s[j])
+        elif merged_point:#check_merged(mcc.x0s[j].log10_fgw,mcc.x0s[j].log10_mc,mcc.FLIs[j].max_toa):
+            #TODO should do this check before updating choleskys
             #set these so that the step is rejected
             #acc_ratio = -1
             #acc_decide = 0.
@@ -349,8 +457,10 @@ def do_intrinsic_update_mt(mcc, itrb):
             log_L_choose = -np.inf
             chosen_trial = -1
             print("Rejected due to too fast evolution.")
-            mcc.x0s[j].update_params(samples_current)
-            safe_reset_swap(mcc.FLIs[j],mcc.x0s[j],samples_current,FLI_mem_save)
+            #mcc.x0s[j].update_params(samples_current)
+            #safe_reset_swap(mcc.FLIs[j],mcc.x0s[j],samples_current,FLI_mem_save)
+            #for ii in range(Npsr):
+            #    mcc.FLI_swap.chol_Sigmas[ii][:] = mcc.FLIs[j].chol_Sigmas[ii]
             mcc.x0s[j].validate_consistent(samples_current)
             mcc.FLIs[j].validate_consistent(mcc.x0s[j])
         else:
@@ -421,6 +531,11 @@ def do_intrinsic_update_mt(mcc, itrb):
 
                 #revert the changes to FastLs
                 safe_reset_swap(mcc.FLIs[j],mcc.x0s[j],samples_current,FLI_mem_save)
+            else:
+                #revert swap to guaranteed self consistent state
+                safe_reset_swap(mcc.FLI_swap,mcc.x0s[j],samples_current,FLI_mem_save)
+                for ii in range(Npsr):
+                    mcc.FLI_swap.chol_Sigmas[ii][:] = mcc.FLIs[j].chol_Sigmas[ii]
 
             #print('2',mcc.FLIs[j].get_lnlikelihood(mcc.x0s[j]))
         #print(which_jump)
@@ -428,10 +543,50 @@ def do_intrinsic_update_mt(mcc, itrb):
         mcc.FLIs[j].validate_consistent(mcc.x0s[j])
         mcc.x0s[j].validate_consistent(mcc.samples[j,itrb+1,:])
         assert mcc.FLIs[j].get_lnlikelihood(mcc.x0s[j]) == mcc.log_likelihood[j,itrb+1]
+        if not recompute_dist:
+            assert np.all(mcc.samples[j,itrb,mcc.x0_swap.idx_dists]==mcc.samples[j,itrb+1,mcc.x0_swap.idx_dists])
+        if not recompute_gwb:
+            assert np.all(mcc.samples[j,itrb,mcc.x0_swap.idx_gwb]==mcc.samples[j,itrb+1,mcc.x0_swap.idx_gwb])
+        if not recompute_int:
+            assert np.all(mcc.samples[j,itrb,mcc.x0_swap.idx_cw_int[:4]]==mcc.samples[j,itrb+1,mcc.x0_swap.idx_cw_int[:4]])
+        if not recompute_rn:
+            assert np.all(mcc.samples[j,itrb,mcc.x0_swap.idx_rn]==mcc.samples[j,itrb+1,mcc.x0_swap.idx_rn])
+        if fail_point or merged_point or log_acc_decide>log_acc_ratio:
+            #check nothing changed if the point failed
+            assert np.all(mcc.samples[j,itrb,:]==mcc.samples[j,itrb+1,:])
+            assert mcc.log_likelihood[j,itrb+1]==mcc.log_likelihood[j,itrb]
+
+        if mask is not None:
+            if np.any(mask):
+                #no updating gwb or common unless everything was updated
+                assert np.all(mcc.samples[j,itrb,mcc.x0_swap.idx_cw_int[:4]]==mcc.samples[j,itrb+1,mcc.x0_swap.idx_cw_int[:4]])
+                assert np.all(mcc.samples[j,itrb,mcc.x0_swap.idx_gwb]==mcc.samples[j,itrb+1,mcc.x0_swap.idx_gwb])
+                #no distance updates for parameters that were masked
+                assert np.all(mcc.samples[j,itrb,mcc.x0_swap.idx_dists[mask]]==mcc.samples[j,itrb+1,mcc.x0_swap.idx_dists[mask]])
+                #no red noise updates for parameters that were masked
+                assert np.all(mcc.samples[j,itrb,mcc.x0_swap.idx_rn_log10_As[mask]]==mcc.samples[j,itrb+1,mcc.x0_swap.idx_rn_log10_As[mask]])
+                assert np.all(mcc.samples[j,itrb,mcc.x0_swap.idx_rn_gammas[mask]]==mcc.samples[j,itrb+1,mcc.x0_swap.idx_rn_gammas[mask]])
+            #no red noise updates for parameters that were not masked
+
+        #print(j,Ts[j],which_jump,which_jump_type,recompute_dist,recompute_gwb,recompute_int,recompute_rn,log_acc_decide,log_acc_ratio,log_acc_decide<log_acc_ratio,log_L_choose,chosen_trial)
+        #print(idx_choose)
+        #print(mask)
+        #if log_acc_decide<=log_acc_ratio:
+        #    print(mcc.FLI_swap.logdet)
+        #    mcc.x0_swap.update_params(new_point)
+        #    mcc.flm.recompute_FastLike(mcc.FLI_swap,mcc.x0_swap,dict(zip(mcc.par_names, new_point)))
+        #    print(mcc.FLI_swap.logdet,mcc.FLIs[j].logdet)
+        #    assert mcc.FLI_swap.logdet==mcc.FLIs[j].logdet
+        #else:
+        #    print(mcc.FLI_swap.logdet)
+        #    mcc.x0_swap.update_params(samples_current)
+        #    mcc.flm.recompute_FastLike(mcc.FLI_swap,mcc.x0_swap,dict(zip(mcc.par_names, samples_current)))
+        #    print(mcc.FLI_swap.logdet,mcc.FLIs[j].logdet)
+        #    assert mcc.FLI_swap.logdet==mcc.FLIs[j].logdet
 
     if fail_point:
-        #something went wrong so do maximum thoroughness test of self consistency
-        mcc.validate_consistent(itrb+1,full_validate=True)
+        #something went wrong so do extra test of self consistency
+        mcc.validate_consistent(itrb+1)
 
     return mcc.FLI_swap
 
@@ -447,7 +602,14 @@ def do_mt_step(mcc,j,itrb,new_point,samples_current,FLI_mem_save,recompute_rn,lo
     #do multiple try MCMC step with random draws of projection parameters
     #more parameters will be uniform at higher temperatures
     fisher_mask = np.sqrt(Ts[j])*mcc.fisher_diag[j][mcc.x0s[0].idx_cw_ext]<0.5
-    random_normals = np.random.normal(0.,1.,(cm.n_multi_try,fisher_mask.sum()))
+    #don't propose fisher jumps at all above some specified temperature
+    fisher_norm = 1.
+    if Ts[j]>cm.proj_prior_all_temp:
+        fisher_mask[:] = False
+    elif fisher_mask.sum()>0:
+        fisher_norm = 2.38/np.sqrt(fisher_mask.sum())
+
+    random_normals = np.random.normal(0.,fisher_norm,(cm.n_multi_try,fisher_mask.sum()))
     jumps = random_normals*np.sqrt(Ts[j])*mcc.fisher_diag[j][mcc.x0s[0].idx_cw_ext][fisher_mask]
     random_draws_from_prior = np.random.uniform(mcc.FPI.cw_ext_lows[~fisher_mask],mcc.FPI.cw_ext_highs[~fisher_mask],(cm.n_multi_try,(~fisher_mask).sum()))
 

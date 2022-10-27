@@ -42,7 +42,7 @@ def do_extrinsic_block(n_chain, samples, itrb, Ts, x0s, FLIs, FPI, n_par_tot, lo
     saturate_count = np.zeros(n_chain,dtype=np.int64)
     for j in range(0,n_chain):
         for ii,idx in enumerate(x0s[j].idx_phases):
-            if np.sqrt(Ts[j])*fisher_diag[j][idx]>=cm.sigma_cw0_p_phase_default:
+            if Ts[j]>cm.proj_phase_saturate_temp or np.sqrt(Ts[j])*fisher_diag[j][idx]>=1.9:#cm.sigma_cw0_p_phase_default:
                 saturate_count[j] += 1
         #allow one saturated parameter without reducing jump size
         if saturate_count[j] > 1:
@@ -56,7 +56,7 @@ def do_extrinsic_block(n_chain, samples, itrb, Ts, x0s, FLIs, FPI, n_par_tot, lo
         for j in prange(0,n_chain):
             samples_current = samples[j,itrb+k,:]
 
-            if k%10==0 or j==n_chain-1:  # every 10th k (so every 5th jump) do a prior draw
+            if k%10==0 or j==n_chain-1 or Ts[j]>cm.proj_prior_all_temp:  # every 10th k (so every 5th jump) do a prior draw
                 new_point = np.copy(samples_current)
                 jump_idx = x0s[j].idx_cw_ext
                 for ii, idx in enumerate(jump_idx):
@@ -118,22 +118,42 @@ def do_pt_swap(n_chain, samples, itrb, Ts, a_yes, a_no, x0s, FLIs, log_likelihoo
     for j in range(n_chain):
         log_Ls.append(log_likelihood[j,itrb])
 
+    target_shuffle = np.random.permutation(np.arange(0,n_chain))
+
+    targets = np.zeros(n_chain,dtype=np.int64)
+    targets[target_shuffle[:n_chain//2]] = target_shuffle[n_chain//2:n_chain]
+    targets[target_shuffle[n_chain//2:n_chain]] = target_shuffle[:n_chain//2]
+
     #loop through and propose a swap at each chain (starting from hottest chain and going down in T) and keep track of results in swap_map
     #for swap_chain in reversed(range(n_chain-1)):
-    for swap_chain in range(n_chain-2, -1, -1):  # same as reversed(range(n_chain-1)) but supported in numba
-        assert swap_map[swap_chain] == swap_chain
-        log_acc_ratio = -log_Ls[swap_map[swap_chain]] / Ts[swap_chain]
-        log_acc_ratio += -log_Ls[swap_map[swap_chain+1]] / Ts[swap_chain+1]
-        log_acc_ratio += log_Ls[swap_map[swap_chain+1]] / Ts[swap_chain]
-        log_acc_ratio += log_Ls[swap_map[swap_chain]] / Ts[swap_chain+1]
+    #for swap_chain in range(n_chain-2, -1, -1):  # same as reversed(range(n_chain-1)) but supported in numba
+    #    assert swap_map[swap_chain] == swap_chain
+    for itrt in range(0,n_chain):
+        itrt_target = targets[itrt]
+        if itrt>itrt_target:
+            continue
+
+        assert swap_map[itrt] == itrt
+        assert swap_map[itrt_target] == itrt_target
+
+        log_acc_ratio = -log_Ls[itrt] / Ts[itrt]
+        log_acc_ratio += -log_Ls[itrt_target] / Ts[itrt_target]
+        log_acc_ratio += log_Ls[itrt_target] / Ts[itrt]
+        log_acc_ratio += log_Ls[itrt] / Ts[itrt_target]
 
         acc_decide = np.log(uniform(0.0, 1.0, 1))
         if acc_decide<=log_acc_ratio:# and do_PT:
-            swap_map[swap_chain], swap_map[swap_chain+1] = swap_map[swap_chain+1], swap_map[swap_chain]
-            a_yes[cm.idx_PT,swap_chain] += 1
+            swap_map[itrt], swap_map[itrt_target] = swap_map[itrt_target], swap_map[itrt]
+            #if np.abs(itrt_target-itrt)==1:
+            if Ts[itrt_target]!=Ts[itrt]:
+                a_yes[cm.idx_PT,itrt] += 1
+                a_yes[cm.idx_PT,itrt_target] += 1
             #a_yes[0,swap_chain]+=1
         else:
-            a_no[cm.idx_PT,swap_chain] += 1
+            #if np.abs(itrt_target-itrt)==1:
+            if Ts[itrt_target]!=Ts[itrt]:
+                a_no[cm.idx_PT,itrt] += 1
+                a_no[cm.idx_PT,itrt_target] += 1
             #a_no[0,swap_chain]+=1
 
     #loop through the chains and record the new samples and log_Ls
@@ -194,9 +214,17 @@ def initialize_de_buffer(sample0,n_par_tot,par_names,chain_params,x0_swap,FPI,ei
 def initialize_sample_helper(chain_params,n_par_tot,Npsr,max_toa,par_names,par_names_cw_ext,par_names_cw_int,FPI,pta,noisedict,rn_emp_dist):
     """initialize starting samples for each chain to a random point"""
     samples = np.zeros((chain_params.n_chain, chain_params.save_every_n+1, n_par_tot))
+    #samples_load = np.load('samples_final_wde_respace3.npy')
+    #samples_load = np.load('samples_final_node18.npy')
     for j in range(chain_params.n_chain):
         #samples[j,0,:] = np.array([par.sample() for par in pta.params])
+        #if j<samples_load.shape[0]:
+        #samples[j,0,:] = samples_load[j]#samples_load[j%min(samples_load.shape[0],5)]
+        #acceptable_initial_samples = True
+        #else:
         acceptable_initial_samples = False
+        #acceptable_initial_samples = False
+
         itr_accept = 0
         while not acceptable_initial_samples:
             if itr_accept >= 10:
@@ -225,7 +253,7 @@ def initialize_sample_helper(chain_params,n_par_tot,Npsr,max_toa,par_names,par_n
                     print("No value found in noisedict for: " + psr + "_red_noise_gamma")
                     print("Using a random draw from the prior as a first sample instead")
                     print(samples[j,0,par_names.index(psr + "_red_noise_gamma")])
-                
+
                 if chain_params.zero_rn:
                     print("zero_rn=True --> Setting " + psr + "_red_noise_log10_A=-20.0")
                     samples[j,0,par_names.index(psr + "_red_noise_log10_A")] = -20.0
@@ -248,7 +276,7 @@ def initialize_sample_helper(chain_params,n_par_tot,Npsr,max_toa,par_names,par_n
             else:
                 print("No value found in noisedict for: gwb_gamma")
                 print("Using a random draw from the prior as a first sample instead")
-            
+
             if chain_params.zero_gwb:
                 print("zero_gwb=True --> Setting gwb_log10_A=-20.0")
                 samples[j,0,par_names.index("gwb_log10_A")] = -20.0
@@ -293,7 +321,7 @@ class ChainParams():
                        save_every_n=10_000, fisher_eig_downsample=10, T_ladder=None,\
                        includeCW=True, prior_recovery=False, verbosity=1,\
                        freq_bounds=np.array([np.nan, 1e-7], dtype=np.float64), gwb_comps=14,\
-                       de_history_size=5_000, thin_de=10_000, log_fishers=False,\
+                       de_history_size=5_000, thin_de=10_000, log_fishers=False,log_mean_likelihoods=True,\
                        savefile=None, thin=100, samples_precision=np.single, save_first_n_chains=1,\
                        prior_draw_prob=0.1, de_prob=0.6, fisher_prob=0.3,\
                        rn_emp_dist_file=None,\
@@ -320,12 +348,14 @@ class ChainParams():
         self.de_history_size = de_history_size
         self.thin_de = thin_de
         self.log_fishers = log_fishers
+        self.log_mean_likelihoods = log_mean_likelihoods
         self.rn_emp_dist_file = rn_emp_dist_file
 
         if T_ladder is None:
             #using geometric spacing
             c = self.T_max**(1./(self.n_chain-1))
             self.Ts = c**np.arange(self.n_chain)
+
             print("Using {0} temperature chains with a geometric spacing of {1:.3f}.\nTemperature ladder is:\n".format(self.n_chain,c),self.Ts)
         else:
             self.Ts = np.array(T_ladder)
@@ -338,7 +368,7 @@ class ChainParams():
         self.thin = thin
         self.samples_precision = samples_precision
         self.save_first_n_chains = save_first_n_chains
-        
+
         #jump type probabilities
         self.prior_draw_prob = prior_draw_prob
         self.de_prob = de_prob
@@ -379,6 +409,40 @@ class ChainParams():
         else:
             self.all_jump_weight = all_jump_weight
 
+        #jump parameters to control number of eigendirections
+        #TODO make these actual arguments
+        self.n_ext_directions = 32
+        self.n_phase_extra = 16
+
+        self.n_dist_extra = 67
+        self.n_dist_main = 67
+
+        self.do_common_def_switch = True#whether to redefine what 'common' parameters above a certain temperature
+        self.common_def_switch_temp = 1.1
+
+        self.do_gwb_common_override_switch = True
+        self.gwb_common_override_switch_temp = 20.
+
+        #above this temperature, assume all phases have saturated for fisher jump sizing in projection parameters
+        #self.proj_phase_saturate_temp = 1.1
+        #above this temperature only do prior proposals for the projection parameters
+        self.proj_prior_all_temp = 1.2
+
+        if self.do_gwb_common_override_switch:
+            #the gwb override only works if the common parameters have already switched to 6d at the specified temperature
+            assert self.do_common_def_switch
+            assert self.gwb_common_override_switch_temp>=self.common_def_switch_temp
+
+        self.do_dist_prior_switch = True
+        self.dist_prior_switch_temp = 1.3
+
+        self.do_dist_all_override_switch = False
+        self.dist_all_override_switch_temp = 1.5
+
+        self.n_noise_emp_dist = 20#5#3#1#30#67#1
+
+        self.big_de_jump_prob = 0.5
+
 
 class MCMCChain():
     """store the miscellaneous objects needed to manage the mcmc chain"""
@@ -405,6 +469,8 @@ class MCMCChain():
         self.fisher_diag_logs = []
         self.fisher_eig_logs = []
         self.fisher_common_logs = []
+        self.mean_likelihoods = []
+        self.max_likelihoods = []
 
 
         self.FPI = CWFastPrior.get_FastPriorInfo(self.pta,self.psrs,self.par_names_cw_ext)
@@ -423,8 +489,19 @@ class MCMCChain():
             print("Reading in RN empirical distributions...")
             with open(self.chain_params.rn_emp_dist_file, 'rb') as f:
                 self.rn_emp_dist = pickle.load(f)
+            #create a temperature adapted empirical distribution
+            self.rn_emp_dist_adapt = []
+            for j,T in enumerate(self.chain_params.Ts):
+                emp_dist_loc = []
+                for emp_dist0 in self.rn_emp_dist:
+                    emp_dist_loc.append(TemperatureAdaptedEmpiricalDistribution(emp_dist0,T))
+
+                self.rn_emp_dist_adapt.append(emp_dist_loc)
+
+
         else:
             self.rn_emp_dist = None
+            self.rn_emp_dist_adapt = None
 
         #set up samples array
         t1 = perf_counter()
@@ -440,7 +517,8 @@ class MCMCChain():
         t1 = perf_counter()
         print("Creating Shared Info Objects at %8.3fs"%(t1-ti))
         self.x0_swap = CWFastLikelihoodNumba.CWInfo(self.Npsr,self.samples[0,0],self.par_names,self.par_names_cw_ext,self.par_names_cw_int)
-        self.samples[:,0,self.x0_swap.idx_dists] = 0.
+        #TODO why was this distance zeroing here? Shouldn't change from initialized state
+        #self.samples[:,0,self.x0_swap.idx_dists] = 0.
 
         self.flm = CWFastLikelihoodNumba.FastLikeMaster(self.psrs,self.pta,dict(zip(self.par_names, self.samples[0, 0, :])),self.x0_swap,
                                                         includeCW=self.includeCW,prior_recovery=self.prior_recovery)
@@ -468,8 +546,9 @@ class MCMCChain():
         #get only the starting point so we can add a fisher red noise jump to the others
         self.samples_sel = np.zeros((self.n_chain,1,self.samples.shape[2]))
         self.samples_sel[:,0,:] = self.samples[:,0,:]
+        #don't bother getting common eigenvectors for the starting positions because they probably aren't at a maximum; will use defaults instead
         self.eig_rn,self.fisher_diag,self.eig_common = get_fishers(self.samples_sel,self.par_names,self.x0_swap, self.flm, self.FLI_swap,\
-                                                                   get_diag=True,get_rn_block=True,get_common=True,get_intrinsic_diag=True)
+                                                                   get_diag=True,get_rn_block=True,get_common=False,get_intrinsic_diag=True)
 
         self.fisher_diag_next = np.zeros_like(self.fisher_diag)
         self.fisher_diag_next2 = np.zeros_like(self.fisher_diag)
@@ -523,6 +602,10 @@ class MCMCChain():
         self.validate_consistent(0)  # check things were initialized as expected
 
         self.best_logL = self.log_likelihood[0,0]
+        best_logL_idx = np.argmax(self.log_likelihood[:,0])
+        self.best_logL_global = self.log_likelihood[best_logL_idx,0]
+        self.best_sample_global = self.samples[best_logL_idx,0].copy()
+
         self.tf_init = perf_counter()
         print("finished initialization steps in %8.3fs"%(self.tf_init-self.ti))
         self.ti_loop = perf_counter()
@@ -540,7 +623,7 @@ class MCMCChain():
 
         #update intrinsic parameters once a block
         self.FLI_swap = do_intrinsic_update_mt(self, itrb+self.n_int_block-2)
-        self.validate_consistent(itrb+self.n_int_block-1)  # check FLIs and x0s appear to have internally consistent parameters
+        self.validate_consistent(itrb+self.n_int_block-1,full_validate=False)  # check FLIs and x0s appear to have internally consistent parameters
 
         do_pt_swap(self.n_chain, self.samples, itrb+self.n_int_block-1, self.chain_params.Ts, self.a_yes,self.a_no, self.x0s, self.FLIs, self.log_likelihood, self.fisher_diag)
         self.update_fishers_partial(itrn+self.n_int_block-1,itrn+self.n_int_block+1)
@@ -558,12 +641,28 @@ class MCMCChain():
             self.tf1_loop = perf_counter()
 
         #update best ever found likelihood
-        self.best_logL = max(self.best_logL,np.max(self.log_likelihood[0,:]))
+        self.best_logL = max(self.best_logL,np.max(self.log_likelihood[self.chain_params.Ts==1.,:]))
+        best_idx = np.unravel_index(np.argmax(self.log_likelihood),self.log_likelihood.shape)
+        best_logL_global_loc = self.log_likelihood[best_idx]
+        if best_logL_global_loc>self.best_logL_global:
+            print("new best global sample old logL=%+12.3f new logL=%+12.3f"%(self.best_logL_global,best_logL_global_loc))
+            self.best_logL_global = best_logL_global_loc
+            self.best_sample_global = self.samples[best_idx].copy()
+            print("local index of global best is",best_idx)
+            print("new best params",self.best_sample_global)
+
         self.itri += 1
+
+        if self.chain_params.log_mean_likelihoods:
+            self.mean_likelihoods.append(self.log_likelihood[:,itrb:itrb+self.n_int_block].mean(axis=1))
+            self.max_likelihoods.append(self.log_likelihood[:,itrb:itrb+self.n_int_block].max(axis=1))
+            if itrb==0:
+                print("mean likelihoods",self.mean_likelihoods[-1])
+                print("best likelihood anywhere in latest block",self.max_likelihoods[-1].max())
 
         #check that there are no large decreases in log likelihood
         #if itrn>self.chain_params.save_every_n and np.any(np.diff(self.log_likelihood[:,:itrb+self.n_int_block],axis=1)<-300.):
-        if itrn>self.chain_params.save_every_n and np.any(np.diff(self.log_likelihood[:,:itrb+self.n_int_block],axis=1)[:,::2].T<-300.*self.chain_params.Ts):    
+        if itrn>self.chain_params.save_every_n and np.any(np.diff(self.log_likelihood[:,:itrb+self.n_int_block],axis=1)[:,::2].T<-300.*self.chain_params.Ts):
             print(np.diff(self.log_likelihood[:,:itrb+self.n_int_block],axis=1)[:,::2].T)
             print(np.diff(self.log_likelihood[:,:itrb+self.n_int_block],axis=1)[:,::2].T.shape)
             print(np.min(np.diff(self.log_likelihood[:,:itrb+self.n_int_block],axis=1)[:,::2].T))
@@ -719,15 +818,20 @@ class MCMCChain():
         """print a status update"""
         t_itr = perf_counter()
         print_acceptance_progress(itrn,N_blocks*self.n_int_block,self.n_int_block,self.a_yes,self.a_no,t_itr,self.ti_loop,self.tf1_loop,self.chain_params.Ts, self.verbosity)
-        print("New log_L=%+12.3f Best log_L=%+12.3f"%(self.FLIs[0].get_lnlikelihood(self.x0s[0]),self.best_logL))#,FLIs[0].resres,FLIs[0].logdet,FLIs[0].pos,FLIs[0].pdist,FLIs[0].NN,FLIs[0].MMs)))
+        if len(self.mean_likelihoods)>=1:
+            mean_likelihood = self.mean_likelihoods[-1][self.chain_params.Ts==1.].mean()
+        else:
+            mean_likelihood = self.FLIs[0].get_lnlikelihood(self.x0s[0])
+        print("New log_L=%+12.3f Mean T=1 last block=%+12.3f Best T=1 log_L=%+12.3f best overall log_L=%+12.3f"%(self.FLIs[0].get_lnlikelihood(self.x0s[0]),mean_likelihood,self.best_logL,self.best_logL_global))#,FLIs[0].resres,FLIs[0].logdet,FLIs[0].pos,FLIs[0].pdist,FLIs[0].NN,FLIs[0].MMs)))
         #itrb = itrn%self.chain_params.save_every_n #index within the block of saved values
         #print(itrb)
         #print(self.samples[0,itrb,:])
         #print("Old log_L=%+12.3f"%(self.pta.get_lnlikelihood(self.samples[0,itrb,:])))
 
-    def output_and_wrap_state(self,itrn,N_blocks):
+    def output_and_wrap_state(self,itrn,N_blocks,do_output=True):
         """wrap the samples around to the first element and save the old ones to the hdf5 file"""
-        output_hdf5_loop(itrn,self.chain_params,self.samples,self.log_likelihood,self.acc_fraction,self.fisher_diag,self.par_names,N_blocks*self.n_int_block,self.verbosity)
+        if do_output:
+            output_hdf5_loop(itrn,self.chain_params,self.samples,self.log_likelihood,self.acc_fraction,self.fisher_diag,self.par_names,N_blocks*self.n_int_block,self.verbosity)
 
         #clear out log_likelihood and samples arrays
         samples_now = self.samples[:,-1,:]
@@ -744,17 +848,70 @@ class MCMCChain():
         t1 = perf_counter()
         print("Entering Loop Body at %8.3fs"%(t1-self.ti))
         for i in range(N_blocks):
-            itrn = i*self.n_int_block #index overall
+            #itrn = i*self.n_int_block #index overall
+            itrn = self.itri*self.n_int_block #index overall
             itrb = itrn%self.chain_params.save_every_n #index within the block of saved values
-            if itrb==0 and i!=0:
+            if itrb==0 and self.itri!=0:
                 self.output_and_wrap_state(itrn,N_blocks)
-            if i%self.chain_params.n_block_status_update==0:
+            if self.itri%self.chain_params.n_block_status_update==0:
                 self.do_status_update(itrn,N_blocks)
+
 
             #advance the block state
             self.advance_block()
+
+        self.do_status_update(self.itri*self.n_int_block,N_blocks)
 
         output_hdf5_end(self.chain_params,self.samples,self.log_likelihood,self.acc_fraction,self.fisher_diag,self.par_names,self.verbosity)
         tf = perf_counter()
         print('whole function time = %8.3f s'%(tf-self.ti))
         print('loop time = %8.3f s'%(tf-self.ti_loop))
+
+
+class TemperatureAdaptedEmpiricalDistribution():
+    """object to adapt a 2d empirical distribution from enterprise to a specific temperature"""
+    def __init__(self,rn_emp_dist0,T):
+        self.rn_emp_dist0 = rn_emp_dist0
+        self.T = T
+        self._edges = self.rn_emp_dist0._edges.copy()
+        self._wids = self.rn_emp_dist0._wids.copy()
+        self._Nbins = self.rn_emp_dist0._Nbins.copy()
+        area = np.outer(*self._wids)
+
+        self._pdf = (self.rn_emp_dist0._pdf.copy())**(1./max(1,T)) #raise pdf to a power
+        self._cdf = np.cumsum((self._pdf*area).ravel())
+
+        #need to adapt cdf and pdf to take into account correct normalization
+        self.renorm = self._cdf[-1]
+        self._pdf /= self.renorm
+        self._cdf /= self.renorm
+
+        self._logpdf = np.log(self._pdf)
+
+    def draw(self):
+        """copied from enterprise_extensions"""
+        draw = np.random.rand()
+        draw_bin = np.searchsorted(self._cdf, draw)
+        idx = np.unravel_index(draw_bin, self._Nbins)
+        samp = [self._edges[ii, idx[ii]] + self._wids[ii, idx[ii]]*np.random.rand()
+                                for ii in range(2)]
+        return np.array(samp)
+
+    def prob(self, params):
+        """copied from enterprise_extensions"""
+        ix, iy = [np.searchsorted(self._edges[ii], params[ii]) - 1 for ii in range(2)]
+
+        return self._pdf[ix, iy]
+
+    def logprob(self, params):
+        """copied from enterprise_extensions"""
+        ix, iy = [np.searchsorted(self._edges[ii], params[ii]) - 1 for ii in range(2)]
+        return self._logpdf[ix, iy]
+
+#    def get_emp_dist_T_ladder(self):
+#        emp_dist0 = mcc.rn_emp_dist
+#        pdf0 = emp_dist0.pdf_
+#        for j,T in enumerate(self.chain_params.Ts):
+#            pdfT = pdf0**(1./T) #raise pdf to power beta
+#
+

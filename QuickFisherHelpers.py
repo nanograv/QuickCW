@@ -135,12 +135,11 @@ def get_fishers(samples, par_names, x0_swap, flm, FLI_swap,get_diag=True,get_com
             if start_safe:
                 assert np.all(logdet_array_in==FLI_swap.logdet_array)
             #pp1s,mm1s,nn1s,epsilons,helper_tuple0,pps,mms,nns = diagonal_data_loc
-
-            if get_common:
-                eig_common[itrc] = get_fisher_eigenvectors_common(params, x0_swap, FLI_swap, diagonal_data_loc)
-                FLI_swap.validate_consistent(x0_swap)
-                if start_safe:
-                    assert np.all(logdet_array_in==FLI_swap.logdet_array)
+            if get_intrinsic_diag or get_common:
+                eig_common[itrc] = get_fisher_eigenvectors_common(params, x0_swap, FLI_swap, diagonal_data_loc,default_all=not get_common)
+            FLI_swap.validate_consistent(x0_swap)
+            if start_safe:
+                assert np.all(logdet_array_in==FLI_swap.logdet_array)
         elif get_rn_block:
             #fisher_diag = np.zeros(len(par_names))
             epsilon_gammas = np.zeros(x0_swap.idx_rn_gammas.size)+2*cm.eps['red_noise_gamma']
@@ -241,7 +240,7 @@ def get_fisher_rn_block_eigenvectors(params, par_names, x0_swap, flm, FLI_swap,d
             #calculate diagonal elements of the Hessian from a central finite element scheme
             #note the minus sign compared to the regular Hessian
             #factor of 4 in the denominator is absorbed because pp1s and mm1s use 2*epsilon steps
-            fisher[itrs,itrp,itrp] = -(pp1s[itrs,itrp] - 2.0*nn1s[itrs] + mm1s[itrs,itrp])/(epsilon_diags[itrs,itrp]*epsilon_diags[itrs,itrp])
+            fisher[itrs,itrp,itrp] = -(pp1s[itrs,itrp] - 2.0*nn1s[itrs] + mm1s[itrs,itrp])/(epsilon_diags[itrs,itrp]*epsilon_diags[itrs,itrp])+1./sigma_noise_defaults[itrp]**2
             #patch to handle bad values
             if ~np.isfinite(fisher[itrs,itrp,itrp]) or fisher[itrs,itrp,itrp] <= fisher_cut_lims[itrp]:
                 fisher[itrs,itrp,itrp] = 1./sigma_noise_defaults[itrp]**2
@@ -261,10 +260,11 @@ def get_fisher_rn_block_eigenvectors(params, par_names, x0_swap, flm, FLI_swap,d
 
     #track ones that defaulted so we can skip evalauation of the off diagonal element completely
     #because many default this can save non-trivial amounts of time
-    defaulted = badc == 2
-    print("Number of Pulsars with Fisher Eigenvectors in Default: ",defaulted.sum())
+    print("Number of Pulsars with Fisher Eigenvectors in Full Default: ",(badc==2).sum(),"Diagonal Default: ",(badc==1).sum(),"No Default: ",(badc==0).sum())
     #TODO temporary to test if we can recover better fishers
-    defaulted[:] = False
+    defaulted = badc == 2
+    #defaulted = badc == 2
+    #defaulted[:] = False
 
     #the noise parameters are very expensive to calculate individually so calculate them all en masse
     #get the off diagonal elements of the fisher matrix
@@ -471,7 +471,8 @@ def safe_reset_swap(FLI_swap,x0_swap,params_old,FLI_mem0):
 
 def get_fisher_diagonal(samples_fisher, par_names, x0_swap, flm, FLI_swap,get_intrinsic_diag=True,start_safe=False):
     """get the diagonal elements of the fisher matrix for all parameters"""
-    print("Updating Fisher Diagonals")
+    #this print out occurs a bit excessively frequently
+    #print("Updating Fisher Diagonals")
     dim = len(par_names)
     fisher_diag = np.zeros(dim)
     #TODO pass directly and fix elsewhere
@@ -656,7 +657,9 @@ def get_fisher_diagonal(samples_fisher, par_names, x0_swap, flm, FLI_swap,get_in
         #note the minus sign compared to the regular Hessian
         #defaulted values will already be nonzero so don't overwrite them
         if fisher_diag[ii] == 0.:
-            fisher_diag[ii] = -(pps[ii] - 2*nns[ii] + mms[ii])/(epsilons[ii]**2)
+            fisher_diag[ii] = -(pps[ii] - 2*nns[ii] + mms[ii])/(epsilons[ii]**2)#+1./sigma_defaults[ii]**2
+            if ii in x0_swap.idx_int:
+                fisher_diag[ii] += 1./sigma_defaults[ii]**2
 
         if np.isnan(fisher_diag[ii]) or fisher_diag[ii] <= 0. :
             fisher_diag[ii] = 1/sigma_defaults[ii]**2#1./cm.sigma_noise_default**2#1/cm.sigma_cw0_p_phase_default**2
@@ -681,7 +684,7 @@ def get_fisher_diagonal(samples_fisher, par_names, x0_swap, flm, FLI_swap,get_in
 
     return 1/np.sqrt(fisher_diag),(pp2s,mm2s,nn2s,epsilons,helper_tuple0,pps,mms,nns)
 
-def get_fisher_eigenvectors_common(params, x0_swap, FLI_swap, diagonal_data, epsilon=1e-4):
+def get_fisher_eigenvectors_common(params, x0_swap, FLI_swap, diagonal_data, epsilon=1e-4,default_all=False):
     """update just the 4x4 block of common eigenvectors"""
     print("Updating Common Parameter Fisher Eigenvectors")
     dim = 4
@@ -692,19 +695,41 @@ def get_fisher_eigenvectors_common(params, x0_swap, FLI_swap, diagonal_data, eps
 
     fisher = np.zeros((dim,dim))
     sigma_defaults = np.array([cm.sigma_noise_default,cm.sigma_noise_default,cm.sigma_log10_fgw_default,cm.sigma_noise_default])
+    diag_bad = np.zeros(dim,dtype=np.bool_)
 
-
-    #calculate diagonal elements
-    for itrp in range(dim):
-        idx_par = idx_to_perturb[itrp]
-        #not a factor of 4 in the denominator is absorbed because epsilon is 2x as large when diagonal elements are computed
-        fisher[itrp,itrp] = -(pps[idx_par] - 2.0*nns[idx_par] + mms[idx_par])/(epsilons_diag[idx_par]**2)
-        if not np.isfinite(fisher[itrp,itrp]) or fisher[itrp,itrp]<=0.:  # diagonal elements cannot be 0 or negative
-            fisher[itrp,itrp] = 1./sigma_defaults[itrp]**2  # TODO pick defaults for diagonals more intelligently
+    if default_all:
+        #option just make all the fishers their default values for initialization
+        for itrp in range(dim):
+            fisher[itrp,itrp] = 1./sigma_defaults[itrp]**2
+            diag_bad[itrp] = True
+    else:
+        #calculate diagonal elements
+        for itrp in range(dim):
+            idx_par = idx_to_perturb[itrp]
+            #check not a factor of 4 in the denominator? Maybe is absorbed because epsilon is 2x as large when diagonal elements are computed
+            fisher[itrp,itrp] = -(pps[idx_par] - 2.0*nns[idx_par] + mms[idx_par])/(epsilons_diag[idx_par]**2)#+1./sigma_defaults[itrp]**2
+            if not np.isfinite(fisher[itrp,itrp]) or fisher[itrp,itrp]<=0.:  # diagonal elements cannot be 0 or negative
+                print('bad diagonal',itrp,idx_par,pps[idx_par],nns[idx_par],mms[idx_par],epsilons_diag[idx_par],fisher[itrp,itrp], 1./sigma_defaults[itrp]**2)
+                fisher[itrp,itrp] = 1./sigma_defaults[itrp]**2  # TODO pick defaults for diagonals more intelligently
+                diag_bad[itrp] = True
+        print(np.diag(fisher))
+        if np.sum(diag_bad)>=1:
+            #several went bad, so just assume they all did and default everything to diagonal defaults
+            for itrp in range(dim):
+                fisher[itrp,itrp] = 1./sigma_defaults[itrp]**2 
+                diag_bad[itrp] = True
 
     #calculate off-diagonal elements
     for i in range(dim):
+        #don't bother calculating the off-diagonals if we didn't get a good diagonal component for either
+        if diag_bad[i]:
+            continue
+
         for j in range(i+1,dim):
+            #don't bother calculating the off-diagonals if we didn't get a good diagonal component for either
+            if diag_bad[j]:
+                continue
+
             #create parameter vectors with ++, --, +-, -+ epsilon in the ith and jth component
             paramsPP = np.copy(params)
             paramsMM = np.copy(params)
@@ -818,6 +843,7 @@ def get_fisher_eigenvectors_common(params, x0_swap, FLI_swap, diagonal_data, eps
 
     #filter w for eigenvalues smaller than 100 and set those to 100 -- Neil's trick
     eig_limit = 1.0#1.0#0.25
+    print('eig sizes',np.abs(w))
 
     W = np.where(np.abs(w)>eig_limit, w, eig_limit)
 
