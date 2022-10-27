@@ -61,14 +61,6 @@ def do_intrinsic_update_mt(mcc, itrb):
         fail_point = False
         merged_point = False
 
-        if which_jump == 2 and mcc.chain_params.do_gwb_common_override_switch and Ts[j]>mcc.chain_params.gwb_common_override_switch_temp:
-            #above a certain temperature switch from jumping in the 2d subspace of gwb common to the 6d subspace of all common
-            which_jump = 3
-
-        if which_jump == 0 and mcc.chain_params.do_dist_all_override_switch and Ts[j]>mcc.chain_params.dist_all_override_switch_temp:
-            #above a certain temperature switch from jumping in distance to everything
-            which_jump = 4
-
         if which_jump==0:  # update psr distances
             recompute_dist = True
             n_dist_loc = min(Npsr,mcc.chain_params.n_dist_main)#max(1,np.int64(cm.n_dist_main*mcc.chain_params.Ts[j])))
@@ -97,15 +89,9 @@ def do_intrinsic_update_mt(mcc, itrb):
             #scaling = 1/np.sqrt(n_jump_loc)
         elif which_jump==3:  # update common intrinsic parameters (chirp mass, frequency, sky location[2])
             recompute_int = True
-            if mcc.chain_params.do_common_def_switch and Ts[j]>mcc.chain_params.common_def_switch_temp:
-                #switch to also jumping in gwb parameters above a certain temperature
-                #because otherwise acceptances can get too high
-                recompute_gwb = True
-                n_jump_loc = 6
-                idx_choose = np.concatenate((mcc.x0s[j].idx_cw_int[:4],mcc.x0s[j].idx_gwb))
-            else:
-                n_jump_loc = 4 #  2+mcc.chain_params.ndist_extra
-                idx_choose = mcc.x0s[j].idx_cw_int[:4]  # np.array([par_names.index(par_names_cw_int[itrk]) for itrk in range(4)])
+
+            n_jump_loc = 4 #  2+mcc.chain_params.ndist_extra
+            idx_choose = mcc.x0s[j].idx_cw_int[:4]  # np.array([par_names.index(par_names_cw_int[itrk]) for itrk in range(4)])
 
             #don't count parameters where jump sizes are probably saturated for the purposes of determining the appropriate jump sizing
             saturated_idxs = np.sum((2.38*np.sqrt(Ts[j])*mcc.fisher_diag[j][idx_choose])>0.5)
@@ -127,18 +113,10 @@ def do_intrinsic_update_mt(mcc, itrb):
             n_dist_loc = min(Npsr,mcc.chain_params.n_dist_main)#max(1,np.int64(cm.n_dist_main*mcc.chain_params.Ts[j])))
             idx_choose_psr_dist = np.random.choice(Npsr,n_dist_loc,replace=False)
             idx_choose_psr = list(range(Npsr))
-            #if (cm.do_dist_prior_switch and Ts[j]>cm.dist_prior_switch_temp):
-                #if high enough temperature, don't include distance jump in fishers, just let it use prior draw for those instead
             n_jump_loc = 2*Npsr+4+2 #distance+RN+common_pars+crn
             idx_choose = np.concatenate((mcc.x0s[j].idx_cw_int[:4],
                                          mcc.x0s[j].idx_rn_gammas, mcc.x0s[j].idx_rn_log10_As,
                                          [mcc.x0s[j].idx_gwb_gamma, mcc.x0s[j].idx_gwb_log10_A]))
-            #else:
-            #    n_jump_loc = n_dist_loc+2*Npsr+4+2 #distance+RN+common_pars+crn
-            #    idx_choose = np.concatenate((mcc.x0s[j].idx_cw_int[:4],
-            #                                 mcc.x0s[j].idx_dists[idx_choose_psr_dist],
-            #                                 mcc.x0s[j].idx_rn_gammas, mcc.x0s[j].idx_rn_log10_As,
-            #                                 [mcc.x0s[j].idx_gwb_gamma, mcc.x0s[j].idx_gwb_log10_A]))
             scaling = 2.38*np.sqrt(Ts[j])/np.sqrt(n_jump_loc)
         else:
             raise ValueError('jump index unrecognized',which_jump)
@@ -186,21 +164,6 @@ def do_intrinsic_update_mt(mcc, itrb):
         which_jump_type = np.random.choice(3, p=[prior_draw_prob/total_type_weight,
                                                  de_prob/total_type_weight,
                                                  fisher_prob/total_type_weight])
-        dist_prior_force = False
-
-        #if which_jump_type==1 and which_jump==3:
-        #    #force common DE jumps to be in all
-        #    which_jump = 4
-        #    idx_choose = np.concatenate((mcc.x0s[j].idx_cw_int[:4],[mcc.x0s[j].idx_gwb_gamma, mcc.x0s[j].idx_gwb_log10_A]))
-        #    n_jump_loc = 6
-        #    scaling = 2.38*np.sqrt(Ts[j])/np.sqrt(n_jump_loc)
-        #    idx_choose_psr = []
-        #    idx_choose_psr_dist = []
-        #    recompute_int = True
-        #    recompute_gwb = True
-        #    recompute_rn = False
-        #    recompute_dist = False
-
         if which_jump_type==1 and which_jump==4:
             #force 'all' differential evolution jumps to be in both gwb and common parameters only
             idx_choose = np.concatenate((mcc.x0s[j].idx_cw_int[:4],[mcc.x0s[j].idx_gwb_gamma, mcc.x0s[j].idx_gwb_log10_A]))
@@ -213,36 +176,11 @@ def do_intrinsic_update_mt(mcc, itrb):
             recompute_rn = False
             recompute_dist = False
 
-        #above some temperature, always include a full distance prior jump in common jumps
-        if which_jump!=0 and not (which_jump==4 and( which_jump_type==0 or which_jump_type==2)): #don't add distance prior to a type of jump that could already include it
-            if (mcc.chain_params.do_dist_prior_switch and Ts[j]>mcc.chain_params.dist_prior_switch_temp):
-                recompute_dist = True
-                #idx_choose_psr_dist = list(range(Npsr))
-                idx_choose_psr_dist = np.random.choice(Npsr,mcc.chain_params.n_dist_extra,replace=False)
-                if which_jump!=1:
-                    dist_prior_force = True
-                elif which_jump==1 and which_jump_type==0:
-                    dist_prior_force = True
-                else:
-                    idx_choose = np.concatenate((idx_choose,idx_choose_psr_dist))
-
-            #all_eigs = False
 
         if which_jump_type==0:  # do prior draw (or empirical distribution in case of RN)
             if which_jump==1: # updateing RN --> do empirical distribution step
-                if dist_prior_force:
-                    #force the distances to be a prior draw
-                    idx_loc = mcc.x0s[j].idx_dists[idx_choose_psr_dist]
-
-                    new_point = CWFastPrior.get_sample_idxs(samples_current.copy(),idx_loc,mcc.FPI)
-
-                    log_prior_old = CWFastPrior.get_lnprior(samples_current, mcc.FPI)
-                    log_prior_new = CWFastPrior.get_lnprior(new_point, mcc.FPI)
-                    #backwards/forwards proposal ratio not necessarily 1 (e.g. for distances with non-flat priors)
-                    log_proposal_ratio = log_prior_old - log_prior_new
-                else:
-                    new_point = samples_current.copy()
-                    log_proposal_ratio = 0.
+                new_point = samples_current.copy()
+                log_proposal_ratio = 0.
 
                 #overwrite the list of pulsars to update,
                 #because we might want to update fewer pulsars when using empirical distributions
@@ -254,10 +192,10 @@ def do_intrinsic_update_mt(mcc, itrb):
                 #log_proposal_ratio = 0.0
                 for psr_idx in idx_choose_psr:
                     #use temperature adapted empirical distributions if possible
-                    if mcc.rn_emp_dist_adapt is None:
-                        rn_emp_dist_loc = mcc.rn_emp_dist
-                    else:
-                        rn_emp_dist_loc = mcc.rn_emp_dist_adapt[j]
+                    #if mcc.rn_emp_dist_adapt is None:
+                    rn_emp_dist_loc = mcc.rn_emp_dist
+                    #else:
+                    #    rn_emp_dist_loc = mcc.rn_emp_dist_adapt[j]
                     #rn_draw = mcc.rn_emp_dist[psr_idx].draw()
                     rn_draw = rn_emp_dist_loc[psr_idx].draw()
                     new_point[mcc.x0s[j].idx_rn_log10_As[psr_idx]] = rn_draw[0]
@@ -328,32 +266,10 @@ def do_intrinsic_update_mt(mcc, itrb):
                     which_eig = np.random.choice(4, size=1)
                     jump[mcc.x0s[j].idx_cw_int[:4]] += scaling*mcc.eig_common[j,which_eig,:].flatten()*np.random.normal(0., 1.)
 
-            if recompute_dist and not dist_prior_force:  # use diagonal fishers
-                #fisher_diag_loc = scaling * np.sqrt(Ts[j])*fisher_diag[j][idx_choose]
-                idx_loc = mcc.x0s[j].idx_dists[idx_choose_psr_dist]
-                fisher_diag_loc = scaling * mcc.fisher_diag[j][idx_loc]
-                #fisher_diag_loc = np.sqrt(1./(1./fisher_diag_loc**2+idx_loc.size/2.38**2)) #smoothly saturate the jump sizes by adding the prior
-                fisher_diag_loc = np.sqrt(1./(1./fisher_diag_loc**2+n_jump_loc/2.38**2)) #smoothly saturate the jump sizes by adding the prior
-                #fisher_diag_loc[fisher_diag_loc>1.] = 1. #saturate the jump sizes by adding the prior
-                jump[idx_loc] += fisher_diag_loc*np.random.normal(0.,1.,idx_loc.size)
-
             new_point = new_point + jump
 
         else:
             raise ValueError('jump type unrecognized',which_jump_type)
-
-        if dist_prior_force and which_jump_type!=0:
-            #force the distances to just be a prior draw, no matter what they were before
-            assert log_proposal_ratio==0.
-            idx_loc = mcc.x0s[j].idx_dists[idx_choose_psr_dist]
-
-            new_point_old = new_point.copy()
-            new_point = CWFastPrior.get_sample_idxs(new_point_old,idx_loc,mcc.FPI)
-
-            log_prior_old = CWFastPrior.get_lnprior(new_point_old, mcc.FPI)
-            log_prior_new = CWFastPrior.get_lnprior(new_point, mcc.FPI)
-            #backwards/forwards proposal ratio not necessarily 1 (e.g. for distances with non-flat priors)
-            log_proposal_ratio = log_prior_old - log_prior_new
 
         #TODO check wrapping is working right
         new_point = correct_intrinsic(new_point,mcc.x0s[j],mcc.chain_params.freq_bounds,mcc.FPI.cut_par_ids, mcc.FPI.cut_lows, mcc.FPI.cut_highs)

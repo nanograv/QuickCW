@@ -44,11 +44,12 @@ sigma_gwb_default = 0.2
 #gwb_common_override_switch_temp = 20.
 #
 #above this temperature, assume all phases have saturated for fisher jump sizing in projection parameters
-proj_phase_saturate_temp = 0.5
-#proj_phase_saturate_temp = 1.1
+#proj_phase_saturate_temp = 0.5
+proj_phase_saturate_temp = 0.1
 #above this temperature only do prior proposals for the projection parameters
-#proj_prior_all_temp = 1.2
-proj_prior_all_temp = 0.55
+proj_prior_all_temp = 1.1
+#proj_prior_all_temp = 0.1
+#proj_prior_all_temp = 0.55
 #
 #if do_gwb_common_override_switch:
 #    #the gwb override only works if the common parameters have already switched to 6d at the specified temperature

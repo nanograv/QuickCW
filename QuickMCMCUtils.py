@@ -41,12 +41,18 @@ def do_extrinsic_block(n_chain, samples, itrb, Ts, x0s, FLIs, FPI, n_par_tot, lo
     #treat all phases where fisher is saturated as 1 parameter for counting purposes in jump scaling
     saturate_count = np.zeros(n_chain,dtype=np.int64)
     for j in range(0,n_chain):
-        for ii,idx in enumerate(x0s[j].idx_phases):
-            if Ts[j]>cm.proj_phase_saturate_temp or np.sqrt(Ts[j])*fisher_diag[j][idx]>=1.9:#cm.sigma_cw0_p_phase_default:
-                saturate_count[j] += 1
-        #allow one saturated parameter without reducing jump size
-        if saturate_count[j] > 1:
-            saturate_count[j] -= 1
+        if Ts[j]>cm.proj_phase_saturate_temp:
+            saturate_count[j] = x0s[j].Npsr-1
+
+    
+
+    #for j in range(0,n_chain):
+    #    for ii,idx in enumerate(x0s[j].idx_phases):
+    #        if Ts[j]>cm.proj_phase_saturate_temp or np.sqrt(Ts[j])*fisher_diag[j][idx]>=1.9:#cm.sigma_cw0_p_phase_default:
+    #            saturate_count[j] += 1
+    #    #allow one saturated parameter without reducing jump size
+    #    if saturate_count[j] > 1:
+    #        saturate_count[j] -= 1
 
     jump_scale_use = np.zeros(n_chain)
     for j in range(n_chain):
@@ -417,28 +423,6 @@ class ChainParams():
         self.n_dist_extra = 67
         self.n_dist_main = 67
 
-        self.do_common_def_switch = True#whether to redefine what 'common' parameters above a certain temperature
-        self.common_def_switch_temp = 1.1
-
-        self.do_gwb_common_override_switch = True
-        self.gwb_common_override_switch_temp = 20.
-
-        #above this temperature, assume all phases have saturated for fisher jump sizing in projection parameters
-        #self.proj_phase_saturate_temp = 1.1
-        #above this temperature only do prior proposals for the projection parameters
-        self.proj_prior_all_temp = 1.2
-
-        if self.do_gwb_common_override_switch:
-            #the gwb override only works if the common parameters have already switched to 6d at the specified temperature
-            assert self.do_common_def_switch
-            assert self.gwb_common_override_switch_temp>=self.common_def_switch_temp
-
-        self.do_dist_prior_switch = True
-        self.dist_prior_switch_temp = 1.3
-
-        self.do_dist_all_override_switch = False
-        self.dist_all_override_switch_temp = 1.5
-
         self.n_noise_emp_dist = 20#5#3#1#30#67#1
 
         self.big_de_jump_prob = 0.5
@@ -490,18 +474,18 @@ class MCMCChain():
             with open(self.chain_params.rn_emp_dist_file, 'rb') as f:
                 self.rn_emp_dist = pickle.load(f)
             #create a temperature adapted empirical distribution
-            self.rn_emp_dist_adapt = []
-            for j,T in enumerate(self.chain_params.Ts):
-                emp_dist_loc = []
-                for emp_dist0 in self.rn_emp_dist:
-                    emp_dist_loc.append(TemperatureAdaptedEmpiricalDistribution(emp_dist0,T))
+            #self.rn_emp_dist_adapt = []
+            #for j,T in enumerate(self.chain_params.Ts):
+            #    emp_dist_loc = []
+            #    for emp_dist0 in self.rn_emp_dist:
+            #        emp_dist_loc.append(TemperatureAdaptedEmpiricalDistribution(emp_dist0,T))
 
-                self.rn_emp_dist_adapt.append(emp_dist_loc)
+            #    self.rn_emp_dist_adapt.append(emp_dist_loc)
 
 
         else:
             self.rn_emp_dist = None
-            self.rn_emp_dist_adapt = None
+            #self.rn_emp_dist_adapt = None
 
         #set up samples array
         t1 = perf_counter()
@@ -868,46 +852,46 @@ class MCMCChain():
         print('loop time = %8.3f s'%(tf-self.ti_loop))
 
 
-class TemperatureAdaptedEmpiricalDistribution():
-    """object to adapt a 2d empirical distribution from enterprise to a specific temperature"""
-    def __init__(self,rn_emp_dist0,T):
-        self.rn_emp_dist0 = rn_emp_dist0
-        self.T = T
-        self._edges = self.rn_emp_dist0._edges.copy()
-        self._wids = self.rn_emp_dist0._wids.copy()
-        self._Nbins = self.rn_emp_dist0._Nbins.copy()
-        area = np.outer(*self._wids)
-
-        self._pdf = (self.rn_emp_dist0._pdf.copy())**(1./max(1,T)) #raise pdf to a power
-        self._cdf = np.cumsum((self._pdf*area).ravel())
-
-        #need to adapt cdf and pdf to take into account correct normalization
-        self.renorm = self._cdf[-1]
-        self._pdf /= self.renorm
-        self._cdf /= self.renorm
-
-        self._logpdf = np.log(self._pdf)
-
-    def draw(self):
-        """copied from enterprise_extensions"""
-        draw = np.random.rand()
-        draw_bin = np.searchsorted(self._cdf, draw)
-        idx = np.unravel_index(draw_bin, self._Nbins)
-        samp = [self._edges[ii, idx[ii]] + self._wids[ii, idx[ii]]*np.random.rand()
-                                for ii in range(2)]
-        return np.array(samp)
-
-    def prob(self, params):
-        """copied from enterprise_extensions"""
-        ix, iy = [np.searchsorted(self._edges[ii], params[ii]) - 1 for ii in range(2)]
-
-        return self._pdf[ix, iy]
-
-    def logprob(self, params):
-        """copied from enterprise_extensions"""
-        ix, iy = [np.searchsorted(self._edges[ii], params[ii]) - 1 for ii in range(2)]
-        return self._logpdf[ix, iy]
-
+#class TemperatureAdaptedEmpiricalDistribution():
+#    """object to adapt a 2d empirical distribution from enterprise to a specific temperature"""
+#    def __init__(self,rn_emp_dist0,T):
+#        self.rn_emp_dist0 = rn_emp_dist0
+#        self.T = T
+#        self._edges = self.rn_emp_dist0._edges.copy()
+#        self._wids = self.rn_emp_dist0._wids.copy()
+#        self._Nbins = self.rn_emp_dist0._Nbins.copy()
+#        area = np.outer(*self._wids)
+#
+#        self._pdf = (self.rn_emp_dist0._pdf.copy())**(1./max(1,T)) #raise pdf to a power
+#        self._cdf = np.cumsum((self._pdf*area).ravel())
+#
+#        #need to adapt cdf and pdf to take into account correct normalization
+#        self.renorm = self._cdf[-1]
+#        self._pdf /= self.renorm
+#        self._cdf /= self.renorm
+#
+#        self._logpdf = np.log(self._pdf)
+#
+#    def draw(self):
+#        """copied from enterprise_extensions"""
+#        draw = np.random.rand()
+#        draw_bin = np.searchsorted(self._cdf, draw)
+#        idx = np.unravel_index(draw_bin, self._Nbins)
+#        samp = [self._edges[ii, idx[ii]] + self._wids[ii, idx[ii]]*np.random.rand()
+#                                for ii in range(2)]
+#        return np.array(samp)
+#
+#    def prob(self, params):
+#        """copied from enterprise_extensions"""
+#        ix, iy = [np.searchsorted(self._edges[ii], params[ii]) - 1 for ii in range(2)]
+#
+#        return self._pdf[ix, iy]
+#
+#    def logprob(self, params):
+#        """copied from enterprise_extensions"""
+#        ix, iy = [np.searchsorted(self._edges[ii], params[ii]) - 1 for ii in range(2)]
+#        return self._logpdf[ix, iy]
+#
 #    def get_emp_dist_T_ladder(self):
 #        emp_dist0 = mcc.rn_emp_dist
 #        pdf0 = emp_dist0.pdf_
