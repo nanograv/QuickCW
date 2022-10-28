@@ -39,10 +39,10 @@ def do_extrinsic_block(n_chain, samples, itrb, Ts, x0s, FLIs, FPI, n_par_tot, lo
     n_par_ext = x0s[0].idx_cw_ext.size
 
     #treat all phases where fisher is saturated as 1 parameter for counting purposes in jump scaling
-    saturate_count = np.zeros(n_chain,dtype=np.int64)
-    for j in range(0,n_chain):
-        if Ts[j]>cm.proj_phase_saturate_temp:
-            saturate_count[j] = x0s[j].Npsr-1
+    #saturate_count = np.zeros(n_chain,dtype=np.int64)
+    #for j in range(0,n_chain):
+    #    if Ts[j]>cm.proj_phase_saturate_temp:
+    #        saturate_count[j] = x0s[j].Npsr-1
 
     
 
@@ -56,13 +56,13 @@ def do_extrinsic_block(n_chain, samples, itrb, Ts, x0s, FLIs, FPI, n_par_tot, lo
 
     jump_scale_use = np.zeros(n_chain)
     for j in range(n_chain):
-        jump_scale_use[j] = 2.38/np.sqrt(n_par_ext-saturate_count[j])*np.sqrt(Ts[j])
+        jump_scale_use[j] = 2.38/np.sqrt(n_par_ext)*np.sqrt(Ts[j])
 
     for k in range(0,n_int_block,2):
         for j in prange(0,n_chain):
             samples_current = samples[j,itrb+k,:]
 
-            if k%10==0 or j==n_chain-1 or Ts[j]>cm.proj_prior_all_temp:  # every 10th k (so every 5th jump) do a prior draw
+            if k%4==0 or j==n_chain-1 or Ts[j]>cm.proj_prior_all_temp:  # every 10th k (so every 5th jump) do a prior draw
                 new_point = np.copy(samples_current)
                 jump_idx = x0s[j].idx_cw_ext
                 for ii, idx in enumerate(jump_idx):
@@ -124,42 +124,22 @@ def do_pt_swap(n_chain, samples, itrb, Ts, a_yes, a_no, x0s, FLIs, log_likelihoo
     for j in range(n_chain):
         log_Ls.append(log_likelihood[j,itrb])
 
-    target_shuffle = np.random.permutation(np.arange(0,n_chain))
-
-    targets = np.zeros(n_chain,dtype=np.int64)
-    targets[target_shuffle[:n_chain//2]] = target_shuffle[n_chain//2:n_chain]
-    targets[target_shuffle[n_chain//2:n_chain]] = target_shuffle[:n_chain//2]
-
     #loop through and propose a swap at each chain (starting from hottest chain and going down in T) and keep track of results in swap_map
     #for swap_chain in reversed(range(n_chain-1)):
-    #for swap_chain in range(n_chain-2, -1, -1):  # same as reversed(range(n_chain-1)) but supported in numba
-    #    assert swap_map[swap_chain] == swap_chain
-    for itrt in range(0,n_chain):
-        itrt_target = targets[itrt]
-        if itrt>itrt_target:
-            continue
-
-        assert swap_map[itrt] == itrt
-        assert swap_map[itrt_target] == itrt_target
-
-        log_acc_ratio = -log_Ls[itrt] / Ts[itrt]
-        log_acc_ratio += -log_Ls[itrt_target] / Ts[itrt_target]
-        log_acc_ratio += log_Ls[itrt_target] / Ts[itrt]
-        log_acc_ratio += log_Ls[itrt] / Ts[itrt_target]
+    for swap_chain in range(n_chain-2, -1, -1):  # same as reversed(range(n_chain-1)) but supported in numba
+        assert swap_map[swap_chain] == swap_chain
+        log_acc_ratio = -log_Ls[swap_map[swap_chain]] / Ts[swap_chain]
+        log_acc_ratio += -log_Ls[swap_map[swap_chain+1]] / Ts[swap_chain+1]
+        log_acc_ratio += log_Ls[swap_map[swap_chain+1]] / Ts[swap_chain]
+        log_acc_ratio += log_Ls[swap_map[swap_chain]] / Ts[swap_chain+1]
 
         acc_decide = np.log(uniform(0.0, 1.0, 1))
         if acc_decide<=log_acc_ratio:# and do_PT:
-            swap_map[itrt], swap_map[itrt_target] = swap_map[itrt_target], swap_map[itrt]
-            #if np.abs(itrt_target-itrt)==1:
-            if Ts[itrt_target]!=Ts[itrt]:
-                a_yes[cm.idx_PT,itrt] += 1
-                a_yes[cm.idx_PT,itrt_target] += 1
+            swap_map[swap_chain], swap_map[swap_chain+1] = swap_map[swap_chain+1], swap_map[swap_chain]
+            a_yes[cm.idx_PT,swap_chain] += 1
             #a_yes[0,swap_chain]+=1
         else:
-            #if np.abs(itrt_target-itrt)==1:
-            if Ts[itrt_target]!=Ts[itrt]:
-                a_no[cm.idx_PT,itrt] += 1
-                a_no[cm.idx_PT,itrt_target] += 1
+            a_no[cm.idx_PT,swap_chain] += 1
             #a_no[0,swap_chain]+=1
 
     #loop through the chains and record the new samples and log_Ls
@@ -176,6 +156,73 @@ def do_pt_swap(n_chain, samples, itrb, Ts, a_yes, a_no, x0s, FLIs, log_likelihoo
     fisher_diag[:] = fisher_diag_new
     FLIs[:] = List(FLIs_new)
     x0s[:] = List(x0s_new)
+#@njit()
+#def do_pt_swap(n_chain, samples, itrb, Ts, a_yes, a_no, x0s, FLIs, log_likelihood,fisher_diag):
+#    """do the parallel tempering swap"""
+#    #print("PT")
+#
+#    #print("PT")
+#
+#    #set up map to help keep track of swaps
+#    swap_map = list(range(n_chain))
+#
+#    #get log_Ls from all the chains
+#    log_Ls = []
+#    for j in range(n_chain):
+#        log_Ls.append(log_likelihood[j,itrb])
+#
+#    target_shuffle = np.random.permutation(np.arange(0,n_chain))
+#
+#    targets = np.zeros(n_chain,dtype=np.int64)
+#    targets[target_shuffle[:n_chain//2]] = target_shuffle[n_chain//2:n_chain]
+#    targets[target_shuffle[n_chain//2:n_chain]] = target_shuffle[:n_chain//2]
+#
+#    #loop through and propose a swap at each chain (starting from hottest chain and going down in T) and keep track of results in swap_map
+#    #for swap_chain in reversed(range(n_chain-1)):
+#    #for swap_chain in range(n_chain-2, -1, -1):  # same as reversed(range(n_chain-1)) but supported in numba
+#    #    assert swap_map[swap_chain] == swap_chain
+#    for itrt in range(0,n_chain):
+#        itrt_target = targets[itrt]
+#        if itrt>itrt_target:
+#            continue
+#
+#        assert swap_map[itrt] == itrt
+#        assert swap_map[itrt_target] == itrt_target
+#
+#        log_acc_ratio = -log_Ls[itrt] / Ts[itrt]
+#        log_acc_ratio += -log_Ls[itrt_target] / Ts[itrt_target]
+#        log_acc_ratio += log_Ls[itrt_target] / Ts[itrt]
+#        log_acc_ratio += log_Ls[itrt] / Ts[itrt_target]
+#
+#        acc_decide = np.log(uniform(0.0, 1.0, 1))
+#        if acc_decide<=log_acc_ratio:# and do_PT:
+#            swap_map[itrt], swap_map[itrt_target] = swap_map[itrt_target], swap_map[itrt]
+#            #if np.abs(itrt_target-itrt)==1:
+#            if Ts[itrt_target]!=Ts[itrt]:
+#                a_yes[cm.idx_PT,itrt] += 1
+#                a_yes[cm.idx_PT,itrt_target] += 1
+#            #a_yes[0,swap_chain]+=1
+#        else:
+#            #if np.abs(itrt_target-itrt)==1:
+#            if Ts[itrt_target]!=Ts[itrt]:
+#                a_no[cm.idx_PT,itrt] += 1
+#                a_no[cm.idx_PT,itrt_target] += 1
+#            #a_no[0,swap_chain]+=1
+#
+#    #loop through the chains and record the new samples and log_Ls
+#    FLIs_new = []
+#    x0s_new = []
+#    fisher_diag_new = np.zeros_like(fisher_diag)
+#    for j in range(n_chain):
+#        samples[j,itrb+1,:] = samples[swap_map[j],itrb,:]
+#        fisher_diag_new[j,:] = fisher_diag[swap_map[j],:]
+#        log_likelihood[j,itrb+1] = log_likelihood[swap_map[j],itrb]
+#        FLIs_new.append(FLIs[swap_map[j]])
+#        x0s_new.append(x0s[swap_map[j]])
+#
+#    fisher_diag[:] = fisher_diag_new
+#    FLIs[:] = List(FLIs_new)
+#    x0s[:] = List(x0s_new)
 
 def add_rn_eig_starting_point(samples,par_names,x0_swap,flm,FLI_swap,chain_params,Npsr,FPI):
     """add a fisher eig jump to the starting point of each chain based only on the fisher matrix at the first point"""

@@ -145,12 +145,12 @@ def do_intrinsic_update_mt(mcc, itrb):
             #else:
             de_prob = mcc.chain_params.de_prob
             fisher_prob = mcc.chain_params.fisher_prob
-        elif False and j==(mcc.n_chain-1) and which_jump==3: #distance of common parameters and hottest chain --> only do prior draws
+        elif j==(mcc.n_chain-1) and which_jump==3: #distance of common parameters and hottest chain --> only do prior draws
             prior_draw_prob = mcc.chain_params.prior_draw_prob
             de_prob = 0
             fisher_prob = 0
         elif which_jump!=3: #distance jump --> do prior draws and fisher
-            prior_draw_prob = 0.#mcc.chain_params.prior_draw_prob
+            prior_draw_prob = mcc.chain_params.prior_draw_prob
             de_prob = 0
             fisher_prob = mcc.chain_params.fisher_prob
         else: #common jump --> do everything

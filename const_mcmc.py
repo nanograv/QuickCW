@@ -27,8 +27,8 @@ use_default_noise_sigma = False
 sigma_noise_default = 0.5
 
 use_default_gwb_sigma = True
-#sigma_gwb_default = 0.1
-sigma_gwb_default = 0.2
+sigma_gwb_default = 0.1
+#sigma_gwb_default = 0.2
 
 ###jump parameters to control number of eigendirections
 #n_ext_directions = 32
