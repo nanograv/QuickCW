@@ -266,6 +266,12 @@ def do_intrinsic_update_mt(mcc, itrb):
                     which_eig = np.random.choice(4, size=1)
                     jump[mcc.x0s[j].idx_cw_int[:4]] += scaling*mcc.eig_common[j,which_eig,:].flatten()*np.random.normal(0., 1.)
 
+            if recompute_dist:  # use diagonal fishers
+                idx_loc = mcc.x0s[j].idx_dists[idx_choose_psr_dist]
+                fisher_diag_loc = scaling * mcc.fisher_diag[j][idx_loc]
+                fisher_diag_loc = np.sqrt(1./(1./fisher_diag_loc**2+n_jump_loc/2.38**2)) #smoothly saturate the jump sizes by adding the prior
+                jump[idx_loc] += fisher_diag_loc*np.random.normal(0.,1.,idx_loc.size)
+
             new_point = new_point + jump
 
         else:
