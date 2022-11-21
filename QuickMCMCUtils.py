@@ -641,7 +641,7 @@ class MCMCChain():
         print("finished initialization steps in %8.3fs"%(self.tf_init-self.ti))
         self.ti_loop = perf_counter()
         self.tf1_loop = perf_counter()
-
+    #@profile
     def advance_block(self):
         """advance the state of the mcmc chain by 1 entire block, updating fisher matrices and differential evolution as necessary"""
         itrn = self.itri*self.n_int_block  # index overall

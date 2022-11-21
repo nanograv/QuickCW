@@ -91,67 +91,68 @@ class FastLikeMaster:
         return self.recompute_FastLike(FLI,x0,params)
     #@profile
     def recompute_FastLike(self,FLI,x0,params, chol_update=False,mask=None):
-        pls_temp = self.pta.get_phiinv(params, logdet=True, method='partition')
         if mask is None:
             #mask to skip updating values if set to True
             mask = np.zeros(self.Npsr,dtype=np.bool_)
+        if not FLI.prior_recovery:
+            pls_temp = self.pta.get_phiinv(params, logdet=True, method='partition')
 
-        if chol_update: #update Cholesky of Sigma instead of recompute
-            #chol_Sigmas, logdet_array, new_phiinvs = cholupdate_loop(FLI.chol_Sigmas, List(pls_temp), FLI.phiinvs, self.Npsr)
-            #
-            #FLI.chol_Sigmas = chol_Sigmas
-            #FLI.logdet_array = logdet_array
-            #FLI.phiinvs = new_phiinvs
+            if chol_update: #update Cholesky of Sigma instead of recompute
+                #chol_Sigmas, logdet_array, new_phiinvs = cholupdate_loop(FLI.chol_Sigmas, List(pls_temp), FLI.phiinvs, self.Npsr)
+                #
+                #FLI.chol_Sigmas = chol_Sigmas
+                #FLI.logdet_array = logdet_array
+                #FLI.phiinvs = new_phiinvs
 
-            for i in range(self.Npsr):
-                if mask[i]:
-                    continue
+                for i in range(self.Npsr):
+                    if mask[i]:
+                        continue
 
-                phiinv_loc,logdetphi_loc = pls_temp[i]
-                chol_Sigma = cholupdate(FLI.chol_Sigmas[i], phiinv_loc-FLI.phiinvs[i])
+                    phiinv_loc,logdetphi_loc = pls_temp[i]
+                    chol_Sigma = cholupdate(FLI.chol_Sigmas[i], phiinv_loc-FLI.phiinvs[i])
 
-                logdet_Sigma_loc = logdet_Sigma_helper(chol_Sigma)
+                    logdet_Sigma_loc = logdet_Sigma_helper(chol_Sigma)
 
-                FLI.chol_Sigmas[i][:] = chol_Sigma
+                    FLI.chol_Sigmas[i][:] = chol_Sigma
 
-                FLI.logdet_array[i] = logdetphi_loc+logdet_Sigma_loc
+                    FLI.logdet_array[i] = logdetphi_loc+logdet_Sigma_loc
 
-                FLI.phiinvs[i][:] = phiinv_loc
+                    FLI.phiinvs[i][:] = phiinv_loc
 
-        else:
-            for i in range(self.Npsr):
-                if mask[i]:
-                    continue
+            else:
+                for i in range(self.Npsr):
+                    if mask[i]:
+                        continue
 
-                phiinv_loc,logdetphi_loc = pls_temp[i]
+                    phiinv_loc,logdetphi_loc = pls_temp[i]
 
-                FLI.phiinvs[i][:] = phiinv_loc
-                if phiinv_loc.ndim == 1:
-                    #Sigma_alt = self.TNTs[i]+np.diag(phiinv_loc)
-                    #overwrite old chol_Sigma so can be done without allocating new array
-                    Sigma = create_Sigma(phiinv_loc,self.TNTs[i],FLI.chol_Sigmas[i].T)
-                    #assert np.allclose(Sigma,Sigma_alt)
-                else:
-                    Sigma = self.TNTs[i]+phiinv_loc
+                    FLI.phiinvs[i][:] = phiinv_loc
+                    if phiinv_loc.ndim == 1:
+                        #Sigma_alt = self.TNTs[i]+np.diag(phiinv_loc)
+                        #overwrite old chol_Sigma so can be done without allocating new array
+                        Sigma = create_Sigma(phiinv_loc,self.TNTs[i],FLI.chol_Sigmas[i].T)
+                        #assert np.allclose(Sigma,Sigma_alt)
+                    else:
+                        Sigma = self.TNTs[i]+phiinv_loc
 
-                #mutate inplace to avoid memory allocation overheads
-                chol_Sigma,lower = scipy.linalg.cho_factor(Sigma.T,lower=True,overwrite_a=True,check_finite=False)
+                    #mutate inplace to avoid memory allocation overheads
+                    chol_Sigma,lower = scipy.linalg.cho_factor(Sigma.T,lower=True,overwrite_a=True,check_finite=False)
 
-                logdet_Sigma_loc = logdet_Sigma_helper(chol_Sigma)#2 * np.sum(np.log(np.diag(chol_Sigma)))
+                    logdet_Sigma_loc = logdet_Sigma_helper(chol_Sigma)#2 * np.sum(np.log(np.diag(chol_Sigma)))
 
-                #this should be mutated in place but assign it anyway to be safe
-                FLI.chol_Sigmas[i][:] = chol_Sigma
+                    #this should be mutated in place but assign it anyway to be safe
+                    FLI.chol_Sigmas[i][:] = chol_Sigma
 
-                #add the necessary component to logdet
-                FLI.logdet_array[i] = logdetphi_loc+logdet_Sigma_loc
+                    #add the necessary component to logdet
+                    FLI.logdet_array[i] = logdetphi_loc+logdet_Sigma_loc
 
 
-        #set logdet
-        FLI.set_resres_logdet(FLI.resres_array,FLI.logdet_array,FLI.logdet_base)
+            #set logdet
+            FLI.set_resres_logdet(FLI.resres_array,FLI.logdet_array,FLI.logdet_base)
 
         #list of pulsars updated
         psr_idxs = np.where(~mask)[0]
-    
+        
         FLI.update_red_noise(x0, psr_idxs)
 
         return FLI#FastLikeInfo(resres,logdet,self.pos,self.pdist,self.toas,invchol_Sigma_TNs,self.Nvecs,self.Nrs,self.max_toa,x0,self.Npsr,self.isqrNvecs,self.residuals)
@@ -978,7 +979,7 @@ class FastLikeInfo:
         self.resres_array[:] = resres_old
         self.set_resres_logdet(resres_old,self.logdet_array,self.logdet_base)
         #assert np.all(resres_old==self.resres_array)
-
+    
     def update_pulsar_distances(self,x0,psr_idxs):
         """recalculate MM and NN only for the affected pulsar if  change an arbitrary number of single pulsar distances"""
         #assert self.cos_gwtheta == x0.cos_gwtheta
@@ -989,21 +990,24 @@ class FastLikeInfo:
         #self.rn_log10_As = x0.rn_log10_As.copy()
         #assert np.all(self.rn_gammas==x0.rn_gammas)
         #assert np.all(self.rn_log10_As==x0.rn_log10_As)
-        assert self.cos_gwtheta==x0.cos_gwtheta
-        assert self.gwphi==x0.gwphi
-        assert self.log10_fgw==x0.log10_fgw
-        assert self.log10_mc==x0.log10_mc
-        assert self.gwb_gamma==x0.gwb_gamma
-        assert self.gwb_log10_A==x0.gwb_log10_A
-        assert np.all(self.rn_gammas==x0.rn_gammas)
-        assert np.all(self.rn_log10_As==x0.rn_log10_As)
+        if not self.prior_recovery:
+            assert self.cos_gwtheta==x0.cos_gwtheta
+            assert self.gwphi==x0.gwphi
+            assert self.log10_fgw==x0.log10_fgw
+            assert self.log10_mc==x0.log10_mc
+            assert self.gwb_gamma==x0.gwb_gamma
+            assert self.gwb_log10_A==x0.gwb_log10_A
+            assert np.all(self.rn_gammas==x0.rn_gammas)
+            assert np.all(self.rn_log10_As==x0.rn_log10_As)
         #leave dist_only in even though it is not currently respected in case it turns out to be faster later
         #resres_temp = self.resres_array.copy()
         resres_old = self.resres_array.copy()
-        update_intrinsic_params2(x0,self.isqNvecs,self.Nrs,self.pos,self.pdist,self.toas, self.NN, self.MMs,self.TNvs,self.chol_Sigmas,psr_idxs,self.resres_array,self.dotTNrs)
+        if not self.prior_recovery:
+            update_intrinsic_params2(x0,self.isqNvecs,self.Nrs,self.pos,self.pdist,self.toas, self.NN, self.MMs,self.TNvs,self.chol_Sigmas,psr_idxs,self.resres_array,self.dotTNrs)
         #protect from incorrectly overwriting
-        self.cw_p_dists[:] = x0.cw_p_dists
-        self.set_resres_logdet(resres_old,self.logdet_array,self.logdet_base)
+        self.cw_p_dists[:] = x0.cw_p_dists.copy()
+        if not self.prior_recovery:
+            self.set_resres_logdet(resres_old,self.logdet_array,self.logdet_base)
 
         #if not np.all(resres_temp==resres_old):
         #    print(resres_temp)
@@ -1033,10 +1037,11 @@ class FastLikeInfo:
         """Recalculate filters with updated intrinsic parameters - not quite the same as the setup, since a few things are already stored"""
         #TODO ensure complete consistency with handling of resres
         resres_temp = self.resres_array.copy()
+        
+        if not self.prior_recovery:
+            update_intrinsic_params2(x0,self.isqNvecs,self.Nrs,self.pos,self.pdist,self.toas, self.NN, self.MMs,self.TNvs,self.chol_Sigmas,np.arange(x0.Npsr),resres_temp,self.dotTNrs)
 
-        update_intrinsic_params2(x0,self.isqNvecs,self.Nrs,self.pos,self.pdist,self.toas, self.NN, self.MMs,self.TNvs,self.chol_Sigmas,np.arange(x0.Npsr),resres_temp,self.dotTNrs)
-
-        self.set_resres_logdet(resres_temp,self.logdet_array,self.logdet_base)
+            self.set_resres_logdet(resres_temp,self.logdet_array,self.logdet_base)
         #track the intrinsic parameters this was set at so we can throw in error if they are inconsistent with an input x0
         self.gwb_gamma = x0.gwb_gamma
         self.gwb_log10_A = x0.gwb_log10_A
@@ -1052,9 +1057,10 @@ class FastLikeInfo:
         """recalculate MM and NN only for the affected pulsars of red noise update - almost same as update_pulsar_distances but with different asserts and param updates"""
         resres_temp = self.resres_array.copy()
 
-        update_intrinsic_params2(x0,self.isqNvecs,self.Nrs,self.pos,self.pdist,self.toas, self.NN, self.MMs,self.TNvs,self.chol_Sigmas,psr_idxs,resres_temp,self.dotTNrs)
+        if not self.prior_recovery:
+            update_intrinsic_params2(x0,self.isqNvecs,self.Nrs,self.pos,self.pdist,self.toas, self.NN, self.MMs,self.TNvs,self.chol_Sigmas,psr_idxs,resres_temp,self.dotTNrs)
 
-        self.set_resres_logdet(resres_temp,self.logdet_array,self.logdet_base)
+            self.set_resres_logdet(resres_temp,self.logdet_array,self.logdet_base)
         #track the intrinsic parameters this was set at so we can throw in error if they are inconsistent with an input x0
         self.gwb_gamma = x0.gwb_gamma
         self.gwb_log10_A = x0.gwb_log10_A
