@@ -5,6 +5,7 @@ MCMC for CW fast likelihood (w/ Neil Cornish and Matthew Digman)"""
 from time import perf_counter
 #import glob
 import json
+import pickle
 
 import numpy as np
 #np.seterr(all='raise')
@@ -30,13 +31,15 @@ from enterprise_extensions import deterministic
 import const_mcmc as cm
 from QuickMCMCUtils import MCMCChain
 
+from PulsarDistPriors import DMDistParameter, PXDistParameter
+
 ################################################################################
 #
 #MAIN MCMC ENGINE
 #
 ################################################################################
 #@profile
-def QuickCW(chain_params, psrs, noise_json=None, use_legacy_equad=False, include_ecorr=True, amplitude_prior='UL',gwb_gamma_prior=None):
+def QuickCW(chain_params, psrs, noise_json=None, use_legacy_equad=False, include_ecorr=True, amplitude_prior='UL',gwb_gamma_prior=None, psr_distance_file=None):
     """Set up all essential objects for QuickCW to do MCMC iterations"""
     print("Began Main Loop")
 
@@ -74,6 +77,29 @@ def QuickCW(chain_params, psrs, noise_json=None, use_legacy_equad=False, include
     pl = utils.powerlaw(log10_A=log10_A, gamma=gamma)
     rn = gp_signals.FourierBasisGP(pl, components=30)
 
+    log10_Agw = parameter.Uniform(-20,-11)('gwb_log10_A')
+
+    if gwb_gamma_prior is None:
+        gwb_gamma_prior = np.array([0,7])
+
+    gamma_gw = parameter.Uniform(gwb_gamma_prior[0],gwb_gamma_prior[1])('gwb_gamma')
+    cpl = utils.powerlaw(log10_A=log10_Agw, gamma=gamma_gw)
+    crn = gp_signals.FourierBasisGP(cpl, components=chain_params.gwb_comps, Tspan=Tspan, name='gw')
+
+    tm = gp_signals.TimingModel()
+
+    if include_ecorr:
+        if use_legacy_equad:
+            s_base = ef + eq + ec + rn + crn + tm
+        else:
+            s_base = efq     + ec + rn + crn + tm
+    else:
+        if use_legacy_equad:
+            s_base = ef + eq      + rn + crn + tm
+        else:
+            s_base = efq          + rn + crn + tm
+
+
     cos_gwtheta = parameter.Uniform(-1,1)('0_cos_gwtheta')
     gwphi = parameter.Uniform(0,2*np.pi)('0_gwphi')
 
@@ -92,7 +118,6 @@ def QuickCW(chain_params, psrs, noise_json=None, use_legacy_equad=False, include
     cos_inc = parameter.Uniform(-1, 1)('0_cos_inc')
 
     p_phase = parameter.Uniform(0, 2*np.pi)
-    p_dist = parameter.Normal(0, 1)
 
     if amplitude_prior=='detection':
         log10_h = parameter.Uniform(-18, -11)('0_log10_h')
@@ -101,35 +126,46 @@ def QuickCW(chain_params, psrs, noise_json=None, use_legacy_equad=False, include
     else:
         raise NotImplementedError("amplitude_prior provided not implemented\nuse either 'detection' for uniform in log-amplitude or 'UL' for uniform in amplitude prior")
 
-    cw_wf = deterministic.cw_delay(cos_gwtheta=cos_gwtheta, gwphi=gwphi, log10_mc=log10_mc,
-                                   log10_h=log10_h, log10_fgw=log10_fgw, phase0=phase0, psrTerm=True,
-                                   p_phase=p_phase, p_dist=p_dist, evolve=True,
-                                   psi=psi, cos_inc=cos_inc, tref=cm.tref)
-    cw = deterministic.CWSignal(cw_wf, psrTerm=True, name='cw0')
+    if psr_distance_file is None: #No pulsar distance file --> use Gaussian prior with pulsar distance and error from psr objects
+        if np.any(np.array([psr.pdist[0] for psr in psrs])==0): #raise error if this is used with psr objects having zero distance
+            raise ValueError("It looks like some of the pulsar distances used are zero. Please provide psr_distance_file or use psr objects with nonzero distance.")
 
-    log10_Agw = parameter.Uniform(-20,-11)('gwb_log10_A')
+        p_dist = parameter.Normal(0, 1)
 
-    if gwb_gamma_prior is None:
-        gwb_gamma_prior = np.array([0,7])
+        cw_wf = deterministic.cw_delay(cos_gwtheta=cos_gwtheta, gwphi=gwphi, log10_mc=log10_mc,
+                                       log10_h=log10_h, log10_fgw=log10_fgw, phase0=phase0, psrTerm=True,
+                                       p_phase=p_phase, p_dist=p_dist, evolve=True,
+                                       psi=psi, cos_inc=cos_inc, tref=cm.tref)
+        cw = deterministic.CWSignal(cw_wf, psrTerm=True, name='cw0')
 
-    gamma_gw = parameter.Uniform(gwb_gamma_prior[0],gwb_gamma_prior[1])('gwb_gamma')
-    cpl = utils.powerlaw(log10_A=log10_Agw, gamma=gamma_gw)
-    crn = gp_signals.FourierBasisGP(cpl, components=chain_params.gwb_comps, Tspan=Tspan, name='gw')
+        s = s_base + cw
 
-    tm = gp_signals.TimingModel()
+        models = [s(psr) for psr in psrs]
+    else: #provided pulsar distance file --> use information in that file for setting up pulsar distance priors
+        if (np.any(np.array([psr.pdist[0] for psr in psrs])>0)) | np.any(np.array([psr.pdist[1] for psr in psrs])!=1): #raise error if this is used while any of the pulsars have non-zero distance
+            raise ValueError("You are running in a mode using parallax and DM based pulsar distance priors, but some of the pulsar object have non-zero distances or non-unit variances. This method requires the pulsar objects to have zero mean and unit variance. Use psr objects that satisfy that or switch to using Gaussian priors based on distances in psr objects by setting psr_distance_file=None.")
 
-    if include_ecorr:
-        if use_legacy_equad:
-            s = ef + eq + ec + rn + crn + cw + tm
-        else:
-            s = efq     + ec + rn + crn + cw + tm
-    else:
-        if use_legacy_equad:
-            s = ef + eq      + rn + crn + cw + tm
-        else:
-            s = efq          + rn + crn + cw + tm
+        #load provided pulsar distance file
+        with open(psr_distance_file, 'rb') as fp:
+            pulsar_distances = pickle.load(fp)
 
-    models = [s(psr) for psr in psrs]
+        models = []
+        for psr in psrs:
+            if 'DM' in pulsar_distances[psr.name]: #use DM distance prior for this pulsar
+                p_dist = DMDistParameter(pulsar_distances[psr.name][0], pulsar_distances[psr.name][1])
+            elif 'PX' in pulsar_distances[psr.name]: #use parallax distance prior for this pulsar
+                p_dist = PXDistParameter(pulsar_distances[psr.name][0], pulsar_distances[psr.name][1])
+
+            cw_wf = deterministic.cw_delay(cos_gwtheta=cos_gwtheta, gwphi=gwphi, log10_mc=log10_mc,
+                                           log10_h=log10_h, log10_fgw=log10_fgw, phase0=phase0, psrTerm=True,
+                                           p_phase=p_phase, p_dist=p_dist, evolve=True,
+                                           psi=psi, cos_inc=cos_inc, tref=cm.tref)
+
+            cw = deterministic.CWSignal(cw_wf, psrTerm=True, name='cw0')
+
+            s = s_base + cw
+
+            models.append(s(psr))
 
     t1 = perf_counter()
     print("Begin Loading Pulsar Timing Array from Enterprise at %8.3fs"%(t1-ti))

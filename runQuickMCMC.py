@@ -38,7 +38,7 @@ with open(data_pkl, 'rb') as psr_pkl:
 print(len(psrs))
 
 #number of iterations (increase to 100 million - 1 billion for actual analysis)
-N = 5000000
+N = 5_000_000
 
 n_int_block = 10_000 #number of iterations in a block (which has one shape update and the rest are projection updates)
 save_every_n = 100_000 #number of iterations between saving intermediate results (needs to be intiger multiple of n_int_block)
@@ -63,6 +63,9 @@ noisefile = 'data/quickCW_noisedict_kernel_ecorr.json'
 rn_emp_dist_file = 'data/emp_dist.pkl'
 #rn_emp_dist_file = None
 
+#file containing information about pulsar distances - None means use pulsar distances present in psr objects
+#if not None psr objects must have zero distance and unit variance
+psr_dist_file = None
 
 #this is where results will be saved
 savefile = 'results/quickCW_test16.h5'
@@ -82,7 +85,10 @@ chain_params = ChainParams(T_max,n_chain, n_block_status_update,
                            dist_jump_weight=0.2, rn_jump_weight=0.3, gwb_jump_weight=0.1, common_jump_weight=0.2, all_jump_weight=0.2, #probability of updating different groups of parameters
                            fix_rn=False, zero_rn=False, fix_gwb=False, zero_gwb=False) #switches to turn off GWB or RN jumps and keep them fixed and to set them to practically zero (gamma=0.0, log10_A=-20)
 
-pta,mcc = QuickCW.QuickCW(chain_params, psrs, noise_json=noisefile)
+pta,mcc = QuickCW.QuickCW(chain_params, psrs,
+                          amplitude_prior='detection', #specify amplitude prior to use - 'detection':uniform in log-amplitude, 'UL': uniform in amplitude
+                          psr_distance_file=psr_dist_file, #file to specify advanced (parallax+DM) pulsar distance priors, if None use regular Gaussian priors based on pulsar distances in pulsar objects
+                          noise_json=noisefile)
 
 #Some parameters in chain_params can be updated later if needed
 mcc.chain_params.thin = 10

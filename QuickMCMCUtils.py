@@ -82,11 +82,15 @@ def do_extrinsic_block(n_chain, samples, itrb, Ts, x0s, FLIs, FPI, n_par_tot, lo
             log_acc_ratio += CWFastPrior.get_lnprior_helper(new_point, FPI.uniform_par_ids, FPI.uniform_lows, FPI.uniform_highs,\
                                                                        FPI.lin_exp_par_ids, FPI.lin_exp_lows, FPI.lin_exp_highs,\
                                                                        FPI.normal_par_ids, FPI.normal_mus, FPI.normal_sigs,\
+                                                                       FPI.dm_par_ids, FPI.dm_dists, FPI.dm_errs,\
+                                                                       FPI.px_par_ids, FPI.px_mus, FPI.px_errs,\
                                                                        FPI.global_common)
             log_acc_ratio += -log_likelihood[j,itrb+k]/Ts[j]
             log_acc_ratio += -CWFastPrior.get_lnprior_helper(samples_current, FPI.uniform_par_ids, FPI.uniform_lows, FPI.uniform_highs,\
                                                                               FPI.lin_exp_par_ids, FPI.lin_exp_lows, FPI.lin_exp_highs,\
                                                                               FPI.normal_par_ids, FPI.normal_mus, FPI.normal_sigs,\
+                                                                              FPI.dm_par_ids, FPI.dm_dists, FPI.dm_errs,\
+                                                                              FPI.px_par_ids, FPI.px_mus, FPI.px_errs,\
                                                                               FPI.global_common)
 
             acc_decide = np.log(uniform(0.0, 1.0, 1))
@@ -506,9 +510,11 @@ class MCMCChain():
 
         self.FPI = CWFastPrior.get_FastPriorInfo(self.pta,self.psrs,self.par_names_cw_ext)
         if self.verbosity>0:
-            print('uniform',self.FPI.uniform_par_ids)
+            print('uniform ',self.FPI.uniform_par_ids)
             print('normal ',self.FPI.normal_par_ids)
-            print('lin exp',self.FPI.lin_exp_par_ids)
+            print('lin exp ',self.FPI.lin_exp_par_ids)
+            print('dm dist ',self.FPI.dm_par_ids)
+            print('px dist ',self.FPI.px_par_ids)
 
         #assert np.all(FPI.cw_ext_lows==cw_ext_lows)
         #assert np.all(FPI.cw_ext_highs==cw_ext_highs)
