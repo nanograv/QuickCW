@@ -578,6 +578,20 @@ class MCMCChain():
         t1 = perf_counter()
         print("Finished Creating Shared Info Objects at %8.3fs"%(t1-self.ti))
 
+        self.dist_prior_sigmas = []
+        for dist_idx in self.x0s[0].idx_dists:
+            if dist_idx in self.FPI.normal_par_ids:
+                self.dist_prior_sigmas.append(self.FPI.normal_sigs[list(self.FPI.normal_par_ids).index(dist_idx)])
+            elif dist_idx in self.FPI.dm_par_ids:
+                self.dist_prior_sigmas.append(self.FPI.dm_errs[list(self.FPI.dm_par_ids).index(dist_idx)])
+            elif dist_idx in self.FPI.px_par_ids:
+                self.dist_prior_sigmas.append(self.FPI.px_errs[list(self.FPI.px_par_ids).index(dist_idx)]/self.FPI.px_mus[list(self.FPI.px_par_ids).index(dist_idx)]**2)
+
+        self.dist_prior_sigmas = np.array(self.dist_prior_sigmas)
+
+        print("Distance prior sigmas calculated for fisher correction:")
+        print(self.dist_prior_sigmas)
+
         t1 = perf_counter()
         print("Geting Starting Fishers at %8.3fs"%(t1-self.ti))
         #get only the starting point so we can add a fisher red noise jump to the others
