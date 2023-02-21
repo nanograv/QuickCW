@@ -3,7 +3,7 @@ MCMC for CW fast likelihood (w/ Neil Cornish and Matthew Digman)
 Helpers to get fisher matrices"""
 import numpy as np
 
-import const_mcmc as cm
+import QuickCW.const_mcmc as cm
 
 def get_FLI_mem(FLI_swap):
     """store everything needed to reset FLI for non-red noise updates"""

@@ -25,9 +25,9 @@ from enterprise_extensions import deterministic
 #import glob
 #import json
 
-import QuickCW
-from QuickMCMCUtils import ChainParams
-#import CWFastLikelihoodNumba
+import QuickCW.QuickCW
+from QuickCW.QuickMCMCUtils import ChainParams
+#import QuickCW.FastLikelihoodNumba as FastLikelihoodNumba
 
 #make sure this points to the pickled pulsars you want to analyze
 data_pkl = 'data/nanograv_11yr_psrs.pkl'
@@ -85,10 +85,10 @@ chain_params = ChainParams(T_max,n_chain, n_block_status_update,
                            dist_jump_weight=0.2, rn_jump_weight=0.3, gwb_jump_weight=0.1, common_jump_weight=0.2, all_jump_weight=0.2, #probability of updating different groups of parameters
                            fix_rn=False, zero_rn=False, fix_gwb=False, zero_gwb=False) #switches to turn off GWB or RN jumps and keep them fixed and to set them to practically zero (gamma=0.0, log10_A=-20)
 
-pta,mcc = QuickCW.QuickCW(chain_params, psrs,
-                          amplitude_prior='detection', #specify amplitude prior to use - 'detection':uniform in log-amplitude, 'UL': uniform in amplitude
-                          psr_distance_file=psr_dist_file, #file to specify advanced (parallax+DM) pulsar distance priors, if None use regular Gaussian priors based on pulsar distances in pulsar objects
-                          noise_json=noisefile)
+pta,mcc = QuickCW.QuickCW.QuickCW(chain_params, psrs,
+                                  amplitude_prior='detection', #specify amplitude prior to use - 'detection':uniform in log-amplitude, 'UL': uniform in amplitude
+                                  psr_distance_file=psr_dist_file, #file to specify advanced (parallax+DM) pulsar distance priors, if None use regular Gaussian priors based on pulsar distances in pulsar objects
+                                  noise_json=noisefile)
 
 #Some parameters in chain_params can be updated later if needed
 mcc.chain_params.thin = 10
