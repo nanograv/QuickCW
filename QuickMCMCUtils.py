@@ -378,6 +378,7 @@ class ChainParams():
                        save_every_n=10_000, fisher_eig_downsample=10, T_ladder=None,\
                        includeCW=True, prior_recovery=False, verbosity=1,\
                        freq_bounds=np.array([np.nan, 1e-7], dtype=np.float64), gwb_comps=14,\
+                       cos_gwtheta_bounds=np.array([-1,1]), gwphi_bounds=np.array([0,2*np.pi]),\
                        de_history_size=5_000, thin_de=10_000, log_fishers=False,log_mean_likelihoods=True,\
                        savefile=None, thin=100, samples_precision=np.single, save_first_n_chains=1,\
                        prior_draw_prob=0.1, de_prob=0.6, fisher_prob=0.3,\
@@ -402,6 +403,8 @@ class ChainParams():
         self.verbosity = verbosity
         self.freq_bounds = freq_bounds
         self.gwb_comps = gwb_comps
+        self.cos_gwtheta_bounds=cos_gwtheta_bounds
+        self.gwphi_bounds=gwphi_bounds
         self.de_history_size = de_history_size
         self.thin_de = thin_de
         self.log_fishers = log_fishers

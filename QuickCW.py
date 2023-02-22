@@ -100,8 +100,10 @@ def QuickCW(chain_params, psrs, noise_json=None, use_legacy_equad=False, include
             s_base = efq          + rn + crn + tm
 
 
-    cos_gwtheta = parameter.Uniform(-1,1)('0_cos_gwtheta')
-    gwphi = parameter.Uniform(0,2*np.pi)('0_gwphi')
+    #cos_gwtheta = parameter.Uniform(-1,1)('0_cos_gwtheta')
+    #gwphi = parameter.Uniform(0,2*np.pi)('0_gwphi')
+    cos_gwtheta = parameter.Uniform(chain_params.cos_gwtheta_bounds[0],chain_params.cos_gwtheta_bounds[1])('0_cos_gwtheta')
+    gwphi = parameter.Uniform(chain_params.gwphi_bounds[0],chain_params.gwphi_bounds[1])('0_gwphi')
 
     #set lower frequency bound to 1/Tspan if it's nan
     if np.isnan(chain_params.freq_bounds[0]):
