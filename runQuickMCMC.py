@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """C 2021 Bence Becsy
 MCMC for CW fast likelihood (w/ Neil Cornish and Matthew Digman)"""
 
