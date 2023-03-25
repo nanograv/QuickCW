@@ -5,4 +5,4 @@ export NUMBA_NUM_THREADS=12
 export MKL_NUM_THREADS=12
 
 #nice -n 20 /usr/bin/time python -u runQuickMCMC.py
-python -u runQuickMCMC.py
+python -u QuickCW/runQuickMCMC.py
