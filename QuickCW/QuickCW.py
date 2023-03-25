@@ -33,7 +33,7 @@ import QuickCW.const_mcmc as cm
 from QuickCW.QuickMCMCUtils import MCMCChain, ChainParams
 
 
-from PulsarDistPriors import DMDistParameter, PXDistParameter
+from QuickCW.PulsarDistPriors import DMDistParameter, PXDistParameter
 
 ################################################################################
 #
