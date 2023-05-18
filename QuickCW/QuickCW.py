@@ -17,7 +17,7 @@ config.THREADING_LAYER = 'omp'
 print("Number of cores used for parallel running: ", config.NUMBA_NUM_THREADS)
 
 import enterprise
-# from enterprise.pulsar import Pulsar
+from enterprise.pulsar import Pulsar
 import enterprise.signals.parameter as parameter
 from enterprise.signals import utils
 from enterprise.signals import signal_base
@@ -32,8 +32,8 @@ from enterprise_extensions import deterministic
 import QuickCW.const_mcmc as cm
 from QuickCW.QuickMCMCUtils import MCMCChain, ChainParams
 
-
-from QuickCW.PulsarDistPriors import DMDistParameter, PXDistParameter
+import inspect
+from PulsarDistPriors import DMDistParameter, PXDistParameter
 
 ################################################################################
 #
@@ -158,18 +158,15 @@ def QuickCW(chain_params, psrs, noise_json=None, use_legacy_equad=False, include
 
         models = []
         for psr in psrs:
-            if 'DM' in pulsar_distances[psr.name]: #use DM distance prior for this pulsar
-                p_dist = DMDistParameter(pulsar_distances[psr.name][0], pulsar_distances[psr.name][1])
-            elif 'PX' in pulsar_distances[psr.name]: #use parallax distance prior for this pulsar
-                p_dist = PXDistParameter(pulsar_distances[psr.name][0], pulsar_distances[psr.name][1])
-
-            cw_wf = deterministic.cw_delay(cos_gwtheta=cos_gwtheta, gwphi=gwphi, log10_mc=log10_mc,
+            # arguments for deterministic.cw_delay
+            cw_delay_args = dict(cos_gwtheta=cos_gwtheta, gwphi=gwphi, log10_mc=log10_mc,
                                            log10_h=log10_h, log10_fgw=log10_fgw, phase0=phase0, psrTerm=True,
-                                           p_phase=p_phase, p_dist=p_dist, evolve=True,
+                                           p_phase=p_phase, evolve=True,
                                            psi=psi, cos_inc=cos_inc, tref=cm.tref)
-
-            cw = deterministic.CWSignal(cw_wf, psrTerm=True, name='cw0')
-
+            # arguments for deterministic.CWSignal
+            CWSignal_args = dict(psrTerm=True, name='cw0')
+            # create CW signal applying pulsar distance prior
+            cw = per_pulsar_prior(psr, pulsar_distances, cw_delay_args, CWSignal_args)
             s = s_base + cw
 
             models.append(s(psr))
@@ -203,3 +200,41 @@ def QuickCW(chain_params, psrs, noise_json=None, use_legacy_equad=False, include
     ##############################################################################
     mcc = MCMCChain(chain_params, psrs, pta, max_toa, noisedict, ti)
     return pta, mcc
+
+
+def get_default_args(func):
+    """
+    Gets default arguments from a python function
+    """
+    signature = inspect.signature(func)
+    return {
+        k: v.default
+        for k, v in signature.parameters.items()
+        if v.default is not inspect.Parameter.empty
+    }
+
+
+def per_pulsar_prior(enterprise_pulsar: Pulsar, pulsar_distances: dict,
+                     cw_delay_args: dict=None, CWSignal_args: dict=None):
+    """
+    Creates a CW signal applying distance priors to individual pulsars based on DM or PX in the pulsar_distances dict
+
+    """
+    if cw_delay_args is None:
+        # could maybe replace this by using an empty dictionary instead
+        cw_delay_args = get_default_args(deterministic.cw_delay)
+    if CWSignal_args is None:
+        CWSignal_args = get_default_args(deterministic.CWSignal)
+
+    if 'DM' in pulsar_distances[enterprise_pulsar.name]:  # use DM distance prior for this pulsar
+        p_dist = DMDistParameter(pulsar_distances[enterprise_pulsar.name][0],
+                                 pulsar_distances[enterprise_pulsar.name][1])
+    elif 'PX' in pulsar_distances[enterprise_pulsar.name]:  # use parallax distance prior for this pulsar
+        p_dist = PXDistParameter(pulsar_distances[enterprise_pulsar.name][0],
+                                 pulsar_distances[enterprise_pulsar.name][1])
+
+    cw_wf = deterministic.cw_delay(p_dist=p_dist, **cw_delay_args)
+
+    cw = deterministic.CWSignal(cw_wf, **CWSignal_args)
+
+    return cw
