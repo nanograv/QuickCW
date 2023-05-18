@@ -33,7 +33,7 @@ import QuickCW.const_mcmc as cm
 from QuickCW.QuickMCMCUtils import MCMCChain, ChainParams
 
 import inspect
-from PulsarDistPriors import DMDistParameter, PXDistParameter
+from QuickCW.PulsarDistPriors import DMDistParameter, PXDistParameter
 
 ################################################################################
 #
@@ -238,3 +238,4 @@ def per_pulsar_prior(enterprise_pulsar: Pulsar, pulsar_distances: dict,
     cw = deterministic.CWSignal(cw_wf, **CWSignal_args)
 
     return cw
+

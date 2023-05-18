@@ -17,24 +17,23 @@
 
 """
 Setup script for QuickCW
-call should look like python setup.py install
+can install like this: pip install -e .
 """
-import os
-from distutils.core import setup
+from setuptools import setup, find_packages
 
-def package_files(directory):
-    paths = []
-    for (path, directories, filenames) in os.walk(directory):
-        for filename in filenames:
-            paths.append(os.path.join("..", path, filename))
-    return paths
 setup(
+    author='Bence Becsy',
     name='QuickCW',
-    version='1.0.1',
-    requires=['numpy', 'enterprise_extensions', 'numba', 'h5py'],
-    packages=['QuickCW'],
+    version='1.1.0',
+    install_requires=[
+         'numpy',
+         'enterprise_extensions',
+         'numba',
+         'h5py',
+    ],
+    python_requires='>=3.7',
+    packages=find_packages(include=['QuickCW']),
     scripts=['runQuickMCMC.py'],
-    license='GPL',
     long_description=open('README.md').read(),
     )
 
