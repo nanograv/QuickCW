@@ -1,51 +1,53 @@
 """C 2021 Bence Becsy
 MCMC for CW fast likelihood (w/ Neil Cornish and Matthew Digman)"""
-#import pickle
+# import pickle
 
 from time import perf_counter
-#import glob
+# import glob
 import json
 import pickle
 
 import numpy as np
-#np.seterr(all='raise')
-#make sure to use the right threading layer
+# np.seterr(all='raise')
+# make sure to use the right threading layer
 from numba import config
+
 config.THREADING_LAYER = 'omp'
-#config.THREADING_LAYER = 'tbb'
+# config.THREADING_LAYER = 'tbb'
 print("Number of cores used for parallel running: ", config.NUMBA_NUM_THREADS)
 
 import enterprise
-#from enterprise.pulsar import Pulsar
+from enterprise.pulsar import Pulsar
 import enterprise.signals.parameter as parameter
 from enterprise.signals import utils
 from enterprise.signals import signal_base
 from enterprise.signals import selections
-#from enterprise.signals.selections import Selection
+# from enterprise.signals.selections import Selection
 from enterprise.signals import white_signals
 from enterprise.signals import gp_signals
-#from enterprise.signals import deterministic_signals
+# from enterprise.signals import deterministic_signals
 
 from enterprise_extensions import deterministic
 
-import const_mcmc as cm
-from QuickMCMCUtils import MCMCChain
+import QuickCW.const_mcmc as cm
+from QuickCW.QuickMCMCUtils import MCMCChain, ChainParams
 
-from PulsarDistPriors import DMDistParameter, PXDistParameter
+import inspect
+from QuickCW.PulsarDistPriors import DMDistParameter, PXDistParameter
 
 ################################################################################
 #
-#MAIN MCMC ENGINE
+# MAIN MCMC ENGINE
 #
 ################################################################################
 #@profile
-def QuickCW(chain_params, psrs, noise_json=None, use_legacy_equad=False, include_ecorr=True, amplitude_prior='UL',gwb_gamma_prior=None, psr_distance_file=None):
+def QuickCW(chain_params, psrs, noise_json=None, use_legacy_equad=False, include_ecorr=True, amplitude_prior='UL', gwb_gamma_prior=None, psr_distance_file=None, backend_selection=True):
     """Set up all essential objects for QuickCW to do MCMC iterations"""
     print("Began Main Loop")
 
     ti = perf_counter()
 
-    #Get observing timespan
+    # Get observing timespan
     tmin = [p.toas.min() for p in psrs]
     tmax = [p.toas.max() for p in psrs]
     Tspan = np.max(tmax) - np.min(tmin)
@@ -55,7 +57,10 @@ def QuickCW(chain_params, psrs, noise_json=None, use_legacy_equad=False, include
     ecorr = parameter.Constant()
 
     # define selection by observing backend
-    selection = selections.Selection(selections.by_backend)
+    if backend_selection:
+        selection = selections.Selection(selections.by_backend)
+    else:
+        selection = selections.Selection(selections.no_selection)
 
     # define white noise signals
     if use_legacy_equad:
@@ -63,14 +68,14 @@ def QuickCW(chain_params, psrs, noise_json=None, use_legacy_equad=False, include
         eq = white_signals.TNEquadNoise(log10_tnequad=equad, selection=selection)
     else:
         efq = white_signals.MeasurementNoise(efac=efac, log10_t2equad=equad, selection=selection)
-    #ec = white_signals.EcorrKernelNoise(log10_ecorr=ecorr, selection=selection)
-    #ec = gp_signals.EcorrBasisModel(log10_ecorr=ecorr, selection=selection)
+    # ec = white_signals.EcorrKernelNoise(log10_ecorr=ecorr, selection=selection)
+    # ec = gp_signals.EcorrBasisModel(log10_ecorr=ecorr, selection=selection)
     if include_ecorr:
-        #give ecorr a name so that we can use the usual noisefiles created for Kernel ecorr
+        # give ecorr a name so that we can use the usual noisefiles created for Kernel ecorr
         ec = gp_signals.EcorrBasisModel(log10_ecorr=ecorr, selection=selection, name='')
 
     log10_A = parameter.Uniform(-20, -11)
-    #log10_A = parameter.Uniform(-18, -11)
+    # log10_A = parameter.Uniform(-18, -11)
     gamma = parameter.Uniform(0, 7)
 
     # define powerlaw PSD and red noise signal
@@ -105,28 +110,30 @@ def QuickCW(chain_params, psrs, noise_json=None, use_legacy_equad=False, include
     cos_gwtheta = parameter.Uniform(chain_params.cos_gwtheta_bounds[0],chain_params.cos_gwtheta_bounds[1])('0_cos_gwtheta')
     gwphi = parameter.Uniform(chain_params.gwphi_bounds[0],chain_params.gwphi_bounds[1])('0_gwphi')
 
-    #set lower frequency bound to 1/Tspan if it's nan
+    # set lower frequency bound to 1/Tspan if it's nan
     if np.isnan(chain_params.freq_bounds[0]):
         print('Found lower frequency bound of nan - Setting it to 1/T.')
-        chain_params.freq_bounds[0] = 1/Tspan
-    log10_fgw = parameter.Uniform(np.log10(chain_params.freq_bounds[0]), np.log10(chain_params.freq_bounds[1]))('0_log10_fgw')
+        chain_params.freq_bounds[0] = 1 / Tspan
+    log10_fgw = parameter.Uniform(np.log10(chain_params.freq_bounds[0]), np.log10(chain_params.freq_bounds[1]))(
+        '0_log10_fgw')
 
     m_max = 10
 
-    log10_mc = parameter.Uniform(7,m_max)('0_log10_mc')
+    log10_mc = parameter.Uniform(7, m_max)('0_log10_mc')
 
-    phase0 = parameter.Uniform(0, 2*np.pi)('0_phase0')
+    phase0 = parameter.Uniform(0, 2 * np.pi)('0_phase0')
     psi = parameter.Uniform(0, np.pi)('0_psi')
     cos_inc = parameter.Uniform(-1, 1)('0_cos_inc')
 
     p_phase = parameter.Uniform(0, 2*np.pi)
 
-    if amplitude_prior=='detection':
+    if amplitude_prior == 'detection':
         log10_h = parameter.Uniform(-18, -11)('0_log10_h')
-    elif amplitude_prior=='UL':
+    elif amplitude_prior == 'UL':
         log10_h = parameter.LinearExp(-18, -11)('0_log10_h')
     else:
-        raise NotImplementedError("amplitude_prior provided not implemented\nuse either 'detection' for uniform in log-amplitude or 'UL' for uniform in amplitude prior")
+        raise NotImplementedError(
+            "amplitude_prior provided not implemented\nuse either 'detection' for uniform in log-amplitude or 'UL' for uniform in amplitude prior")
 
     if psr_distance_file is None: #No pulsar distance file --> use Gaussian prior with pulsar distance and error from psr objects
         if np.any(np.array([psr.pdist[0] for psr in psrs])==0): #raise error if this is used with psr objects having zero distance
@@ -153,49 +160,84 @@ def QuickCW(chain_params, psrs, noise_json=None, use_legacy_equad=False, include
 
         models = []
         for psr in psrs:
-            if 'DM' in pulsar_distances[psr.name]: #use DM distance prior for this pulsar
-                p_dist = DMDistParameter(pulsar_distances[psr.name][0], pulsar_distances[psr.name][1])
-            elif 'PX' in pulsar_distances[psr.name]: #use parallax distance prior for this pulsar
-                p_dist = PXDistParameter(pulsar_distances[psr.name][0], pulsar_distances[psr.name][1])
-
-            cw_wf = deterministic.cw_delay(cos_gwtheta=cos_gwtheta, gwphi=gwphi, log10_mc=log10_mc,
+            # arguments for deterministic.cw_delay
+            cw_delay_args = dict(cos_gwtheta=cos_gwtheta, gwphi=gwphi, log10_mc=log10_mc,
                                            log10_h=log10_h, log10_fgw=log10_fgw, phase0=phase0, psrTerm=True,
-                                           p_phase=p_phase, p_dist=p_dist, evolve=True,
+                                           p_phase=p_phase, evolve=True,
                                            psi=psi, cos_inc=cos_inc, tref=cm.tref)
-
-            cw = deterministic.CWSignal(cw_wf, psrTerm=True, name='cw0')
-
+            # arguments for deterministic.CWSignal
+            CWSignal_args = dict(psrTerm=True, name='cw0')
+            # create CW signal applying pulsar distance prior
+            cw = per_pulsar_prior(psr, pulsar_distances, cw_delay_args, CWSignal_args)
             s = s_base + cw
 
             models.append(s(psr))
 
     t1 = perf_counter()
-    print("Begin Loading Pulsar Timing Array from Enterprise at %8.3fs"%(t1-ti))
+    print("Begin Loading Pulsar Timing Array from Enterprise at %8.3fs" % (t1 - ti))
     pta = signal_base.PTA(models)
     t1 = perf_counter()
-    print("Finished Loading Pulsar Timing Array from Enterprise at %8.3fs"%(t1-ti))
+    print("Finished Loading Pulsar Timing Array from Enterprise at %8.3fs" % (t1 - ti))
 
     with open(noise_json, 'r') as fp:
         noisedict = json.load(fp)
 
-    #print(noisedict)
+    # print(noisedict)
     pta.set_default_params(noisedict)
-    if chain_params.verbosity>1:
+    if chain_params.verbosity > 1:
         print(pta.summary())
-    if chain_params.verbosity>0:
+    if chain_params.verbosity > 0:
         print("List of parameters in the model with their priors:")
         print(pta.params)
 
-    #get max toa which is needed to mae sure the initial parameters don't result in an already merged system
+    # get max toa which is needed to mae sure the initial parameters don't result in an already merged system
     max_toa = np.max(psrs[0].toas)
     for i in range(len(psrs)):
-        max_toa = max(max_toa,np.max(psrs[i].toas))
+        max_toa = max(max_toa, np.max(psrs[i].toas))
 
     ##############################################################################
     #
     # Make MCMC Object
     #
     ##############################################################################
-    mcc = MCMCChain(chain_params,psrs,pta,max_toa,noisedict,ti)
+    mcc = MCMCChain(chain_params, psrs, pta, max_toa, noisedict, ti)
+    return pta, mcc
 
-    return pta,mcc
+
+def get_default_args(func):
+    """
+    Gets default arguments from a python function
+    """
+    signature = inspect.signature(func)
+    return {
+        k: v.default
+        for k, v in signature.parameters.items()
+        if v.default is not inspect.Parameter.empty
+    }
+
+
+def per_pulsar_prior(enterprise_pulsar: Pulsar, pulsar_distances: dict,
+                     cw_delay_args: dict=None, CWSignal_args: dict=None):
+    """
+    Creates a CW signal applying distance priors to individual pulsars based on DM or PX in the pulsar_distances dict
+
+    """
+    if cw_delay_args is None:
+        # could maybe replace this by using an empty dictionary instead
+        cw_delay_args = get_default_args(deterministic.cw_delay)
+    if CWSignal_args is None:
+        CWSignal_args = get_default_args(deterministic.CWSignal)
+
+    if 'DM' in pulsar_distances[enterprise_pulsar.name]:  # use DM distance prior for this pulsar
+        p_dist = DMDistParameter(pulsar_distances[enterprise_pulsar.name][0],
+                                 pulsar_distances[enterprise_pulsar.name][1])
+    elif 'PX' in pulsar_distances[enterprise_pulsar.name]:  # use parallax distance prior for this pulsar
+        p_dist = PXDistParameter(pulsar_distances[enterprise_pulsar.name][0],
+                                 pulsar_distances[enterprise_pulsar.name][1])
+
+    cw_wf = deterministic.cw_delay(p_dist=p_dist, **cw_delay_args)
+
+    cw = deterministic.CWSignal(cw_wf, **CWSignal_args)
+
+    return cw
+

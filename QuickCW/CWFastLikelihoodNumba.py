@@ -8,9 +8,9 @@ from numba.typed import List
 import scipy.linalg
 
 from enterprise import constants as const
-from lapack_wrappers import solve_triangular
+from QuickCW.lapack_wrappers import solve_triangular
 
-import const_mcmc as cm
+import QuickCW.const_mcmc as cm
 
 class FastLikeMaster:
     """class to store pta things so they do not have to be recomputed when red noise is recomputed"""
