@@ -380,6 +380,7 @@ class ChainParams():
                  fisher_eig_downsample: int = 10, T_ladder: list = None,
                  includeCW: bool = True, prior_recovery: bool = False, verbosity: int = 1,
                  freq_bounds: np.ndarray = np.array([np.nan, 1e-7], dtype=np.float64), gwb_comps: int = 14,
+                 cos_gwtheta_bounds: np.ndarray = np.array([-1,1]), gwphi_bounds: np.ndarray = np.array([0,2*np.pi]),
                  de_history_size: int = 5_000, thin_de: int = 10_000,
                  log_fishers: bool = False, log_mean_likelihoods: bool = True,
                  savefile: str = None, thin: int = 100, samples_precision: type = np.single,
@@ -408,6 +409,8 @@ class ChainParams():
         self.verbosity = verbosity
         self.freq_bounds = freq_bounds
         self.gwb_comps = gwb_comps
+        self.cos_gwtheta_bounds=cos_gwtheta_bounds
+        self.gwphi_bounds=gwphi_bounds
         self.de_history_size = de_history_size
         self.thin_de = thin_de
         self.log_fishers = log_fishers
