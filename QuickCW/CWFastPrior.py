@@ -21,9 +21,16 @@ from numba.typed import List
 #
 ################################################################################
 class FastPrior:
-    """helper class to set up information about priors"""
+    """helper class to set up information about priors
+
+    :param pta:
+    enterprise PTA object
+    :param psrs:
+    list of enterprise pulsar objects
+    :param par_names_cw_ext:
+    list of projection parameters (previously called extrinsic parameters)
+    """
     def __init__(self, pta, psrs, par_names_cw_ext):
-        """pta is an enterprise pta and par_names_cw_ext is a list of the extrinsic parameters"""
         self.pta = pta
         self.param_names = List(pta.param_names)
         uniform_pars = []
@@ -186,7 +193,44 @@ def get_sample_helper_full(n_par,uniform_par_ids, uniform_lows, uniform_highs,
                            normal_par_ids, normal_mus, normal_sigs,
                            dm_par_ids, dm_dists, dm_errs,
                            px_par_ids, px_mus, px_errs):
-    """jittable helper for prior draws"""
+    """jittable helper for prior draws
+
+    :param n_par:
+    Number of parameters in likelihood/prior
+    :param uniform_par_ids:
+    Indices of parameters with uniform prior
+    :param uniform_lows:
+    Lower prior bounds of uniform prior parameters
+    :param uniform_highs:
+    Upper prior bounds of uniform prior parameters
+    :param lin_exp_par_ids:
+    Indices of parameters with linear exponential prior
+    :param lin_exp_lows:
+    Lower prior bounds of linear exponential prior parameters
+    :param lin_exp_highs:
+    Upper prior bounds of linear exponential prior parameters
+    :param normal_par_ids:
+    Indices of parameters with normal prior
+    :param normal_mus:
+    Means of normal prior parameters
+    :param normal_sigs:
+    Standard deviations of normal prior parameters
+    :param dm_par_ids:
+    Indices of parameters with DM distance prior
+    :param dm_dists:
+    Mean distances of DM distance prior parameters
+    :param dm_errs:
+    Errors of DM distance prior parameters
+    :param px_par_ids:
+    Indices of parameters with parallax distance prior
+    :param px_mus:
+    Means of parallax distance prior parameters
+    :param px_errs:
+    Errors of parallax distance prior parameters
+
+    :return res:
+    Array of prior draws
+    """
     res = np.zeros(n_par)
     for itrp,idx in enumerate(uniform_par_ids):
         res[idx] = np.random.uniform(uniform_lows[itrp], uniform_highs[itrp])
@@ -221,7 +265,44 @@ def get_sample_helper(idx, uniform_par_ids, uniform_lows, uniform_highs,
                            normal_par_ids, normal_mus, normal_sigs,
                            dm_par_ids, dm_dists, dm_errs,
                            px_par_ids, px_mus, px_errs):
-    """jittable helper for prior draws"""
+    """jittable helper for prior draws - same as get_sample_helper_full but only for a single parameter
+
+    :param idx:
+    Index of parameters for which we want a prior draw
+    :param uniform_par_ids:
+    Indices of parameters with uniform prior
+    :param uniform_lows:
+    Lower prior bounds of uniform prior parameters
+    :param uniform_highs:
+    Upper prior bounds of uniform prior parameters
+    :param lin_exp_par_ids:
+    Indices of parameters with linear exponential prior
+    :param lin_exp_lows:
+    Lower prior bounds of linear exponential prior parameters
+    :param lin_exp_highs:
+    Upper prior bounds of linear exponential prior parameters
+    :param normal_par_ids:
+    Indices of parameters with normal prior
+    :param normal_mus:
+    Means of normal prior parameters
+    :param normal_sigs:
+    Standard deviations of normal prior parameters
+    :param dm_par_ids:
+    Indices of parameters with DM distance prior
+    :param dm_dists:
+    Mean distances of DM distance prior parameters
+    :param dm_errs:
+    Errors of DM distance prior parameters
+    :param px_par_ids:
+    Indices of parameters with parallax distance prior
+    :param px_mus:
+    Means of parallax distance prior parameters
+    :param px_errs:
+    Errors of parallax distance prior parameters
+
+    :return:
+    Prior draw of the parameter of interest
+    """
     if idx in uniform_par_ids:
         iii = np.argmax(uniform_par_ids==idx)
         return np.random.uniform(uniform_lows[iii], uniform_highs[iii])
@@ -261,7 +342,46 @@ def get_lnprior_helper(x0, uniform_par_ids, uniform_lows, uniform_highs,\
                            dm_par_ids, dm_dists, dm_errs,\
                            px_par_ids, px_mus, px_errs,\
                            global_common):
-    """jittable helper for calculating the log prior"""
+    """jittable helper for calculating the log prior
+
+    :param x0:
+    Array of parameters for which we want to calculate the prior
+    :param uniform_par_ids:
+    Indices of parameters with uniform prior
+    :param uniform_lows:
+    Lower prior bounds of uniform prior parameters
+    :param uniform_highs:
+    Upper prior bounds of uniform prior parameters
+    :param lin_exp_par_ids:
+    Indices of parameters with linear exponential prior
+    :param lin_exp_lows:
+    Lower prior bounds of linear exponential prior parameters
+    :param lin_exp_highs:
+    Upper prior bounds of linear exponential prior parameters
+    :param normal_par_ids:
+    Indices of parameters with normal prior
+    :param normal_mus:
+    Means of normal prior parameters
+    :param normal_sigs:
+    Standard deviations of normal prior parameters
+    :param dm_par_ids:
+    Indices of parameters with DM distance prior
+    :param dm_dists:
+    Mean distances of DM distance prior parameters
+    :param dm_errs:
+    Errors of DM distance prior parameters
+    :param px_par_ids:
+    Indices of parameters with parallax distance prior
+    :param px_mus:
+    Means of parallax distance prior parameters
+    :param px_errs:
+    Errors of parallax distance prior parameters
+    :param global_common:
+    Part of the log prior independent of the parameter values
+
+    :return log_prior:
+    Log prior
+    """
     log_prior = global_common
 
     #loop through uniform parameters and make sure all are in range
@@ -323,7 +443,16 @@ def get_lnprior_helper(x0, uniform_par_ids, uniform_lows, uniform_highs,\
     return log_prior
 
 def get_lnprior(x0,FPI):
-    """wrapper to get lnprior from jitted helper"""
+    """wrapper to get lnprior from jitted helper
+
+    :param x0:
+    Array of parameter values for which we want to calculate the prior
+    :param FPI:
+    FastPriorInfo object
+
+    :return:
+    log prior
+    """
     return get_lnprior_helper(x0, FPI.uniform_par_ids, FPI.uniform_lows, FPI.uniform_highs,\
                                          FPI.lin_exp_par_ids, FPI.lin_exp_lows, FPI.lin_exp_highs,\
                                          FPI.normal_par_ids, FPI.normal_mus, FPI.normal_sigs,\
@@ -333,7 +462,16 @@ def get_lnprior(x0,FPI):
 
 
 def get_lnprior_array(samples,FPI):
-    """wrapper to get lnprior from jitted helper"""
+    """wrapper to get lnprior from jitted helper
+
+    :param samples:
+    2d array of parameter sets for which we want to calculate the prior
+    :param FPI:
+    FastPriorInfo object
+
+    :return:
+    Array of log prior values
+    """
     return get_lnprior_helper_array(samples, FPI.uniform_par_ids, FPI.uniform_lows, FPI.uniform_highs,\
                                            FPI.lin_exp_par_ids, FPI.lin_exp_lows, FPI.lin_exp_highs,\
                                            FPI.normal_par_ids, FPI.normal_mus, FPI.normal_sigs,\
@@ -348,7 +486,47 @@ def get_lnprior_helper_array(x0s, uniform_par_ids, uniform_lows, uniform_highs,\
                            dm_par_ids, dm_dists, dm_errs,\
                            px_par_ids, px_mus, px_errs,\
                            global_common):
-    """jittable helper for calculating the log prior"""
+    """jittable helper for calculating the log prior for an array of points
+    same as get_lnprior_helper, but can be called on an array of parameters
+
+    :param x0s:
+    2D array of multiple parameter sets for which we want to calculate the prior
+    :param uniform_par_ids:
+    Indices of parameters with uniform prior
+    :param uniform_lows:
+    Lower prior bounds of uniform prior parameters
+    :param uniform_highs:
+    Upper prior bounds of uniform prior parameters
+    :param lin_exp_par_ids:
+    Indices of parameters with linear exponential prior
+    :param lin_exp_lows:
+    Lower prior bounds of linear exponential prior parameters
+    :param lin_exp_highs:
+    Upper prior bounds of linear exponential prior parameters
+    :param normal_par_ids:
+    Indices of parameters with normal prior
+    :param normal_mus:
+    Means of normal prior parameters
+    :param normal_sigs:
+    Standard deviations of normal prior parameters
+    :param dm_par_ids:
+    Indices of parameters with DM distance prior
+    :param dm_dists:
+    Mean distances of DM distance prior parameters
+    :param dm_errs:
+    Errors of DM distance prior parameters
+    :param px_par_ids:
+    Indices of parameters with parallax distance prior
+    :param px_mus:
+    Means of parallax distance prior parameters
+    :param px_errs:
+    Errors of parallax distance prior parameters
+    :param global_common:
+    Part of the log prior independent of the parameter values
+
+    :return log_priors:
+    Array of log prior values
+    """
     npoint = x0s.shape[0]
 
     log_priors = np.zeros(npoint)+global_common
@@ -404,7 +582,18 @@ def get_lnprior_helper_array(x0s, uniform_par_ids, uniform_lows, uniform_highs,\
     return log_priors
 
 def get_sample_idxs(old_point,idx_choose,FPI):
-    """get just some indexes reset for a uniform sample, actually just gets a whole new prior draw and picks the idxs needed"""
+    """get just some indexes drawn from a prior
+
+    :param old_point:
+    Old array of parameters
+    :param idx_choose:
+    List of indices for which we want to drawn from the prior
+    :param FPI:
+    FastPriorInfo object
+
+    :return new_point:
+    New array of parameters
+    """
     new_point = old_point.copy()
     res = get_sample_full(new_point.size,FPI)
     for idx in idx_choose:
@@ -413,7 +602,16 @@ def get_sample_idxs(old_point,idx_choose,FPI):
     return new_point
 
 def get_sample_full(n_par,FPI):
-    """helper to get a sample with the specified indexes redrawn"""
+    """helper to get a full prior draw sample
+
+    :param n_par:
+    Number of parameters
+    :param FPI:
+    FastPriorInfo object
+
+    :return new_point:
+    Array with parameters drawn from their priors
+    """
     new_point = get_sample_helper_full(n_par, FPI.uniform_par_ids, FPI.uniform_lows, FPI.uniform_highs,\
                                               FPI.lin_exp_par_ids, FPI.lin_exp_lows, FPI.lin_exp_highs,\
                                               FPI.normal_par_ids, FPI.normal_mus, FPI.normal_sigs,\
@@ -430,7 +628,53 @@ def get_sample_full(n_par,FPI):
            ('cw_ext_par_ids',nb.int64[:]),('cw_ext_lows',nb.float64[:]),('cw_ext_highs',nb.float64[:]),\
            ('global_common',nb.float64)])
 class FastPriorInfo:
-    """simple jitclass to store the various elements of fast prior calculation in a way that can be accessed quickly from a numba environment"""
+    """simple jitclass to store the various elements of fast prior calculation in a way that can be accessed quickly from a numba environment
+
+    :param uniform_par_ids:
+    Indices of parameters with uniform prior
+    :param uniform_lows:
+    Lower prior bounds of uniform prior parameters
+    :param uniform_highs:
+    Upper prior bounds of uniform prior parameters
+    :param lin_exp_par_ids:
+    Indices of parameters with linear exponential prior
+    :param lin_exp_lows:
+    Lower prior bounds of linear exponential prior parameters
+    :param lin_exp_highs:
+    Upper prior bounds of linear exponential prior parameters
+    :param normal_par_ids:
+    Indices of parameters with normal prior
+    :param normal_mus:
+    Means of normal prior parameters
+    :param normal_sigs:
+    Standard deviations of normal prior parameters
+    :param dm_par_ids:
+    Indices of parameters with DM distance prior
+    :param dm_dists:
+    Mean distances of DM distance prior parameters
+    :param dm_errs:
+    Errors of DM distance prior parameters
+    :param px_par_ids:
+    Indices of parameters with parallax distance prior
+    :param px_mus:
+    Means of parallax distance prior parameters
+    :param px_errs:
+    Errors of parallax distance prior parameters
+    :param cut_par_ids:
+    Indices of parameters where an extra cut might be needed to stay in prior range (like distance)
+    :param cut_lows:
+    Lower bounds of these parameters
+    :param cut_highs:
+    Upper bounds of these parameters
+    :param cw_ext_par_ids:
+    Indices of projection parameters (previously called extrinsic parameters)
+    :param cw_ext_lows:
+    Lower bounds of extrinsic parameters
+    :param cw_ext_highs:
+    Upper bounds of extrinsic parameters
+    :param global_common:
+    Part of the log prior independent of the parameter values
+    """
     def __init__(self, uniform_par_ids, uniform_lows, uniform_highs, lin_exp_par_ids, lin_exp_lows, lin_exp_highs, normal_par_ids, normal_mus, normal_sigs, dm_par_ids, dm_dists, dm_errs, px_par_ids, px_mus, px_errs, cut_par_ids, cut_lows, cut_highs, cw_ext_par_ids, cw_ext_lows, cw_ext_highs, global_common):
         self.uniform_par_ids = uniform_par_ids
         self.uniform_lows = uniform_lows
@@ -456,7 +700,15 @@ class FastPriorInfo:
         self.global_common = global_common
 
 def get_FastPriorInfo(pta,psrs,par_names_cw_ext):
-    """get FastPriorInfo object from pta"""
+    """get FastPriorInfo object from pta
+
+    :param pta:
+    enterprise PTA object
+    :param psrs:
+    List of enterprise pulsar objects
+    :param par_names_cw_ext:
+    List of parameter names which are projection parameters (previously called extrinsic parameters)
+    """
     fp_loc = FastPrior(pta,psrs,par_names_cw_ext)
     FPI = FastPriorInfo(fp_loc.uniform_par_ids, fp_loc.uniform_lows, fp_loc.uniform_highs,\
                         fp_loc.lin_exp_par_ids, fp_loc.lin_exp_lows, fp_loc.lin_exp_highs,\

@@ -23,7 +23,29 @@ display_names ={'dist-prior-noproj':'Dist Prior','dist-DE-noproj':'Dist DE','dis
                 'PT':'PT','proj':'proj'}
 
 def print_acceptance_progress(itrn,N,n_int_block,a_yes,a_no,t_itr,ti_loop,tf1_loop,Ts,verbosity):
-    """print the acceptance fraction"""
+    """print the acceptance fraction
+
+    :param itrn:
+    Overall index (as opposed to the block index itri or the index within saved values itrb)
+    :param N:
+    Total number of iterations we asked for at startup
+    :param n_int_block:
+    Number of iterations within a block
+    :param a_yes:
+    Array holding number of accepted steps
+    :param a_no:
+    Array holding number of rejected steps
+    :param t_itr:
+    Time just before calling this function got from time.perf_counter()
+    :param ti_loop:
+    Time after initialization got from time.perf_counter()
+    :param tf1_loop:
+    Time at start of this block got from time.perf_counter()
+    :param Ts:
+    Temperature ladder
+    :param verbosity:
+    Parameter indicating how much info to print (higher value means more prints)
+    """
     with np.errstate(invalid='ignore'):
         acc_fraction = a_yes/(a_no+a_yes)
     t_initial = tf1_loop-ti_loop
@@ -84,7 +106,27 @@ def print_acceptance_progress(itrn,N,n_int_block,a_yes,a_no,t_itr,ti_loop,tf1_lo
 
 
 def output_hdf5_loop(itrn,chain_params,samples,log_likelihood,acc_fraction,fisher_diag,par_names,N,verbosity):
-    """output to hdf5 at loop iteration"""
+    """output to hdf5 at loop iteration
+
+    :param itrn:
+    Overall index (as opposed to the block index itri or the index within saved values itrb)
+    :param chain_params:
+    ChainParams object
+    :param samples:
+    Array with posterior samples
+    :param log_likelihood:
+    Array with log likelihood values corresponding to samples
+    :param acc_fraction:
+    Array with acceptance rates
+    :param fisher diag:
+    Array with the digonal elements of fisher matrix
+    :param par_names:
+    List of parameter names
+    :param N:
+    Total number of samples
+    :param verbosity:
+    Parameter indicating how much info to print (higher value means more prints)
+    """
     n_chain = chain_params.n_chain
     save_every_n = chain_params.save_every_n
     Ts = chain_params.Ts
@@ -119,7 +161,23 @@ def output_hdf5_loop(itrn,chain_params,samples,log_likelihood,acc_fraction,fishe
                 f.create_dataset('samples_freq', data=samples[:,:-1:thin,par_names.index('0_log10_fgw')], dtype=samples_precision, compression="gzip", chunks=True, maxshape=(n_chain,int(N/thin)))
 
 def output_hdf5_end(chain_params,samples,log_likelihood,acc_fraction,fisher_diag,par_names,verbosity):
-    """output to hdf5 file at end of body of loop"""
+    """output to hdf5 file at end of body of loop
+
+    :param chain_params:
+    ChainParams object
+    :param samples:
+    Array with posterior samples
+    :param log_likelihood:
+    Array with log likelihood values corresponding to samples
+    :param acc_fraction:
+    Array with acceptance rates
+    :param fisher diag:
+    Array with the digonal elements of fisher matrix
+    :param par_names:
+    List of parameter names
+    :param verbosity:
+    Parameter indicating how much info to print (higher value means more prints)
+    """
     Ts = chain_params.Ts
     savefile = chain_params.savefile
     save_first_n_chains = chain_params.save_first_n_chains

@@ -6,7 +6,19 @@ import numpy as np
 import QuickCW.const_mcmc as cm
 
 def get_FLI_mem(FLI_swap):
-    """store everything needed to reset FLI for non-red noise updates"""
+    """store everything needed to reset FLI for non-red noise updates
+
+    :param FLI_swap:
+    FastLikelihoodInfo object
+
+    :return:
+    Tuple with following elements:
+                MMs0:               list of M matrices
+                NN0:                list of N vectors
+                resres_array0:      array with resres values
+                logdet_array0:      array with logdet contributions
+                logdet_base_old:    base value of logdet
+    """
     MMs0 = FLI_swap.MMs.copy()
     NN0 = FLI_swap.NN.copy()
     resres_array0 = FLI_swap.resres_array.copy()
@@ -14,10 +26,36 @@ def get_FLI_mem(FLI_swap):
     logdet_base_old = FLI_swap.logdet_base
     return (MMs0,NN0,resres_array0,logdet_array0,logdet_base_old)
 
-
-
 def params_perturb_helper(params,x0_swap,FLI_swap,flm,par_names,idxs_targ,epsilons,dist_mode=False,phase_mode=False,mask=None):
-    """helper to perturb the specified parameters by factors of epsilon en masse"""
+    """helper to perturb the specified parameters by factors of epsilon en masse
+
+    :param params:
+    array of parameter values
+    :param x0_swap:
+    CWInfo object
+    :param FLI_swap:
+    FastLikelihoodInfo object
+    :param flm:
+    FastLikeMaster object
+    :param par_names:
+    List of parameter names
+    :param idxs_targ:
+    Indices of parameters to be perturbed
+    :param epsilon:
+    Amount of perturbation
+    :param dist_mode:
+    Specify if pulsar distances are being perturbed [False]
+    :param phase_mode:
+    Specify if phases are being perturbed [False]
+    :param mask:
+    Mask to specify which pulsars need to be updated [None]
+    If None, all pulsars are updated
+
+    :return paramsPP:
+    Perturbed parameters
+    :return FLI_memp:
+    FastLikeInfo object for the perturbed parameters
+    """
     paramsPP = np.copy(params)
     paramsPP[idxs_targ] += epsilons
 
@@ -48,7 +86,24 @@ def params_perturb_helper(params,x0_swap,FLI_swap,flm,par_names,idxs_targ,epsilo
 
 #@njit()
 def fisher_synthetic_FLI_helper(helper_tuple_RR,x0_swap,FLI_swap,params_old,dist_mode=False,phase_mode=False):
-    """helper to construct synthetic likelihoods for each pulsar from input MMs and NNs one by one"""
+    """helper to construct synthetic likelihoods for each pulsar from input MMs and NNs one by one
+
+    :param helper_tuple_RR:
+
+    :param x0_swap:
+    CWInfo object
+    :param FLI_swap:
+    FastLikelihoodInfo object
+    :param params_old:
+
+    :param dist_mode:
+
+    :param phase_mode:
+
+
+    :return rrs:
+
+    """
     (paramsRR,FLI_memr) = helper_tuple_RR
     (MMsr,NNr,resres_arrayr,logdet_arrayr,_) = FLI_memr
     rrs = np.zeros(x0_swap.Npsr)
@@ -108,7 +163,36 @@ def fisher_synthetic_FLI_helper(helper_tuple_RR,x0_swap,FLI_swap,params_old,dist
 #
 ################################################################################
 def get_fishers(samples, par_names, x0_swap, flm, FLI_swap,get_diag=True,get_common=True,get_rn_block=True,get_intrinsic_diag=True,start_safe=False):
-    """get all the red noise eigenvectors in a block, and if get_diag is True also get all the diagonal fisher matrix elements"""
+    """get all the red noise eigenvectors in a block, and if get_diag is True also get all the diagonal fisher matrix elements
+
+    :param samples:
+    Array of samples
+    :param par_names:
+    List of parameter names
+    :param x0_swap:
+    CWInfo object
+    :param flm:
+    FastLikeMaster object
+    :param FLI_swap:
+    FastLikeInfo object
+    :param get_diag:
+
+    :param get_common:
+
+    :param get_rn_block:
+
+    :param get_intrinsic_diag:
+
+    :param start_safe:
+
+    
+    :return eig_rn:
+
+    :return fisher_diag:
+
+    :return eig_common:
+
+    """
     #logdet_base is not needed for anything so turn it off, will revert later.
     n_chain = samples.shape[0]
     Npsr = x0_swap.Npsr
@@ -188,7 +272,24 @@ def get_fishers(samples, par_names, x0_swap, flm, FLI_swap,get_diag=True,get_com
 
 
 def get_fisher_rn_block_eigenvectors(params, par_names, x0_swap, flm, FLI_swap,diagonal_data_loc):
-    """get the diagonal elements of the fisher matrix with the needed local stabilizations"""
+    """get the diagonal elements of the fisher matrix with the needed local stabilizations
+
+    :param params:
+
+    :param par_names:
+    List of parameter names
+    :param x0_swap:
+    CWInfo object
+    :param flm:
+    FastLikeMaster object
+    :param FLI_swap:
+    FastLikeInfo object
+    :param diagonal_data_loc:
+
+
+    :return eig_rn:
+
+    """
     Npsr = x0_swap.Npsr
     dim = 2
     #[0.8,0.25] is more reflective of center of distribution for poorly constrained rn parameters
@@ -349,7 +450,45 @@ def get_fisher_rn_block_eigenvectors(params, par_names, x0_swap, flm, FLI_swap,d
 
 
 def fisher_rn_mm_pp_diagonal_helper(params,x0_swap,FLI_swap,flm,par_names,epsilon_gammas,epsilon_log10_As,Npsr,get_intrinsic_diag=True,start_safe=False,get_gwb=True):
-    """helper to get the mm and pp values needed to calculate the diagonal fisher eigenvectors for the red noise parameters"""
+    """helper to get the mm and pp values needed to calculate the diagonal fisher eigenvectors for the red noise parameters
+
+    :param params:
+
+    :param x0_swap:
+    CWInfo object
+    :param FLI_swap:
+    FastLikeInfo object
+    :param flm:
+    FastLikeMaster object
+    :param par_names:
+    List of parameter names
+    :param epsilon_gammas:
+
+    :param epsilon_log10_As:
+
+    :param Npsr:
+    Number of pulsars
+    :param get_intrinsic_diag:
+
+    :param start_safe:
+
+    :param get_gwb:
+    
+    :return pp1s:
+
+    :return mm1s:
+    
+    :return nn1s:
+
+    :return helper_tuple0:
+
+    :return pps_gwb:
+
+    :return mms_gwb:
+
+    :return nns_gwb:
+
+    """
     if get_intrinsic_diag:
         print("Calculating RN fisher Eigenvectors")
     #future locations

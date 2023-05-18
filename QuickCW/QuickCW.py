@@ -42,7 +42,37 @@ from QuickCW.PulsarDistPriors import DMDistParameter, PXDistParameter
 ################################################################################
 #@profile
 def QuickCW(chain_params, psrs, noise_json=None, use_legacy_equad=False, include_ecorr=True, amplitude_prior='UL', gwb_gamma_prior=None, psr_distance_file=None, backend_selection=True):
-    """Set up all essential objects for QuickCW to do MCMC iterations"""
+    """Set up all essential objects for QuickCW to do MCMC iterations
+
+    :param chain_params:
+    ChainParams object
+    :param psrs:
+    enterprise pulsar objects
+    :param noise_json:
+    JSON file with noise dictionary [None]
+    :param use_legacy_equad:
+    Option to use old convention for equad [False]
+    :param include_ecorr:
+    Option to include ECORR white noise [True]
+    :param amplitude_prior:
+    Prior to use on CW amplitude
+    'UL' indicates uniform in amplitude prior (used for upper limits)
+    'detection' indicates uniform in log amplitude prior (used for Bayes factor calculation/detection)
+    :param gwb_gamma_prior:
+    Option to specify prior range on GWB spectral index gamma [None]
+    None means we use the default np.array([0,7])
+    :param psr_distance_file:
+    File containing parallax and DM distance information for pulsars [None]
+    If None, we use Gaussian prior with pulsar distance and error from psr objects
+    :param backend_selection:
+    Option to use an enterprise Selection based on backend [True]
+    Usually use True for real data False for simulated data
+
+    :return pta:
+    enterprise PTA object
+    :return mcc:
+    MCMCChain onject
+    """
     print("Began Main Loop")
 
     ti = perf_counter()
@@ -205,9 +235,7 @@ def QuickCW(chain_params, psrs, noise_json=None, use_legacy_equad=False, include
 
 
 def get_default_args(func):
-    """
-    Gets default arguments from a python function
-    """
+    """Gets default arguments from a python function"""
     signature = inspect.signature(func)
     return {
         k: v.default
@@ -218,9 +246,19 @@ def get_default_args(func):
 
 def per_pulsar_prior(enterprise_pulsar: Pulsar, pulsar_distances: dict,
                      cw_delay_args: dict=None, CWSignal_args: dict=None):
-    """
-    Creates a CW signal applying distance priors to individual pulsars based on DM or PX in the pulsar_distances dict
+    """Creates a CW signal applying distance priors to individual pulsars based on DM or PX in the pulsar_distances dict
+    
+    :param enterprise_pulsar:
+    enterprise pulsar object
+    :param pulsar_distances:
+    dictionary containing pulsar distance info
+    :param cw_delay_args:
+    arguments to be passed on to deterministic.cw_delay
+    :param CWSignal_args:
+    arguments to be passed on to deterministic.CWSignal
 
+    :return cw:
+    enterprise signal object with the CW model
     """
     if cw_delay_args is None:
         # could maybe replace this by using an empty dictionary instead

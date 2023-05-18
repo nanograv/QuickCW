@@ -47,7 +47,16 @@ functype = ctypes.CFUNCTYPE(None,
 dtrtrs_fn = functype(addr)
 @njit()
 def solve_triangular(x,y,lower_a=True,trans_a=True,unitdiag=False,overwrite_b=False):
-    """solve x*B=y where x is a triangular matrix, note y must be fortran ordered and x must be either type of contiguous"""
+    """solve x*B=y
+
+    :param x:
+    triangular matrix (must be either type of contiguous)
+    :param y:
+    vector (must be fortran ordered)
+    
+    :return B:
+    Solution to x*B=y
+    """
     #if the input matrix is c contiguous but not fortran contiguous
     #transposing it will make it fortran contiguous with no copying
     #then flipping upper and lower and telling dtrtrs to undo the transpose will force dtrtrs to do the correct operation
