@@ -1,15 +1,7 @@
 # Quick-start Guide to QuickCW
 
 ## Setup
-`QuickCW` relies on the following non-standard packages:
-```
-enterprise
-enterprise_extensions
-numba
-h5py
-```
-
-Using `conda`, we can set up a new clean environment with these as follows. Create new `conda` environment:
+It is advisable, to create new `conda` environment:
 ```
 conda create --name QuickCW python=3.9
 ```
@@ -21,23 +13,21 @@ Install `enterprise`:
 ```
 conda install -c conda-forge enterprise-pulsar
 ```
-Install `enterprise_extensions`:
+Clone the `QuickCW` repo:
 ```
-pip install git+https://github.com/nanograv/enterprise_extensions@master
+git clone https://github.com/bencebecsy/QuickCW.git
 ```
-Install `numba`:
+Move into the repo's folder:
 ```
-conda install numba
+cd QuickCW
 ```
-At this point `h5py` might already be installed. If not, install it with:
+Install `QuickCW` and all remaining requirements:
 ```
-pip install h5py
+pip install -e .
 ```
-
-Once these are installed `QuickCW` can be used without installation.
 
 ## Running QuickCW
-The main analysis code can be found in `QuickCW.py`, which can be executed by the wrapper script `runQuickMCMC.py`. Before running, make sure that in that script:
+The main analysis code can be found in `QuickCW.py`, which can be executed by the wrapper script `runQuickMCMC.py`. Move this file into the folder where you want to run it, and modify it so that:
 * `data_pkl` points to the pickled pulsar object you want to analyze. Alternatively one can rewrite the script so that it loads in par/tim files. What matters in the end is that `psrs` contain the pulsar objects we want to use.
 * `noisefile` points to the json file containing the noise dictionary we plan to use for setting the white noise parameters.
 * `savefile` is the name of the file we want to save our results.
