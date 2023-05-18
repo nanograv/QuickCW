@@ -41,7 +41,7 @@ from PulsarDistPriors import DMDistParameter, PXDistParameter
 #
 ################################################################################
 #@profile
-def QuickCW(chain_params, psrs, noise_json=None, use_legacy_equad=False, include_ecorr=True, amplitude_prior='UL', gwb_gamma_prior=None, psr_distance_file=None):
+def QuickCW(chain_params, psrs, noise_json=None, use_legacy_equad=False, include_ecorr=True, amplitude_prior='UL', gwb_gamma_prior=None, psr_distance_file=None, backend_selection=True):
     """Set up all essential objects for QuickCW to do MCMC iterations"""
     print("Began Main Loop")
 
@@ -57,7 +57,10 @@ def QuickCW(chain_params, psrs, noise_json=None, use_legacy_equad=False, include
     ecorr = parameter.Constant()
 
     # define selection by observing backend
-    selection = selections.Selection(selections.by_backend)
+    if backend_selection:
+        selection = selections.Selection(selections.by_backend)
+    else:
+        selection = selections.Selection(selections.no_selection)
 
     # define white noise signals
     if use_legacy_equad:
