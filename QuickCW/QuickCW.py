@@ -232,17 +232,12 @@ def per_pulsar_prior(enterprise_pulsar: Pulsar, pulsar_distances: dict,
                      cw_delay_args: dict=None, CWSignal_args: dict=None):
     """Creates a CW signal applying distance priors to individual pulsars based on DM or PX in the pulsar_distances dict
     
-    :param enterprise_pulsar:
-    enterprise pulsar object
-    :param pulsar_distances:
-    dictionary containing pulsar distance info
-    :param cw_delay_args:
-    arguments to be passed on to deterministic.cw_delay
-    :param CWSignal_args:
-    arguments to be passed on to deterministic.CWSignal
+    :param enterprise_pulsar:   enterprise pulsar object
+    :param pulsar_distances:    dictionary containing pulsar distance info
+    :param cw_delay_args:       arguments to be passed on to deterministic.cw_delay
+    :param CWSignal_args:       arguments to be passed on to deterministic.CWSignal
 
-    :return cw:
-    enterprise signal object with the CW model
+    :return cw:                 enterprise signal object with the CW model
     """
     if cw_delay_args is None:
         # could maybe replace this by using an empty dictionary instead

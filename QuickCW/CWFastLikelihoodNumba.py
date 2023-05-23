@@ -18,16 +18,11 @@ class FastLikeMaster:
         """
         get Class for generating the fast CW likelihood.
         
-        :param pta:
-        `enterprise` pta object.
-        :param params:
-        Dictionary of noise parameters.
-        :param x0:
-        CWInfo object, which is partially redundant with params but better handled by numba
-        :param includeCW:
-        Switch if we want to include the contribution of the CW signal or not [True]
-        :param prior_recovery:
-        If True, we return constant likelihood to be used for prior recovery diagnostic test [False]
+        :param pta:             `enterprise` pta object.
+        :param params:          Dictionary of noise parameters.
+        :param x0:              CWInfo object, which is partially redundant with params but better handled by numba
+        :param includeCW:       Switch if we want to include the contribution of the CW signal or not [True]
+        :param prior_recovery:  If True, we return constant likelihood to be used for prior recovery diagnostic test [False]
         """
         self.Npsr = x0.Npsr
         self.pta = pta
@@ -170,21 +165,14 @@ def cholupdate_loop(chol_Sigmas, pls_temp, old_phiinvs, Npsr):
     """Jitted loop over Sigma matrices to update their Cholesky.
     Currently not faster than recalculating from scratch, so not used.
 
-    :param chol_Sigmas:
-    List of Cholesky decompositions of Sigma matrices
-    :param pls_temp:
-    New list of tuples returned by pta.get_phiinv
-    :param old_phiinvs:
-    Old list of phiinv matrices
-    :param Npsr:
-    Number of pulsars (also number of Sigma matrices)
+    :param chol_Sigmas:     List of Cholesky decompositions of Sigma matrices
+    :param pls_temp:        New list of tuples returned by pta.get_phiinv
+    :param old_phiinvs:     Old list of phiinv matrices
+    :param Npsr:            Number of pulsars (also number of Sigma matrices)
 
-    :return chol_Sigmas:
-    List of updated Choleskies
-    :return logdet_array:
-    New array containing logdet values
-    :return new_phiinvs:
-    List of new phiinv matrices
+    :return chol_Sigmas:    List of updated Choleskies
+    :return logdet_array:   New array containing logdet values
+    :return new_phiinvs:    List of new phiinv matrices
     """
     logdet_array = np.zeros(Npsr)
     new_phiinvs = List()
@@ -201,13 +189,10 @@ def cholupdate(L_in,diag_diff):
     """Jitted routine to update the Cholesky of a matrix instead of recomputing it.
     In principle could be faster, but right now it is not, so it's not used.
 
-    :param L_in:
-    Previous Cholesky that we want to update
-    :param diag_diff:
-    Differences in the diagonal of the original matrix
+    :param L_in:        Previous Cholesky that we want to update
+    :param diag_diff:   Differences in the diagonal of the original matrix
 
-    :return L:
-    Updated Cholesky    
+    :return L:          Updated Cholesky    
     """
     n = L_in.shape[0]
     #L = L_in
@@ -246,11 +231,9 @@ def cholupdate(L_in,diag_diff):
 def logdet_Sigma_helper(chol_Sigma):
     """get logdet sigma from cholesky of Sigma
 
-    :param chol_Sigma:
-    Cholesky decomposition of Sigma matrix
+    :param chol_Sigma:  Cholesky decomposition of Sigma matrix
 
-    :return 2*res:
-    Contribution to logdet from this Sigma matrix
+    :return 2*res:      Contribution to logdet from this Sigma matrix
     """
     res = 0.
     for itrj in prange(0,chol_Sigma.shape[0]):
@@ -262,16 +245,11 @@ def logdet_Sigma_helper(chol_Sigma):
 def create_Sigma(phiinv_loc,TNT,Sigma):
     """create just the upper triangle of the Sigma matrix with phiinv_loc added to the diagonal, lower triangle will be garbage
 
-    :param phiinv_loc:
-    phiinv matrix
-    :param TNT:
-    Precomputed matrix product of TNT
-    :param Sigma:
-    Initialized mtrix with the right shape to hold Sigma
-    (allows for just overwriting instead of creating new array each time we update this)
+    :param phiinv_loc:  phiinv matrix
+    :param TNT:         Precomputed matrix product of TNT
+    :param Sigma:       Initialized mtrix with the right shape to hold Sigma (allows for just overwriting instead of creating new array each time we update this)
 
-    :return Sigma:
-    Upper trinagle Sigma matrix - lower triangle is junk
+    :return Sigma:      Upper trinagle Sigma matrix - lower triangle is junk
     """
     #Sigma = np.zeros((phiinv_loc.size,phiinv_loc.size))
     for itrj1 in prange(0,phiinv_loc.size):
@@ -292,16 +270,11 @@ def create_Sigma(phiinv_loc,TNT,Sigma):
 class CWInfo:
     """simple jitclass to store the various parmeters in a way that can be accessed quickly from a numba environment
 
-    :param Npsr:
-    Number of pulsars
-    :param params_in:
-    Array of all parameters in the same order as in par_names
-    :param par_names:
-    List of parameter names - must follow certain naming conventions so we can identify parameters
-    :param par_names_cw_ext:
-    Subset of all parameters that describe the CW signal and are projection parameters (previously called extrinsic parameters)
-    :param par_names_cw_int:
-    Subset of all parameters that describe the CW signal and are shape parameters (previously called intrinsic parameters)
+    :param Npsr:                Number of pulsars
+    :param params_in:           Array of all parameters in the same order as in par_names
+    :param par_names:           List of parameter names - must follow certain naming conventions so we can identify parameters
+    :param par_names_cw_ext:    Subset of all parameters that describe the CW signal and are projection parameters (previously called extrinsic parameters)
+    :param par_names_cw_int:    Subset of all parameters that describe the CW signal and are shape parameters (previously called intrinsic parameters)
     """
     
     def __init__(self,Npsr,params_in,par_names,par_names_cw_ext,par_names_cw_int):
@@ -378,27 +351,17 @@ class CWInfo:
 def get_lnlikelihood_helper(x0,resres,logdet,pos,pdist,NN,MMs,includeCW=True,prior_recovery=False):
     """jittable helper for calculating the log likelihood in CWFastLikelihood
     
-    :param x0:
-    CWInfo object
-    :param resres:
-    Array holding the (residual|residual) inner product
-    :param logdet:
-    Log determinant piece of the likelihood
-    :param pos:
-    (number of pulsars, 3) array holding 3d unit vector pointing towards each pulsar given by psr.pos
-    :param pdist:
-    (number of pulsars, 2) array holding distance and error of distance for each pulsar in kpc given by psr.pdist
-    :param NN:
-    N matrices holding (filter|residual) type inner products
-    :param MMs:
-    M matrices holding (filter|filter) type inner products
-    :param includeCW:
-    Switch if we want to include the contribution of the CW signal or not [True]
-    :param prior_recovery:
-    If True, we return constant likelihood to be used for prior recovery diagnostic test [False]
+    :param x0:              CWInfo object
+    :param resres:          Array holding the (residual|residual) inner product
+    :param logdet:          Log determinant piece of the likelihood
+    :param pos:             (number of pulsars, 3) array holding 3d unit vector pointing towards each pulsar given by psr.pos
+    :param pdist:           (number of pulsars, 2) array holding distance and error of distance for each pulsar in kpc given by psr.pdist
+    :param NN:              N matrices holding (filter|residual) type inner products
+    :param MMs:             M matrices holding (filter|filter) type inner products
+    :param includeCW:       Switch if we want to include the contribution of the CW signal or not [True]
+    :param prior_recovery:  If True, we return constant likelihood to be used for prior recovery diagnostic test [False]
 
-    :return log_L:
-    Log likelihood value
+    :return log_L:          Log likelihood value
     """
     if prior_recovery:
         return 0.0
@@ -476,32 +439,19 @@ def get_lnlikelihood_helper(x0,resres,logdet,pos,pdist,NN,MMs,includeCW=True,pri
 def update_intrinsic_params2(x0,isqrNvecs,Nrs,pos,pdist,toas,NN,MMs,TNvs,chol_Sigmas,idxs,resres_array,dotTNrs):
     '''Calculate inner products N=(res|S), M=(S|S)
 
-    :param x0:
-    CWInfo object
-    :param isqrNvecs:
-    Inverse squareroot of N vectors
-    :param Nrs:
-    Residuals times inverse sqareroot N vectors
-    :param pos:
-    (number of pulsars, 3) array holding 3d unit vector pointing towards each pulsar given by psr.pos
-    :param pdist:
-    (number of pulsars, 2) array holding distance and error of distance for each pulsar in kpc given by psr.pdist
-    :param toas:
-    List of arrays of TOAs for each pulsar
-    :param NN:
-    N matrices holding (filter|residual) type inner products
-    :param MMs:
-    M matrices holding (filter|filter) type inner products
-    :param TNvs:
-    T vectros times inverse squareroot N vectors
-    :param chol_Sigmas:
-    List of Cholesky decompositions of Sigma matrices
-    :param idxs:
-    Indices of pulsar for which we want to update things
-    :param resres_array:
-    Array containing contributions to (res|res)
-    :param dotTNrs:
-    Precalculated dot product of Nrs and TNvs
+    :param x0:              CWInfo object
+    :param isqrNvecs:       Inverse squareroot of N vectors
+    :param Nrs:             Residuals times inverse sqareroot N vectors
+    :param pos:             (number of pulsars, 3) array holding 3d unit vector pointing towards each pulsar given by psr.pos
+    :param pdist:           (number of pulsars, 2) array holding distance and error of distance for each pulsar in kpc given by psr.pdist
+    :param toas:            List of arrays of TOAs for each pulsar
+    :param NN:              N matrices holding (filter|residual) type inner products
+    :param MMs:             M matrices holding (filter|filter) type inner products
+    :param TNvs:            T vectros times inverse squareroot N vectors
+    :param chol_Sigmas:     List of Cholesky decompositions of Sigma matrices
+    :param idxs:            Indices of pulsar for which we want to update things
+    :param resres_array:    Array containing contributions to (res|res)
+    :param dotTNrs:         Precalculated dot product of Nrs and TNvs
     '''
 
     w0 = np.pi * 10.0**x0.log10_fgw
@@ -730,30 +680,18 @@ def update_intrinsic_params2(x0,isqrNvecs,Nrs,pos,pdist,toas,NN,MMs,TNvs,chol_Si
 def update_intrinsic_params(x0,isqrNvecs,Nrs,pos,pdist,toas,NN,MMs,SigmaTNrProds,invchol_Sigma_TNs,idxs,dist_only=True):
     '''Calculate inner products N=(res|S), M=(S|S)
 
-    :param x0:
-    CWInfo object
-    :param isqrNvecs:
-    Inverse squareroot of N vectors
-    :param Nrs:
-    Residuals times inverse sqareroot N vectors
-    :param pos:
-    (number of pulsars, 3) array holding 3d unit vector pointing towards each pulsar given by psr.pos
-    :param pdist:
-    (number of pulsars, 2) array holding distance and error of distance for each pulsar in kpc given by psr.pdist
-    :param toas:
-    List of arrays of TOAs for each pulsar
-    :param NN:
-    N matrices holding (filter|residual) type inner products
-    :param MMs:
-    M matrices holding (filter|filter) type inner products
-    :param SigmaTNrProds:
-    ---
-    :param invchol_Sigma_TNs:
-    ---
-    :param idxs:
-    Indices of pulsar for which we want to update things
-    :param dist_only:
-    Option to skip parts of calculation whn only updating pulsar distances - not currently used
+    :param x0:                  CWInfo object
+    :param isqrNvecs:           Inverse squareroot of N vectors
+    :param Nrs:                 Residuals times inverse sqareroot N vectors
+    :param pos:                 (number of pulsars, 3) array holding 3d unit vector pointing towards each pulsar given by psr.pos
+    :param pdist:               (number of pulsars, 2) array holding distance and error of distance for each pulsar in kpc given by psr.pdist
+    :param toas:                List of arrays of TOAs for each pulsar
+    :param NN:                  N matrices holding (filter|residual) type inner products
+    :param MMs:                 M matrices holding (filter|filter) type inner products
+    :param SigmaTNrProds:       ---
+    :param invchol_Sigma_TNs:   ---
+    :param idxs:                Indices of pulsar for which we want to update things
+    :param dist_only:           Option to skip parts of calculation whn only updating pulsar distances - not currently used
     '''
 
     w0 = np.pi * 10.0**x0.log10_fgw
@@ -954,38 +892,22 @@ def update_intrinsic_params(x0,isqrNvecs,Nrs,pos,pdist,toas,NN,MMs,SigmaTNrProds
 class FastLikeInfo:
     """simple jitclass to store the various elements of fast likelihood calculation in a way that can be accessed quickly from a numba environment
 
-    :param logdet_base:
-    Contibution to logdet without CW signal
-    :param pos:
-    (number of pulsars, 3) array holding 3d unit vector pointing towards each pulsar given by psr.pos
-    :param pdist:
-    (number of pulsars, 2) array holding distance and error of distance for each pulsar in kpc given by psr.pdist
-    :param toas:
-    List of arrays of TOAs for each pulsar
-    :param Nvecs:
-    List of N vectors
-    :param Nrs:
-    Residuals times inverse sqareroot N vectors
-    :param max_toa:
-    Maximum TOA over all pulsars
-    :param x0:
-    CWInfo object
-    :param Npsr:
-    Number of pulsars
-    :param isqrNvecs:
-    Inverse squareroot of N vectors
-    :param TNvs:
-    T vectros times inverse squareroot N vectors
-    :param dotTNrs:
-    Precalculated dot product of Nrs and TNvs
-    :param chol_Sigmas:
-    List of Cholesky decompositions of Sigma matrices
-    :param phiinvs:
-    List of phiinv matrices
-    :param includeCW:
-    Switch if we want to include the contribution of the CW signal or not [True]
-    :param prior_recovery:
-    If True, we return constant likelihood to be used for prior recovery diagnostic test [False]
+    :param logdet_base:     Contibution to logdet without CW signal
+    :param pos:             (number of pulsars, 3) array holding 3d unit vector pointing towards each pulsar given by psr.pos
+    :param pdist:           (number of pulsars, 2) array holding distance and error of distance for each pulsar in kpc given by psr.pdist
+    :param toas:            List of arrays of TOAs for each pulsar
+    :param Nvecs:           List of N vectors
+    :param Nrs:             Residuals times inverse sqareroot N vectors
+    :param max_toa:         Maximum TOA over all pulsars
+    :param x0:              CWInfo object
+    :param Npsr:            Number of pulsars
+    :param isqrNvecs:       Inverse squareroot of N vectors
+    :param TNvs:            T vectros times inverse squareroot N vectors
+    :param dotTNrs:         Precalculated dot product of Nrs and TNvs
+    :param chol_Sigmas:     List of Cholesky decompositions of Sigma matrices
+    :param phiinvs:         List of phiinv matrices
+    :param includeCW:       Switch if we want to include the contribution of the CW signal or not [True]
+    :param prior_recovery:  If True, we return constant likelihood to be used for prior recovery diagnostic test [False]
     """
     def __init__(self,logdet_base,pos,pdist,toas,Nvecs,Nrs,max_toa,x0,Npsr,isqrNvecs,TNvs,dotTNrs,chol_Sigmas,phiinvs,includeCW=True,prior_recovery=False):
         self.resres = 0. #compute internally
@@ -1195,11 +1117,11 @@ class FastLikeInfo:
 def isclose(a,b,rtol=1.e-5,atol=1.e-8):
     """check if close in same way as np.isclose
 
-    :param a: First float to use in comparison
-    :param b: Second float to use in comparison
-    :param rtol: Realtive tolerance - default:1e-5
-    :param atol: Absolute tolerance - default:1e-8
+    :param a:       First float to use in comparison
+    :param b:       Second float to use in comparison
+    :param rtol:    Realtive tolerance - default:1e-5
+    :param atol:    Absolute tolerance - default:1e-8
 
-    :return: True/False indicating if a and b are close to each other
+    :return:        True/False indicating if a and b are close to each other
     """
     return np.abs(a - b) <= (atol + rtol * np.abs(b))

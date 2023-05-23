@@ -28,7 +28,7 @@ author = 'Bence Becsy, Neil Cornish, Matthew Digman'
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
-extensions = ["sphinx.ext.autodoc", "sphinx.ext.viewcode"]
+extensions = ["sphinx.ext.autodoc", "sphinx.ext.viewcode", "myst_parser", "nbsphinx"]
 
 # get doctrings for __init__ method
 autoclass_content = "both"
@@ -41,6 +41,8 @@ autodoc_mock_imports = ["enterprise", "enterprise_extensions", "libstempo"]
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
+
+source_suffix = [".rst", ".md"]
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.

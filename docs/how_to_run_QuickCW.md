@@ -47,5 +47,5 @@ nohup ./run_QuickCW.sh > nohup.out 2>&1 &
 This will use `run_QuickCW.sh` to run the analysis in the background and send all output into the file `nohup.out`.
 
 ## Postprocessing
-Once the MCMC run finished (or even during since it saves intermediate results during runtime) all the results can be found in a single HDF5 file. Follow this jupyter notebook for a few simple postprocessing of the results, like traces, corner plots and upper limit curves: https://github.com/bencebecsy/QuickCW/blob/main/doc/plotting_results.ipynb
+Once the MCMC run finished (or even during since it saves intermediate results during runtime) all the results can be found in a single HDF5 file. Follow this jupyter notebook for a few simple postprocessing of the results, like traces, corner plots and upper limit curves: https://github.com/bencebecsy/QuickCW/blob/main/docs/plotting_results.ipynb
 
