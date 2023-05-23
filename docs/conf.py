@@ -37,7 +37,7 @@ autoclass_content = "both"
 autodoc_member_order = "groupwise"
 
 # we won't even try installing these
-autodoc_mock_imports = ["enterprise"]
+autodoc_mock_imports = ["enterprise", "libstempo"]
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
