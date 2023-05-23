@@ -11,7 +11,7 @@ build:
 
 python:
   # Install our python package before building the docs
-  version: 3.9
+  version: 3.8
   install:
     - method: pip
       path: .
