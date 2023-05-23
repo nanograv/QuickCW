@@ -4,12 +4,14 @@ conda:
   environment: docs/environment.yml
 
 build:
-  os: "ubuntu-20.04"
-  tools:
-    python: "3.9"
+  image: latest
+#  os: "ubuntu-20.04"
+#  tools:
+#    python: "3.9"
 
 python:
   # Install our python package before building the docs
+  version: 3.9
   install:
     - method: pip
       path: .
