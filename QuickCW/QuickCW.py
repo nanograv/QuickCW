@@ -44,34 +44,18 @@ from QuickCW.PulsarDistPriors import DMDistParameter, PXDistParameter
 def QuickCW(chain_params, psrs, noise_json=None, use_legacy_equad=False, include_ecorr=True, amplitude_prior='UL', gwb_gamma_prior=None, psr_distance_file=None, backend_selection=True):
     """Set up all essential objects for QuickCW to do MCMC iterations
 
-    :param chain_params:
-    ChainParams object
-    :param psrs:
-    enterprise pulsar objects
-    :param noise_json:
-    JSON file with noise dictionary [None]
-    :param use_legacy_equad:
-    Option to use old convention for equad [False]
-    :param include_ecorr:
-    Option to include ECORR white noise [True]
-    :param amplitude_prior:
-    Prior to use on CW amplitude
-    'UL' indicates uniform in amplitude prior (used for upper limits)
-    'detection' indicates uniform in log amplitude prior (used for Bayes factor calculation/detection)
-    :param gwb_gamma_prior:
-    Option to specify prior range on GWB spectral index gamma [None]
-    None means we use the default np.array([0,7])
-    :param psr_distance_file:
-    File containing parallax and DM distance information for pulsars [None]
-    If None, we use Gaussian prior with pulsar distance and error from psr objects
-    :param backend_selection:
-    Option to use an enterprise Selection based on backend [True]
-    Usually use True for real data False for simulated data
+    :param chain_params:        ChainParams object
+    :param psrs:                enterprise pulsar objects
+    :param noise_json:          JSON file with noise dictionary [None]
+    :param use_legacy_equad:    Option to use old convention for equad [False]
+    :param include_ecorr:       Option to include ECORR white noise [True]
+    :param amplitude_prior:     Prior to use on CW amplitude; 'UL' indicates uniform in amplitude prior (used for upper limits); 'detection' indicates uniform in log amplitude prior (used for Bayes factor calculation/detection)
+    :param gwb_gamma_prior:     Option to specify prior range on GWB spectral index gamma; None means we use the default np.array([0,7]) [None]
+    :param psr_distance_file:   File containing parallax and DM distance information for pulsars; If None, we use Gaussian prior with pulsar distance and error from psr objects [None]
+    :param backend_selection:   Option to use an enterprise Selection based on backend; Usually use True for real data False for simulated data [True]
 
-    :return pta:
-    enterprise PTA object
-    :return mcc:
-    MCMCChain onject
+    :return pta:                enterprise PTA object
+    :return mcc:                MCMCChain onject
     """
     print("Began Main Loop")
 
