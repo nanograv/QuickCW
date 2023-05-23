@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>QuickCW.QuickCorrectionUtils &mdash; QuickCW  documentation</title>
+      <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js"></script>
+        <script src="../../_static/jquery.js"></script>
+        <script src="../../_static/underscore.js"></script>
+        <script src="../../_static/_sphinx_javascript_frameworks_compat.js"></script>
+        <script src="../../_static/doctools.js"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            QuickCW
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <!-- Local TOC -->
+              <div class="local-toc"></div>
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">QuickCW</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">QuickCW.QuickCorrectionUtils</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for QuickCW.QuickCorrectionUtils</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;C 2021 Bence Becsy</span>
+<span class="sd">MCMC for CW fast likelihood (w/ Neil Cornish and Matthew Digman)</span>
+<span class="sd">utils for correcting parameters to nominal ranges&quot;&quot;&quot;</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">numba</span> <span class="kn">import</span> <span class="n">njit</span>
+<span class="kn">import</span> <span class="nn">QuickCW.const_mcmc</span> <span class="k">as</span> <span class="nn">cm</span>
+<span class="kn">import</span> <span class="nn">enterprise.constants</span> <span class="k">as</span> <span class="nn">const</span>
+
+<div class="viewcode-block" id="reflect_cosines"><a class="viewcode-back" href="../../QuickCW.html#QuickCW.QuickCorrectionUtils.reflect_cosines">[docs]</a><span class="nd">@njit</span><span class="p">()</span>
+<span class="k">def</span> <span class="nf">reflect_cosines</span><span class="p">(</span><span class="n">cos_in</span><span class="p">,</span><span class="n">angle_in</span><span class="p">,</span><span class="n">rotfac</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="p">,</span><span class="n">modfac</span><span class="o">=</span><span class="mi">2</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;helper to reflect cosines of coordinates around poles  to get them between -1 and 1,</span>
+<span class="sd">       which requires also rotating the signal by rotfac each time, then mod the angle by modfac</span>
+
+<span class="sd">    :param cos_in:</span>
+<span class="sd">    cosine of polar angle</span>
+<span class="sd">    :param angle_in:</span>
+<span class="sd">    azimuthal angle</span>
+<span class="sd">    :param rotfac:</span>
+<span class="sd">    angle to get to the other side of pole [np.pi]</span>
+<span class="sd">    :param modfac:</span>
+<span class="sd">    angle to change azimuthal angle by before getting back to the same point [2*np.pi]</span>
+
+<span class="sd">    :return cos_in:</span>
+<span class="sd">    Reflected cosine of polar angle</span>
+<span class="sd">    :return angle_in:</span>
+<span class="sd">    Reflected azimuthal angle</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">cos_in</span> <span class="o">&lt;</span> <span class="o">-</span><span class="mf">1.</span><span class="p">:</span>
+        <span class="n">cos_in</span> <span class="o">=</span> <span class="o">-</span><span class="mf">1.</span><span class="o">+</span><span class="p">(</span><span class="o">-</span><span class="p">(</span><span class="n">cos_in</span><span class="o">+</span><span class="mf">1.</span><span class="p">))</span><span class="o">%</span><span class="mi">4</span>
+        <span class="n">angle_in</span> <span class="o">+=</span> <span class="n">rotfac</span>
+    <span class="k">if</span> <span class="n">cos_in</span> <span class="o">&gt;</span> <span class="mf">1.</span><span class="p">:</span>
+        <span class="n">cos_in</span> <span class="o">=</span> <span class="mf">1.</span><span class="o">-</span><span class="p">(</span><span class="n">cos_in</span><span class="o">-</span><span class="mf">1.</span><span class="p">)</span><span class="o">%</span><span class="mi">4</span>
+        <span class="n">angle_in</span> <span class="o">+=</span> <span class="n">rotfac</span>
+        <span class="c1">#if this reflects even number of times, params_in[1] after is guaranteed to be between -1 and -3, so one more correction attempt will suffice</span>
+        <span class="k">if</span> <span class="n">cos_in</span> <span class="o">&lt;</span> <span class="o">-</span><span class="mf">1.</span><span class="p">:</span>
+            <span class="n">cos_in</span> <span class="o">=</span> <span class="o">-</span><span class="mf">1.</span><span class="o">+</span><span class="p">(</span><span class="o">-</span><span class="p">(</span><span class="n">cos_in</span><span class="o">+</span><span class="mf">1.</span><span class="p">))</span><span class="o">%</span><span class="mi">4</span>
+            <span class="n">angle_in</span> <span class="o">+=</span> <span class="n">rotfac</span>
+    <span class="n">angle_in</span> <span class="o">=</span> <span class="n">angle_in</span><span class="o">%</span><span class="n">modfac</span>
+    <span class="k">return</span> <span class="n">cos_in</span><span class="p">,</span><span class="n">angle_in</span></div>
+
+<div class="viewcode-block" id="reflect_cosines_array"><a class="viewcode-back" href="../../QuickCW.html#QuickCW.QuickCorrectionUtils.reflect_cosines_array">[docs]</a><span class="nd">@njit</span><span class="p">()</span>
+<span class="k">def</span> <span class="nf">reflect_cosines_array</span><span class="p">(</span><span class="n">cos_ins</span><span class="p">,</span><span class="n">angle_ins</span><span class="p">,</span><span class="n">rotfac</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="p">,</span><span class="n">modfac</span><span class="o">=</span><span class="mi">2</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;helper to reflect cosines of coordinates around poles  to get them between -1 and 1,</span>
+<span class="sd">       which requires also rotating the signal by rotfac each time, then mod the angle by modfac</span>
+<span class="sd">       same as reflect_cosines but handles arrays</span>
+
+<span class="sd">    :param cos_in:</span>
+<span class="sd">    cosine of polar angle</span>
+<span class="sd">    :param angle_in:</span>
+<span class="sd">    azimuthal angle</span>
+<span class="sd">    :param rotfac:</span>
+<span class="sd">    angle to get to the other side of pole [np.pi]</span>
+<span class="sd">    :param modfac:</span>
+<span class="sd">    angle to change azimuthal angle by before getting back to the same point [2*np.pi]</span>
+
+<span class="sd">    :return cos_in:</span>
+<span class="sd">    Reflected cosine of polar angle</span>
+<span class="sd">    :return angle_in:</span>
+<span class="sd">    Reflected azimuthal angle</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">for</span> <span class="n">itrk</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">cos_ins</span><span class="o">.</span><span class="n">size</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">cos_ins</span><span class="p">[</span><span class="n">itrk</span><span class="p">]</span> <span class="o">&lt;</span> <span class="o">-</span><span class="mf">1.</span><span class="p">:</span>
+            <span class="n">cos_ins</span><span class="p">[</span><span class="n">itrk</span><span class="p">]</span> <span class="o">=</span> <span class="o">-</span><span class="mf">1.</span><span class="o">+</span><span class="p">(</span><span class="o">-</span><span class="p">(</span><span class="n">cos_ins</span><span class="p">[</span><span class="n">itrk</span><span class="p">]</span><span class="o">+</span><span class="mf">1.</span><span class="p">))</span><span class="o">%</span><span class="mi">4</span>
+            <span class="n">angle_ins</span><span class="p">[</span><span class="n">itrk</span><span class="p">]</span> <span class="o">+=</span> <span class="n">rotfac</span>
+        <span class="k">if</span> <span class="n">cos_ins</span><span class="p">[</span><span class="n">itrk</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mf">1.</span><span class="p">:</span>
+            <span class="n">cos_ins</span><span class="p">[</span><span class="n">itrk</span><span class="p">]</span> <span class="o">=</span> <span class="mf">1.</span><span class="o">-</span><span class="p">(</span><span class="n">cos_ins</span><span class="p">[</span><span class="n">itrk</span><span class="p">]</span><span class="o">-</span><span class="mf">1.</span><span class="p">)</span><span class="o">%</span><span class="mi">4</span>
+            <span class="n">angle_ins</span><span class="p">[</span><span class="n">itrk</span><span class="p">]</span> <span class="o">+=</span> <span class="n">rotfac</span>
+            <span class="c1">#if this reflects even number of times, params_in[1] after is guaranteed to be between -1 and -3, so one more correction attempt will suffice</span>
+            <span class="k">if</span> <span class="n">cos_ins</span><span class="p">[</span><span class="n">itrk</span><span class="p">]</span> <span class="o">&lt;</span> <span class="o">-</span><span class="mf">1.</span><span class="p">:</span>
+                <span class="n">cos_ins</span><span class="p">[</span><span class="n">itrk</span><span class="p">]</span> <span class="o">=</span> <span class="o">-</span><span class="mf">1.</span><span class="o">+</span><span class="p">(</span><span class="o">-</span><span class="p">(</span><span class="n">cos_ins</span><span class="p">[</span><span class="n">itrk</span><span class="p">]</span><span class="o">+</span><span class="mf">1.</span><span class="p">))</span><span class="o">%</span><span class="mi">4</span>
+                <span class="n">angle_ins</span><span class="p">[</span><span class="n">itrk</span><span class="p">]</span> <span class="o">+=</span> <span class="n">rotfac</span>
+        <span class="n">angle_ins</span><span class="p">[</span><span class="n">itrk</span><span class="p">]</span> <span class="o">=</span> <span class="n">angle_ins</span><span class="p">[</span><span class="n">itrk</span><span class="p">]</span><span class="o">%</span><span class="n">modfac</span>
+    <span class="k">return</span> <span class="n">cos_ins</span><span class="p">,</span><span class="n">angle_ins</span></div>
+
+<div class="viewcode-block" id="reflect_into_range"><a class="viewcode-back" href="../../QuickCW.html#QuickCW.QuickCorrectionUtils.reflect_into_range">[docs]</a><span class="nd">@njit</span><span class="p">()</span>
+<span class="k">def</span> <span class="nf">reflect_into_range</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">x_low</span><span class="p">,</span> <span class="n">x_high</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;reflect an arbitrary parameter into a nominal range</span>
+
+<span class="sd">    :param x:</span>
+<span class="sd">    Value of parameter to reflect in range</span>
+<span class="sd">    :param x_low:</span>
+<span class="sd">    Lower bound of parameter</span>
+<span class="sd">    :param x_high:</span>
+<span class="sd">    Upper bound of prameter</span>
+
+<span class="sd">    :return res:</span>
+<span class="sd">    Value of parameter reflected into range</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1">#ensure always returns something in range (i.e. do an arbitrary number of reflections) similar to reflect_cosines but does not need to track angles</span>
+    <span class="n">x_range</span> <span class="o">=</span> <span class="n">x_high</span><span class="o">-</span><span class="n">x_low</span>
+    <span class="n">res</span> <span class="o">=</span> <span class="n">x</span>
+    <span class="k">if</span> <span class="n">res</span><span class="o">&lt;</span><span class="n">x_low</span><span class="p">:</span>
+        <span class="n">res</span> <span class="o">=</span> <span class="n">x_low</span><span class="o">+</span><span class="p">(</span><span class="o">-</span><span class="p">(</span><span class="n">res</span><span class="o">-</span><span class="n">x_low</span><span class="p">))</span><span class="o">%</span><span class="p">(</span><span class="mi">2</span><span class="o">*</span><span class="n">x_range</span><span class="p">)</span>  <span class="c1"># 2*x_low - x</span>
+    <span class="k">if</span> <span class="n">res</span><span class="o">&gt;</span><span class="n">x_high</span><span class="p">:</span>
+        <span class="n">res</span> <span class="o">=</span> <span class="n">x_high</span><span class="o">-</span><span class="p">(</span><span class="n">res</span><span class="o">-</span><span class="n">x_high</span><span class="p">)</span><span class="o">%</span><span class="p">(</span><span class="mi">2</span><span class="o">*</span><span class="n">x_range</span><span class="p">)</span>  <span class="c1"># 2*x_high - x</span>
+        <span class="k">if</span> <span class="n">res</span><span class="o">&lt;</span><span class="n">x_low</span><span class="p">:</span>
+            <span class="n">res</span> <span class="o">=</span> <span class="n">x_low</span><span class="o">+</span><span class="p">(</span><span class="o">-</span><span class="p">(</span><span class="n">res</span><span class="o">-</span><span class="n">x_low</span><span class="p">))</span><span class="o">%</span><span class="p">(</span><span class="mi">2</span><span class="o">*</span><span class="n">x_range</span><span class="p">)</span>  <span class="c1"># 2*x_low - x</span>
+    <span class="k">return</span> <span class="n">res</span></div>
+
+<div class="viewcode-block" id="check_merged"><a class="viewcode-back" href="../../QuickCW.html#QuickCW.QuickCorrectionUtils.check_merged">[docs]</a><span class="k">def</span> <span class="nf">check_merged</span><span class="p">(</span><span class="n">log10_fgw</span><span class="p">,</span><span class="n">log10_mc</span><span class="p">,</span><span class="n">max_toa</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;check the maximum toa is not such that the source has already merged, and if so draw new parameters to avoid starting from nan likelihood</span>
+
+<span class="sd">    :param log10_fgw:</span>
+<span class="sd">    log base 10 of GW frequency</span>
+<span class="sd">    :param log10_mc:</span>
+<span class="sd">    log base 10 of chirp mass</span>
+<span class="sd">    :param max_toa:</span>
+<span class="sd">    Latest TOA in any pulsar in the array</span>
+
+<span class="sd">    :return:</span>
+<span class="sd">    True if source already merged, False otherwise</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">w0</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span> <span class="o">*</span> <span class="mf">10.0</span><span class="o">**</span><span class="n">log10_fgw</span>
+    <span class="n">mc</span> <span class="o">=</span> <span class="mf">10.0</span><span class="o">**</span><span class="n">log10_mc</span>
+
+    <span class="k">if</span> <span class="p">(</span><span class="mf">1.</span> <span class="o">-</span> <span class="mf">256.</span><span class="o">/</span><span class="mf">5.</span> <span class="o">*</span> <span class="p">(</span><span class="n">mc</span> <span class="o">*</span> <span class="n">const</span><span class="o">.</span><span class="n">Tsun</span><span class="p">)</span><span class="o">**</span><span class="p">(</span><span class="mf">5.</span><span class="o">/</span><span class="mf">3.</span><span class="p">)</span> <span class="o">*</span> <span class="n">w0</span><span class="o">**</span><span class="p">(</span><span class="mf">8.</span><span class="o">/</span><span class="mf">3.</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="n">max_toa</span> <span class="o">-</span> <span class="n">cm</span><span class="o">.</span><span class="n">tref</span><span class="p">))</span> <span class="o">&gt;=</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">False</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">True</span></div>
+
+<div class="viewcode-block" id="correct_extrinsic"><a class="viewcode-back" href="../../QuickCW.html#QuickCW.QuickCorrectionUtils.correct_extrinsic">[docs]</a><span class="nd">@njit</span><span class="p">()</span>
+<span class="k">def</span> <span class="nf">correct_extrinsic</span><span class="p">(</span><span class="n">sample</span><span class="p">,</span><span class="n">x0</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;correct extrinsic parameters for phases and cosines</span>
+<span class="sd">    </span>
+<span class="sd">    :param sample:</span>
+<span class="sd">    Array with parameters</span>
+<span class="sd">    :param x0:</span>
+<span class="sd">    CWInfo object</span>
+
+<span class="sd">    :return sample:</span>
+<span class="sd">    Corrected sample array</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">sample</span><span class="p">[</span><span class="n">x0</span><span class="o">.</span><span class="n">idx_cos_inc</span><span class="p">],</span><span class="n">sample</span><span class="p">[</span><span class="n">x0</span><span class="o">.</span><span class="n">idx_psi</span><span class="p">]</span> <span class="o">=</span> <span class="n">reflect_cosines</span><span class="p">(</span><span class="n">sample</span><span class="p">[</span><span class="n">x0</span><span class="o">.</span><span class="n">idx_cos_inc</span><span class="p">],</span><span class="n">sample</span><span class="p">[</span><span class="n">x0</span><span class="o">.</span><span class="n">idx_psi</span><span class="p">],</span><span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="o">/</span><span class="mi">2</span><span class="p">,</span><span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="p">)</span>
+    <span class="n">sample</span><span class="p">[</span><span class="n">x0</span><span class="o">.</span><span class="n">idx_phase0</span><span class="p">]</span> <span class="o">=</span> <span class="n">sample</span><span class="p">[</span><span class="n">x0</span><span class="o">.</span><span class="n">idx_phase0</span><span class="p">]</span><span class="o">%</span><span class="p">(</span><span class="mi">2</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="p">)</span>
+    <span class="n">sample</span><span class="p">[</span><span class="n">x0</span><span class="o">.</span><span class="n">idx_phases</span><span class="p">]</span> <span class="o">=</span> <span class="n">sample</span><span class="p">[</span><span class="n">x0</span><span class="o">.</span><span class="n">idx_phases</span><span class="p">]</span><span class="o">%</span><span class="p">(</span><span class="mi">2</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">sample</span></div>
+
+<div class="viewcode-block" id="correct_extrinsic_array"><a class="viewcode-back" href="../../QuickCW.html#QuickCW.QuickCorrectionUtils.correct_extrinsic_array">[docs]</a><span class="nd">@njit</span><span class="p">()</span>
+<span class="k">def</span> <span class="nf">correct_extrinsic_array</span><span class="p">(</span><span class="n">samples</span><span class="p">,</span><span class="n">x0</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;correct extrinsic parameters for phases and cosines</span>
+<span class="sd">       same as correct_extrinsic but handles mutiple samples</span>
+
+<span class="sd">    :param samples:</span>
+<span class="sd">    2D array with parameters for multiple samples</span>
+<span class="sd">    :param x0:</span>
+<span class="sd">    CWInfo object</span>
+
+<span class="sd">    :return samples:</span>
+<span class="sd">    Corrected samples array</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">samples</span><span class="p">[:,</span><span class="n">x0</span><span class="o">.</span><span class="n">idx_cos_inc</span><span class="p">],</span><span class="n">samples</span><span class="p">[:,</span><span class="n">x0</span><span class="o">.</span><span class="n">idx_psi</span><span class="p">]</span> <span class="o">=</span> <span class="n">reflect_cosines_array</span><span class="p">(</span><span class="n">samples</span><span class="p">[:,</span><span class="n">x0</span><span class="o">.</span><span class="n">idx_cos_inc</span><span class="p">],</span><span class="n">samples</span><span class="p">[:,</span><span class="n">x0</span><span class="o">.</span><span class="n">idx_psi</span><span class="p">],</span><span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="o">/</span><span class="mi">2</span><span class="p">,</span><span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="p">)</span>
+    <span class="n">samples</span><span class="p">[:,</span><span class="n">x0</span><span class="o">.</span><span class="n">idx_phase0</span><span class="p">]</span> <span class="o">%=</span> <span class="p">(</span><span class="mi">2</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="p">)</span>
+    <span class="n">samples</span><span class="p">[:,</span><span class="n">x0</span><span class="o">.</span><span class="n">idx_phases</span><span class="p">]</span> <span class="o">%=</span> <span class="p">(</span><span class="mi">2</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">samples</span></div>
+
+<div class="viewcode-block" id="correct_intrinsic"><a class="viewcode-back" href="../../QuickCW.html#QuickCW.QuickCorrectionUtils.correct_intrinsic">[docs]</a><span class="nd">@njit</span><span class="p">()</span>
+<span class="k">def</span> <span class="nf">correct_intrinsic</span><span class="p">(</span><span class="n">sample</span><span class="p">,</span><span class="n">x0</span><span class="p">,</span><span class="n">freq_bounds</span><span class="p">,</span><span class="n">cut_par_ids</span><span class="p">,</span> <span class="n">cut_lows</span><span class="p">,</span> <span class="n">cut_highs</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;correct intrinsic parameters for phases and cosines</span>
+
+<span class="sd">    :param sample:</span>
+<span class="sd">    Array with parameters</span>
+<span class="sd">    :param x0:</span>
+<span class="sd">    CWInfo object</span>
+<span class="sd">    :param freq_bounds:</span>
+<span class="sd">    Lower and upper prior bounds of GW frequency</span>
+<span class="sd">    :param cut_par_ids:</span>
+<span class="sd">    Indices of parameters needing extra check</span>
+<span class="sd">    :param cut_lows:</span>
+<span class="sd">    Lower bounds of parameters needing extra check</span>
+<span class="sd">    :param cut_highs:</span>
+<span class="sd">    Upper bounds of parameters needing extra check</span>
+
+<span class="sd">    :return sample:</span>
+<span class="sd">    Corrected sample array</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">sample</span><span class="p">[</span><span class="n">x0</span><span class="o">.</span><span class="n">idx_cos_gwtheta</span><span class="p">],</span><span class="n">sample</span><span class="p">[</span><span class="n">x0</span><span class="o">.</span><span class="n">idx_gwphi</span><span class="p">]</span> <span class="o">=</span> <span class="n">reflect_cosines</span><span class="p">(</span><span class="n">sample</span><span class="p">[</span><span class="n">x0</span><span class="o">.</span><span class="n">idx_cos_gwtheta</span><span class="p">],</span><span class="n">sample</span><span class="p">[</span><span class="n">x0</span><span class="o">.</span><span class="n">idx_gwphi</span><span class="p">],</span><span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="p">,</span><span class="mi">2</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="p">)</span>
+
+    <span class="k">for</span> <span class="n">itr</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">cut_par_ids</span><span class="o">.</span><span class="n">size</span><span class="p">):</span>
+        <span class="n">idx</span> <span class="o">=</span> <span class="n">cut_par_ids</span><span class="p">[</span><span class="n">itr</span><span class="p">]</span>
+        <span class="n">sample</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span> <span class="o">=</span> <span class="n">reflect_into_range</span><span class="p">(</span><span class="n">sample</span><span class="p">[</span><span class="n">idx</span><span class="p">],</span><span class="n">cut_lows</span><span class="p">[</span><span class="n">itr</span><span class="p">],</span><span class="n">cut_highs</span><span class="p">[</span><span class="n">itr</span><span class="p">])</span>
+
+    <span class="n">sample</span><span class="p">[</span><span class="n">x0</span><span class="o">.</span><span class="n">idx_log10_fgw</span><span class="p">]</span> <span class="o">=</span> <span class="n">reflect_into_range</span><span class="p">(</span><span class="n">sample</span><span class="p">[</span><span class="n">x0</span><span class="o">.</span><span class="n">idx_log10_fgw</span><span class="p">],</span> <span class="n">np</span><span class="o">.</span><span class="n">log10</span><span class="p">(</span><span class="n">freq_bounds</span><span class="p">[</span><span class="mi">0</span><span class="p">]),</span> <span class="n">np</span><span class="o">.</span><span class="n">log10</span><span class="p">(</span><span class="n">freq_bounds</span><span class="p">[</span><span class="mi">1</span><span class="p">]))</span>
+
+    <span class="k">return</span> <span class="n">sample</span></div>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Bence Becsy, Neil Cornish, Matthew Digman.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>QuickCW.OutputUtils &mdash; QuickCW  documentation</title>
+      <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js"></script>
+        <script src="../../_static/jquery.js"></script>
+        <script src="../../_static/underscore.js"></script>
+        <script src="../../_static/_sphinx_javascript_frameworks_compat.js"></script>
+        <script src="../../_static/doctools.js"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            QuickCW
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <!-- Local TOC -->
+              <div class="local-toc"></div>
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">QuickCW</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">QuickCW.OutputUtils</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for QuickCW.OutputUtils</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;C 2021 Bence Becsy</span>
+<span class="sd">MCMC for CW fast likelihood (w/ Neil Cornish and Matthew Digman)</span>
+<span class="sd">Helpers to print outputs&quot;&quot;&quot;</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">h5py</span>
+
+<span class="n">row_labels</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;dist-prior-noproj&#39;</span><span class="p">,</span><span class="s1">&#39;dist-prior-proj&#39;</span><span class="p">,</span><span class="s1">&#39;dist-DE-noproj&#39;</span><span class="p">,</span><span class="s1">&#39;dist-DE-proj&#39;</span><span class="p">,</span><span class="s1">&#39;dist-fisher-noproj&#39;</span><span class="p">,</span><span class="s1">&#39;dist-fisher-proj&#39;</span><span class="p">,</span>\
+              <span class="s1">&#39;RN-prior-noproj&#39;</span><span class="p">,</span><span class="s1">&#39;RN-prior-proj&#39;</span><span class="p">,</span><span class="s1">&#39;RN-DE-noproj&#39;</span><span class="p">,</span><span class="s1">&#39;RN-DE-proj&#39;</span><span class="p">,</span><span class="s1">&#39;RN-fisher-noproj&#39;</span><span class="p">,</span><span class="s1">&#39;RN-fisher-proj&#39;</span><span class="p">,</span>\
+              <span class="s1">&#39;GWB-prior-noproj&#39;</span><span class="p">,</span><span class="s1">&#39;GWB-prior-proj&#39;</span><span class="p">,</span><span class="s1">&#39;GWB-DE-noproj&#39;</span><span class="p">,</span><span class="s1">&#39;GWB-DE-proj&#39;</span><span class="p">,</span><span class="s1">&#39;GWB-fisher-noproj&#39;</span><span class="p">,</span><span class="s1">&#39;GWB-fisher-proj&#39;</span><span class="p">,</span>\
+              <span class="s1">&#39;common-prior-noproj&#39;</span><span class="p">,</span><span class="s1">&#39;common-prior-proj&#39;</span><span class="p">,</span><span class="s1">&#39;common-DE-noproj&#39;</span><span class="p">,</span><span class="s1">&#39;common-DE-proj&#39;</span><span class="p">,</span><span class="s1">&#39;common-fisher-noproj&#39;</span><span class="p">,</span><span class="s1">&#39;common-fisher-proj&#39;</span><span class="p">,</span>\
+              <span class="s1">&#39;all-prior-noproj&#39;</span><span class="p">,</span><span class="s1">&#39;all-prior-proj&#39;</span><span class="p">,</span><span class="s1">&#39;all-DE-noproj&#39;</span><span class="p">,</span><span class="s1">&#39;all-DE-proj&#39;</span><span class="p">,</span><span class="s1">&#39;all-fisher-noproj&#39;</span><span class="p">,</span><span class="s1">&#39;all-fisher-proj&#39;</span><span class="p">,</span>\
+              <span class="s1">&#39;PT&#39;</span><span class="p">,</span><span class="s1">&#39;proj&#39;</span><span class="p">]</span>
+<span class="n">display_names</span> <span class="o">=</span><span class="p">{</span><span class="s1">&#39;dist-prior-noproj&#39;</span><span class="p">:</span><span class="s1">&#39;Dist Prior&#39;</span><span class="p">,</span><span class="s1">&#39;dist-DE-noproj&#39;</span><span class="p">:</span><span class="s1">&#39;Dist DE&#39;</span><span class="p">,</span><span class="s1">&#39;dist-fisher-noproj&#39;</span><span class="p">:</span><span class="s1">&#39;Dist Fisher&#39;</span><span class="p">,</span>\
+                <span class="s1">&#39;RN-prior-noproj&#39;</span><span class="p">:</span><span class="s1">&#39;RN Emp Dist&#39;</span><span class="p">,</span><span class="s1">&#39;RN-DE-noproj&#39;</span><span class="p">:</span><span class="s1">&#39;RN DE&#39;</span><span class="p">,</span><span class="s1">&#39;RN-fisher-noproj&#39;</span><span class="p">:</span><span class="s1">&#39;RN Fisher&#39;</span><span class="p">,</span>\
+                <span class="s1">&#39;GWB-prior-noproj&#39;</span><span class="p">:</span><span class="s1">&#39;GWB Prior&#39;</span><span class="p">,</span><span class="s1">&#39;GWB-DE-noproj&#39;</span><span class="p">:</span><span class="s1">&#39;GWB DE&#39;</span><span class="p">,</span><span class="s1">&#39;GWB-fisher-noproj&#39;</span><span class="p">:</span><span class="s1">&#39;GWB Fisher&#39;</span><span class="p">,</span>\
+                <span class="s1">&#39;common-prior-noproj&#39;</span><span class="p">:</span><span class="s1">&#39;Common Prior&#39;</span><span class="p">,</span><span class="s1">&#39;common-DE-noproj&#39;</span><span class="p">:</span><span class="s1">&#39;Common DE&#39;</span><span class="p">,</span><span class="s1">&#39;common-fisher-noproj&#39;</span><span class="p">:</span><span class="s1">&#39;Common Fisher&#39;</span><span class="p">,</span>\
+                <span class="s1">&#39;all-prior-noproj&#39;</span><span class="p">:</span><span class="s1">&#39;All Prior&#39;</span><span class="p">,</span><span class="s1">&#39;all-DE-noproj&#39;</span><span class="p">:</span><span class="s1">&#39;All DE&#39;</span><span class="p">,</span><span class="s1">&#39;all-fisher-noproj&#39;</span><span class="p">:</span><span class="s1">&#39;All Fisher&#39;</span><span class="p">,</span>\
+                <span class="s1">&#39;dist-prior-proj&#39;</span><span class="p">:</span><span class="s1">&#39;Dist Prior&#39;</span><span class="p">,</span><span class="s1">&#39;dist-DE-proj&#39;</span><span class="p">:</span><span class="s1">&#39;Dist DE&#39;</span><span class="p">,</span><span class="s1">&#39;dist-fisher-proj&#39;</span><span class="p">:</span><span class="s1">&#39;Dist Fisher&#39;</span><span class="p">,</span>\
+                <span class="s1">&#39;RN-prior-proj&#39;</span><span class="p">:</span><span class="s1">&#39;RN Emp Dist&#39;</span><span class="p">,</span><span class="s1">&#39;RN-DE-proj&#39;</span><span class="p">:</span><span class="s1">&#39;RN DE&#39;</span><span class="p">,</span><span class="s1">&#39;RN-fisher-proj&#39;</span><span class="p">:</span><span class="s1">&#39;RN Fisher&#39;</span><span class="p">,</span>\
+                <span class="s1">&#39;GWB-prior-proj&#39;</span><span class="p">:</span><span class="s1">&#39;GWB Prior&#39;</span><span class="p">,</span><span class="s1">&#39;GWB-DE-proj&#39;</span><span class="p">:</span><span class="s1">&#39;GWB DE&#39;</span><span class="p">,</span><span class="s1">&#39;GWB-fisher-proj&#39;</span><span class="p">:</span><span class="s1">&#39;GWB Fisher&#39;</span><span class="p">,</span>\
+                <span class="s1">&#39;common-prior-proj&#39;</span><span class="p">:</span><span class="s1">&#39;Common Prior&#39;</span><span class="p">,</span><span class="s1">&#39;common-DE-proj&#39;</span><span class="p">:</span><span class="s1">&#39;Common DE&#39;</span><span class="p">,</span><span class="s1">&#39;common-fisher-proj&#39;</span><span class="p">:</span><span class="s1">&#39;Common Fisher&#39;</span><span class="p">,</span>\
+                <span class="s1">&#39;all-prior-proj&#39;</span><span class="p">:</span><span class="s1">&#39;All Prior&#39;</span><span class="p">,</span><span class="s1">&#39;all-DE-proj&#39;</span><span class="p">:</span><span class="s1">&#39;All DE&#39;</span><span class="p">,</span><span class="s1">&#39;all-fisher-proj&#39;</span><span class="p">:</span><span class="s1">&#39;All Fisher&#39;</span><span class="p">,</span>\
+                <span class="s1">&#39;PT&#39;</span><span class="p">:</span><span class="s1">&#39;PT&#39;</span><span class="p">,</span><span class="s1">&#39;proj&#39;</span><span class="p">:</span><span class="s1">&#39;proj&#39;</span><span class="p">}</span>
+
+<div class="viewcode-block" id="print_acceptance_progress"><a class="viewcode-back" href="../../QuickCW.html#QuickCW.OutputUtils.print_acceptance_progress">[docs]</a><span class="k">def</span> <span class="nf">print_acceptance_progress</span><span class="p">(</span><span class="n">itrn</span><span class="p">,</span><span class="n">N</span><span class="p">,</span><span class="n">n_int_block</span><span class="p">,</span><span class="n">a_yes</span><span class="p">,</span><span class="n">a_no</span><span class="p">,</span><span class="n">t_itr</span><span class="p">,</span><span class="n">ti_loop</span><span class="p">,</span><span class="n">tf1_loop</span><span class="p">,</span><span class="n">Ts</span><span class="p">,</span><span class="n">verbosity</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;print the acceptance fraction</span>
+
+<span class="sd">    :param itrn:</span>
+<span class="sd">    Overall index (as opposed to the block index itri or the index within saved values itrb)</span>
+<span class="sd">    :param N:</span>
+<span class="sd">    Total number of iterations we asked for at startup</span>
+<span class="sd">    :param n_int_block:</span>
+<span class="sd">    Number of iterations within a block</span>
+<span class="sd">    :param a_yes:</span>
+<span class="sd">    Array holding number of accepted steps</span>
+<span class="sd">    :param a_no:</span>
+<span class="sd">    Array holding number of rejected steps</span>
+<span class="sd">    :param t_itr:</span>
+<span class="sd">    Time just before calling this function got from time.perf_counter()</span>
+<span class="sd">    :param ti_loop:</span>
+<span class="sd">    Time after initialization got from time.perf_counter()</span>
+<span class="sd">    :param tf1_loop:</span>
+<span class="sd">    Time at start of this block got from time.perf_counter()</span>
+<span class="sd">    :param Ts:</span>
+<span class="sd">    Temperature ladder</span>
+<span class="sd">    :param verbosity:</span>
+<span class="sd">    Parameter indicating how much info to print (higher value means more prints)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">with</span> <span class="n">np</span><span class="o">.</span><span class="n">errstate</span><span class="p">(</span><span class="n">invalid</span><span class="o">=</span><span class="s1">&#39;ignore&#39;</span><span class="p">):</span>
+        <span class="n">acc_fraction</span> <span class="o">=</span> <span class="n">a_yes</span><span class="o">/</span><span class="p">(</span><span class="n">a_no</span><span class="o">+</span><span class="n">a_yes</span><span class="p">)</span>
+    <span class="n">t_initial</span> <span class="o">=</span> <span class="n">tf1_loop</span><span class="o">-</span><span class="n">ti_loop</span>
+    <span class="n">t_spent</span> <span class="o">=</span> <span class="n">t_itr</span><span class="o">-</span><span class="n">tf1_loop</span>
+    <span class="k">if</span> <span class="n">itrn</span><span class="o">&gt;</span><span class="n">n_int_block</span><span class="p">:</span>
+        <span class="c1">#forecast total time based on average speed ignoring the very first block which may include compile time</span>
+        <span class="n">t_forecast</span> <span class="o">=</span> <span class="p">(</span><span class="n">N</span><span class="o">-</span><span class="n">n_int_block</span><span class="p">)</span><span class="o">/</span><span class="p">(</span><span class="n">itrn</span><span class="o">-</span><span class="n">n_int_block</span><span class="p">)</span><span class="o">*</span><span class="n">t_spent</span><span class="o">+</span><span class="n">t_initial</span>
+    <span class="k">elif</span> <span class="n">itrn</span><span class="o">&gt;</span><span class="mi">0</span><span class="p">:</span>
+        <span class="n">t_forecast</span> <span class="o">=</span> <span class="n">N</span><span class="o">/</span><span class="n">itrn</span><span class="o">*</span><span class="n">t_initial</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">t_forecast</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Progress: </span><span class="si">{0:2.2f}</span><span class="s1">% &#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">itrn</span><span class="o">/</span><span class="n">N</span><span class="o">*</span><span class="mi">100</span><span class="p">)</span><span class="o">+</span><span class="s2">&quot;at t= </span><span class="si">%8.3f</span><span class="s2">s forecast loop time </span><span class="si">%8.3f</span><span class="s2">s&quot;</span><span class="o">%</span><span class="p">(</span><span class="n">t_spent</span><span class="p">,</span><span class="n">t_forecast</span><span class="p">))</span>
+
+    <span class="c1">#print(&#39;Acceptance fraction #columns: chain number; rows: proposal type (for morphological: w/o and w/ projection perturbation) (dist-prior, dist-DE, dist-fisher, RN-prior, RN-DE, RN-fisher, common-prior, common-DE, common-fisher, PT, proj):&#39;)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Acceptance fractions for various jumps&#39;</span><span class="p">)</span>
+    <span class="n">str_build</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="si">%-13s</span><span class="s2"> &quot;</span><span class="o">%</span><span class="s2">&quot;Jump Name&quot;</span>
+    <span class="k">for</span> <span class="n">itrc</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">acc_fraction</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]):</span>
+        <span class="n">str_build</span> <span class="o">+=</span> <span class="s2">&quot; chain </span><span class="si">%3d</span><span class="s2"> &quot;</span><span class="o">%</span><span class="n">itrc</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">str_build</span><span class="p">)</span>
+
+    <span class="n">str_build</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="si">%-13s</span><span class="s2"> &quot;</span><span class="o">%</span><span class="s2">&quot;Temperature&quot;</span>
+    <span class="k">for</span> <span class="n">itrc</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">acc_fraction</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]):</span>
+        <span class="n">str_build</span> <span class="o">+=</span> <span class="s2">&quot; </span><span class="si">%.3e</span><span class="s2"> &quot;</span><span class="o">%</span><span class="n">Ts</span><span class="p">[</span><span class="n">itrc</span><span class="p">]</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">str_build</span><span class="p">)</span>
+
+    <span class="n">str_proj_rows</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">str_noproj_rows</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="k">for</span> <span class="n">itrp</span><span class="p">,</span><span class="n">label</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">row_labels</span><span class="p">):</span>
+        <span class="n">str_build</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="si">%-13s</span><span class="s2"> &quot;</span><span class="o">%</span><span class="n">display_names</span><span class="p">[</span><span class="n">label</span><span class="p">]</span>
+        <span class="c1">#skip the one jump that is never attempted, unless it actually has been attempted</span>
+
+        <span class="k">for</span> <span class="n">itrc</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">acc_fraction</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]):</span>
+            <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">acc_fraction</span><span class="p">[</span><span class="n">itrp</span><span class="p">,</span><span class="n">itrc</span><span class="p">]):</span>
+                <span class="n">str_build</span> <span class="o">+=</span> <span class="s2">&quot; No Trials &quot;</span>
+            <span class="k">elif</span> <span class="n">acc_fraction</span><span class="p">[</span><span class="n">itrp</span><span class="p">,</span><span class="n">itrc</span><span class="p">]</span> <span class="o">==</span> <span class="mf">0.</span><span class="p">:</span>
+                <span class="c1">#alternate printout to roughly indicate how many have been tried if acceptance is 0</span>
+                <span class="n">str_build</span> <span class="o">+=</span> <span class="s2">&quot;&lt;</span><span class="si">%8.7f</span><span class="s2"> &quot;</span><span class="o">%</span><span class="p">(</span><span class="mf">1.</span><span class="o">/</span><span class="p">(</span><span class="n">a_yes</span><span class="p">[</span><span class="n">itrp</span><span class="p">,</span><span class="n">itrc</span><span class="p">]</span><span class="o">+</span><span class="n">a_no</span><span class="p">[</span><span class="n">itrp</span><span class="p">,</span><span class="n">itrc</span><span class="p">]))</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">str_build</span> <span class="o">+=</span> <span class="s2">&quot; </span><span class="si">%8.7f</span><span class="s2"> &quot;</span><span class="o">%</span><span class="n">acc_fraction</span><span class="p">[</span><span class="n">itrp</span><span class="p">,</span><span class="n">itrc</span><span class="p">]</span>
+
+        <span class="k">if</span> <span class="p">(</span><span class="s1">&#39;RN-prior&#39;</span> <span class="ow">in</span> <span class="n">label</span> <span class="ow">or</span> <span class="s1">&#39;GWB-prior&#39;</span> <span class="ow">in</span> <span class="n">label</span> <span class="ow">or</span> <span class="s1">&#39;all-prior&#39;</span> <span class="ow">in</span> <span class="n">label</span><span class="p">)</span> <span class="ow">and</span> <span class="n">np</span><span class="o">.</span><span class="n">all</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">acc_fraction</span><span class="p">[</span><span class="n">itrp</span><span class="p">])):</span>
+            <span class="k">continue</span>
+        <span class="k">if</span> <span class="s1">&#39;-noproj&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">label</span><span class="p">:</span>
+            <span class="n">str_proj_rows</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">str_build</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">str_noproj_rows</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">str_build</span><span class="p">)</span>
+
+    <span class="k">for</span> <span class="n">str_build</span> <span class="ow">in</span> <span class="n">str_proj_rows</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="n">str_build</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">verbosity</span><span class="o">&gt;</span><span class="mi">1</span><span class="p">:</span>
+        <span class="c1">#the noproj rows have different meaning so print them as a separate channel</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;&quot;</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Fraction of time Multiple Try selected first sample, whether or not trial was accepted:&quot;</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">str_build</span> <span class="ow">in</span> <span class="n">str_noproj_rows</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="n">str_build</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="output_hdf5_loop"><a class="viewcode-back" href="../../QuickCW.html#QuickCW.OutputUtils.output_hdf5_loop">[docs]</a><span class="k">def</span> <span class="nf">output_hdf5_loop</span><span class="p">(</span><span class="n">itrn</span><span class="p">,</span><span class="n">chain_params</span><span class="p">,</span><span class="n">samples</span><span class="p">,</span><span class="n">log_likelihood</span><span class="p">,</span><span class="n">acc_fraction</span><span class="p">,</span><span class="n">fisher_diag</span><span class="p">,</span><span class="n">par_names</span><span class="p">,</span><span class="n">N</span><span class="p">,</span><span class="n">verbosity</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;output to hdf5 at loop iteration</span>
+
+<span class="sd">    :param itrn:</span>
+<span class="sd">    Overall index (as opposed to the block index itri or the index within saved values itrb)</span>
+<span class="sd">    :param chain_params:</span>
+<span class="sd">    ChainParams object</span>
+<span class="sd">    :param samples:</span>
+<span class="sd">    Array with posterior samples</span>
+<span class="sd">    :param log_likelihood:</span>
+<span class="sd">    Array with log likelihood values corresponding to samples</span>
+<span class="sd">    :param acc_fraction:</span>
+<span class="sd">    Array with acceptance rates</span>
+<span class="sd">    :param fisher diag:</span>
+<span class="sd">    Array with the digonal elements of fisher matrix</span>
+<span class="sd">    :param par_names:</span>
+<span class="sd">    List of parameter names</span>
+<span class="sd">    :param N:</span>
+<span class="sd">    Total number of samples</span>
+<span class="sd">    :param verbosity:</span>
+<span class="sd">    Parameter indicating how much info to print (higher value means more prints)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">n_chain</span> <span class="o">=</span> <span class="n">chain_params</span><span class="o">.</span><span class="n">n_chain</span>
+    <span class="n">save_every_n</span> <span class="o">=</span> <span class="n">chain_params</span><span class="o">.</span><span class="n">save_every_n</span>
+    <span class="n">Ts</span> <span class="o">=</span> <span class="n">chain_params</span><span class="o">.</span><span class="n">Ts</span>
+    <span class="n">savefile</span> <span class="o">=</span> <span class="n">chain_params</span><span class="o">.</span><span class="n">savefile</span>
+    <span class="n">save_first_n_chains</span> <span class="o">=</span> <span class="n">chain_params</span><span class="o">.</span><span class="n">save_first_n_chains</span>
+    <span class="n">samples_precision</span> <span class="o">=</span> <span class="n">chain_params</span><span class="o">.</span><span class="n">samples_precision</span>
+    <span class="n">thin</span> <span class="o">=</span> <span class="n">chain_params</span><span class="o">.</span><span class="n">thin</span>
+    <span class="k">if</span> <span class="n">savefile</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">itrn</span><span class="o">&gt;</span><span class="n">save_every_n</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">verbosity</span><span class="o">&gt;</span><span class="mi">1</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Append to HDF5 file...&quot;</span><span class="p">)</span>
+            <span class="k">with</span> <span class="n">h5py</span><span class="o">.</span><span class="n">File</span><span class="p">(</span><span class="n">savefile</span><span class="p">,</span> <span class="s1">&#39;a&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+                <span class="n">f</span><span class="p">[</span><span class="s1">&#39;samples_cold&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">resize</span><span class="p">((</span><span class="n">f</span><span class="p">[</span><span class="s1">&#39;samples_cold&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="nb">int</span><span class="p">((</span><span class="n">samples</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span><span class="o">/</span><span class="n">thin</span><span class="p">)),</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+                <span class="n">f</span><span class="p">[</span><span class="s1">&#39;samples_cold&#39;</span><span class="p">][:,</span><span class="o">-</span><span class="nb">int</span><span class="p">((</span><span class="n">samples</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span><span class="o">/</span><span class="n">thin</span><span class="p">):,:]</span> <span class="o">=</span> <span class="n">samples</span><span class="p">[:</span><span class="n">save_first_n_chains</span><span class="p">,:</span><span class="o">-</span><span class="mi">1</span><span class="p">:</span><span class="n">thin</span><span class="p">,:]</span>
+                <span class="n">f</span><span class="p">[</span><span class="s1">&#39;log_likelihood&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">resize</span><span class="p">((</span><span class="n">f</span><span class="p">[</span><span class="s1">&#39;log_likelihood&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="nb">int</span><span class="p">((</span><span class="n">log_likelihood</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span><span class="o">/</span><span class="n">thin</span><span class="p">)),</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+                <span class="n">f</span><span class="p">[</span><span class="s1">&#39;log_likelihood&#39;</span><span class="p">][:,</span><span class="o">-</span><span class="nb">int</span><span class="p">((</span><span class="n">log_likelihood</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span><span class="o">/</span><span class="n">thin</span><span class="p">):]</span> <span class="o">=</span> <span class="n">log_likelihood</span><span class="p">[:,:</span><span class="o">-</span><span class="mi">1</span><span class="p">:</span><span class="n">thin</span><span class="p">]</span>
+                <span class="n">f</span><span class="p">[</span><span class="s1">&#39;acc_fraction&#39;</span><span class="p">][</span><span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="n">acc_fraction</span><span class="p">)</span>
+                <span class="n">f</span><span class="p">[</span><span class="s1">&#39;fisher_diag&#39;</span><span class="p">][</span><span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="n">fisher_diag</span><span class="p">)</span>
+                <span class="n">f</span><span class="p">[</span><span class="s1">&#39;T-ladder&#39;</span><span class="p">][</span><span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="n">Ts</span><span class="p">)</span>
+                <span class="n">f</span><span class="p">[</span><span class="s1">&#39;samples_freq&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">resize</span><span class="p">((</span><span class="n">f</span><span class="p">[</span><span class="s1">&#39;samples_freq&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="nb">int</span><span class="p">((</span><span class="n">samples</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span><span class="o">/</span><span class="n">thin</span><span class="p">)),</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+                <span class="n">f</span><span class="p">[</span><span class="s1">&#39;samples_freq&#39;</span><span class="p">][:,</span><span class="o">-</span><span class="nb">int</span><span class="p">((</span><span class="n">samples</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span><span class="o">/</span><span class="n">thin</span><span class="p">):]</span> <span class="o">=</span> <span class="n">samples</span><span class="p">[:,:</span><span class="o">-</span><span class="mi">1</span><span class="p">:</span><span class="n">thin</span><span class="p">,</span><span class="n">par_names</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="s1">&#39;0_log10_fgw&#39;</span><span class="p">)]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">verbosity</span><span class="o">&gt;</span><span class="mi">1</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Create HDF5 file...&quot;</span><span class="p">)</span>
+            <span class="k">with</span> <span class="n">h5py</span><span class="o">.</span><span class="n">File</span><span class="p">(</span><span class="n">savefile</span><span class="p">,</span> <span class="s1">&#39;w&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+                <span class="n">f</span><span class="o">.</span><span class="n">create_dataset</span><span class="p">(</span><span class="s1">&#39;samples_cold&#39;</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">samples</span><span class="p">[:</span><span class="n">save_first_n_chains</span><span class="p">,:</span><span class="o">-</span><span class="mi">1</span><span class="p">:</span><span class="n">thin</span><span class="p">,:],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">samples_precision</span><span class="p">,</span> <span class="n">compression</span><span class="o">=</span><span class="s2">&quot;gzip&quot;</span><span class="p">,</span> <span class="n">chunks</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">maxshape</span><span class="o">=</span><span class="p">(</span><span class="n">save_first_n_chains</span><span class="p">,</span><span class="nb">int</span><span class="p">(</span><span class="n">N</span><span class="o">/</span><span class="n">thin</span><span class="p">),</span><span class="n">samples</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">2</span><span class="p">]))</span>
+                <span class="n">f</span><span class="o">.</span><span class="n">create_dataset</span><span class="p">(</span><span class="s1">&#39;log_likelihood&#39;</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">log_likelihood</span><span class="p">[:,:</span><span class="o">-</span><span class="mi">1</span><span class="p">:</span><span class="n">thin</span><span class="p">],</span> <span class="n">compression</span><span class="o">=</span><span class="s2">&quot;gzip&quot;</span><span class="p">,</span> <span class="n">chunks</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">maxshape</span><span class="o">=</span><span class="p">(</span><span class="n">samples</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span><span class="nb">int</span><span class="p">(</span><span class="n">N</span><span class="o">/</span><span class="n">thin</span><span class="p">)))</span>
+                <span class="n">f</span><span class="o">.</span><span class="n">create_dataset</span><span class="p">(</span><span class="s1">&#39;par_names&#39;</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">par_names</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="s1">&#39;S&#39;</span><span class="p">))</span>
+                <span class="n">f</span><span class="o">.</span><span class="n">create_dataset</span><span class="p">(</span><span class="s1">&#39;acc_fraction&#39;</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">acc_fraction</span><span class="p">)</span>
+                <span class="n">f</span><span class="o">.</span><span class="n">create_dataset</span><span class="p">(</span><span class="s1">&#39;fisher_diag&#39;</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">fisher_diag</span><span class="p">)</span>
+                <span class="n">f</span><span class="o">.</span><span class="n">create_dataset</span><span class="p">(</span><span class="s1">&#39;T-ladder&#39;</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">Ts</span><span class="p">)</span>
+                <span class="n">f</span><span class="o">.</span><span class="n">create_dataset</span><span class="p">(</span><span class="s1">&#39;samples_freq&#39;</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">samples</span><span class="p">[:,:</span><span class="o">-</span><span class="mi">1</span><span class="p">:</span><span class="n">thin</span><span class="p">,</span><span class="n">par_names</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="s1">&#39;0_log10_fgw&#39;</span><span class="p">)],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">samples_precision</span><span class="p">,</span> <span class="n">compression</span><span class="o">=</span><span class="s2">&quot;gzip&quot;</span><span class="p">,</span> <span class="n">chunks</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">maxshape</span><span class="o">=</span><span class="p">(</span><span class="n">n_chain</span><span class="p">,</span><span class="nb">int</span><span class="p">(</span><span class="n">N</span><span class="o">/</span><span class="n">thin</span><span class="p">)))</span></div>
+
+<div class="viewcode-block" id="output_hdf5_end"><a class="viewcode-back" href="../../QuickCW.html#QuickCW.OutputUtils.output_hdf5_end">[docs]</a><span class="k">def</span> <span class="nf">output_hdf5_end</span><span class="p">(</span><span class="n">chain_params</span><span class="p">,</span><span class="n">samples</span><span class="p">,</span><span class="n">log_likelihood</span><span class="p">,</span><span class="n">acc_fraction</span><span class="p">,</span><span class="n">fisher_diag</span><span class="p">,</span><span class="n">par_names</span><span class="p">,</span><span class="n">verbosity</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;output to hdf5 file at end of body of loop</span>
+
+<span class="sd">    :param chain_params:</span>
+<span class="sd">    ChainParams object</span>
+<span class="sd">    :param samples:</span>
+<span class="sd">    Array with posterior samples</span>
+<span class="sd">    :param log_likelihood:</span>
+<span class="sd">    Array with log likelihood values corresponding to samples</span>
+<span class="sd">    :param acc_fraction:</span>
+<span class="sd">    Array with acceptance rates</span>
+<span class="sd">    :param fisher diag:</span>
+<span class="sd">    Array with the digonal elements of fisher matrix</span>
+<span class="sd">    :param par_names:</span>
+<span class="sd">    List of parameter names</span>
+<span class="sd">    :param verbosity:</span>
+<span class="sd">    Parameter indicating how much info to print (higher value means more prints)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">Ts</span> <span class="o">=</span> <span class="n">chain_params</span><span class="o">.</span><span class="n">Ts</span>
+    <span class="n">savefile</span> <span class="o">=</span> <span class="n">chain_params</span><span class="o">.</span><span class="n">savefile</span>
+    <span class="n">save_first_n_chains</span> <span class="o">=</span> <span class="n">chain_params</span><span class="o">.</span><span class="n">save_first_n_chains</span>
+    <span class="n">thin</span> <span class="o">=</span> <span class="n">chain_params</span><span class="o">.</span><span class="n">thin</span>
+    <span class="k">if</span> <span class="n">savefile</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">verbosity</span><span class="o">&gt;</span><span class="mi">1</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Append to HDF5 file...&quot;</span><span class="p">)</span>
+        <span class="k">with</span> <span class="n">h5py</span><span class="o">.</span><span class="n">File</span><span class="p">(</span><span class="n">savefile</span><span class="p">,</span> <span class="s1">&#39;a&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+            <span class="n">f</span><span class="p">[</span><span class="s1">&#39;samples_cold&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">resize</span><span class="p">((</span><span class="n">f</span><span class="p">[</span><span class="s1">&#39;samples_cold&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="nb">int</span><span class="p">((</span><span class="n">samples</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span><span class="o">/</span><span class="n">thin</span><span class="p">)),</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+            <span class="n">f</span><span class="p">[</span><span class="s1">&#39;samples_cold&#39;</span><span class="p">][:,</span><span class="o">-</span><span class="nb">int</span><span class="p">((</span><span class="n">samples</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span><span class="o">/</span><span class="n">thin</span><span class="p">):,:]</span> <span class="o">=</span> <span class="n">samples</span><span class="p">[:</span><span class="n">save_first_n_chains</span><span class="p">,:</span><span class="o">-</span><span class="mi">1</span><span class="p">:</span><span class="n">thin</span><span class="p">,:]</span>
+            <span class="n">f</span><span class="p">[</span><span class="s1">&#39;log_likelihood&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">resize</span><span class="p">((</span><span class="n">f</span><span class="p">[</span><span class="s1">&#39;log_likelihood&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="nb">int</span><span class="p">((</span><span class="n">log_likelihood</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span><span class="o">/</span><span class="n">thin</span><span class="p">)),</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+            <span class="n">f</span><span class="p">[</span><span class="s1">&#39;log_likelihood&#39;</span><span class="p">][:,</span><span class="o">-</span><span class="nb">int</span><span class="p">((</span><span class="n">log_likelihood</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span><span class="o">/</span><span class="n">thin</span><span class="p">):]</span> <span class="o">=</span> <span class="n">log_likelihood</span><span class="p">[:,:</span><span class="o">-</span><span class="mi">1</span><span class="p">:</span><span class="n">thin</span><span class="p">]</span>
+            <span class="n">f</span><span class="p">[</span><span class="s1">&#39;acc_fraction&#39;</span><span class="p">][</span><span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="n">acc_fraction</span><span class="p">)</span>
+            <span class="n">f</span><span class="p">[</span><span class="s1">&#39;fisher_diag&#39;</span><span class="p">][</span><span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="n">fisher_diag</span><span class="p">)</span>
+            <span class="n">f</span><span class="p">[</span><span class="s1">&#39;T-ladder&#39;</span><span class="p">][</span><span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="n">Ts</span><span class="p">)</span>
+            <span class="n">f</span><span class="p">[</span><span class="s1">&#39;samples_freq&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">resize</span><span class="p">((</span><span class="n">f</span><span class="p">[</span><span class="s1">&#39;samples_freq&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="nb">int</span><span class="p">((</span><span class="n">samples</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span><span class="o">/</span><span class="n">thin</span><span class="p">)),</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+            <span class="n">f</span><span class="p">[</span><span class="s1">&#39;samples_freq&#39;</span><span class="p">][:,</span><span class="o">-</span><span class="nb">int</span><span class="p">((</span><span class="n">samples</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span><span class="o">/</span><span class="n">thin</span><span class="p">):]</span> <span class="o">=</span> <span class="n">samples</span><span class="p">[:,:</span><span class="o">-</span><span class="mi">1</span><span class="p">:</span><span class="n">thin</span><span class="p">,</span><span class="n">par_names</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="s1">&#39;0_log10_fgw&#39;</span><span class="p">)]</span></div>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Bence Becsy, Neil Cornish, Matthew Digman.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

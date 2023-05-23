@@ -1,0 +1,1845 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>QuickCW package &mdash; QuickCW  documentation</title>
+      <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+        <script src="_static/jquery.js"></script>
+        <script src="_static/underscore.js"></script>
+        <script src="_static/_sphinx_javascript_frameworks_compat.js"></script>
+        <script src="_static/doctools.js"></script>
+        <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            QuickCW
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <!-- Local TOC -->
+              <div class="local-toc"><ul>
+<li><a class="reference internal" href="#">QuickCW package</a><ul>
+<li><a class="reference internal" href="#submodules">Submodules</a></li>
+<li><a class="reference internal" href="#module-QuickCW.CWFastLikelihoodNumba">QuickCW.CWFastLikelihoodNumba module</a></li>
+<li><a class="reference internal" href="#module-QuickCW.CWFastPrior">QuickCW.CWFastPrior module</a></li>
+<li><a class="reference internal" href="#module-QuickCW.OutputUtils">QuickCW.OutputUtils module</a></li>
+<li><a class="reference internal" href="#module-QuickCW.PulsarDistPriors">QuickCW.PulsarDistPriors module</a></li>
+<li><a class="reference internal" href="#module-QuickCW.QuickCW">QuickCW.QuickCW module</a></li>
+<li><a class="reference internal" href="#module-QuickCW.QuickCorrectionUtils">QuickCW.QuickCorrectionUtils module</a></li>
+<li><a class="reference internal" href="#module-QuickCW.QuickFisherHelpers">QuickCW.QuickFisherHelpers module</a></li>
+<li><a class="reference internal" href="#module-QuickCW.QuickMCMCUtils">QuickCW.QuickMCMCUtils module</a></li>
+<li><a class="reference internal" href="#module-QuickCW.QuickMTHelpers">QuickCW.QuickMTHelpers module</a></li>
+<li><a class="reference internal" href="#module-QuickCW.const_mcmc">QuickCW.const_mcmc module</a></li>
+<li><a class="reference internal" href="#module-QuickCW.lapack_wrappers">QuickCW.lapack_wrappers module</a></li>
+<li><a class="reference internal" href="#quickcw-test-fisher-convergence-module">QuickCW.test_fisher_convergence module</a></li>
+</ul>
+</li>
+</ul>
+</div>
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">QuickCW</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">QuickCW package</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/QuickCW.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-QuickCW">
+<span id="quickcw-package"></span><h1>QuickCW package<a class="headerlink" href="#module-QuickCW" title="Permalink to this heading"></a></h1>
+<section id="submodules">
+<h2>Submodules<a class="headerlink" href="#submodules" title="Permalink to this heading"></a></h2>
+</section>
+<section id="module-QuickCW.CWFastLikelihoodNumba">
+<span id="quickcw-cwfastlikelihoodnumba-module"></span><h2>QuickCW.CWFastLikelihoodNumba module<a class="headerlink" href="#module-QuickCW.CWFastLikelihoodNumba" title="Permalink to this heading"></a></h2>
+<p>C 2021 Matthew Digman and Bence Becsy
+numba version of fast likelihood</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="QuickCW.CWFastLikelihoodNumba.CWInfo">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">QuickCW.CWFastLikelihoodNumba.</span></span><span class="sig-name descname"><span class="pre">CWInfo</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/QuickCW/CWFastLikelihoodNumba.html#CWInfo"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#QuickCW.CWFastLikelihoodNumba.CWInfo" title="Permalink to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="#QuickCW.CWFastLikelihoodNumba.CWInfo" title="QuickCW.CWFastLikelihoodNumba.CWInfo"><code class="xref py py-class docutils literal notranslate"><span class="pre">CWInfo</span></code></a></p>
+<p>simple jitclass to store the various parmeters in a way that can be accessed quickly from a numba environment</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>Npsr</strong> – </p>
+</dd>
+</dl>
+<p>Number of pulsars
+:param params_in:
+Array of all parameters in the same order as in par_names
+:param par_names:
+List of parameter names - must follow certain naming conventions so we can identify parameters
+:param par_names_cw_ext:
+Subset of all parameters that describe the CW signal and are projection parameters (previously called extrinsic parameters)
+:param par_names_cw_int:
+Subset of all parameters that describe the CW signal and are shape parameters (previously called intrinsic parameters)</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="QuickCW.CWFastLikelihoodNumba.CWInfo.class_type">
+<span class="sig-name descname"><span class="pre">class_type</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">jitclass.CWInfo#7f2219349dc0&lt;Npsr:int64,cw_p_dists:array(float64,</span> <span class="pre">1d,</span> <span class="pre">A),cw_p_phases:array(float64,</span> <span class="pre">1d,</span> <span class="pre">A),rn_gammas:array(float64,</span> <span class="pre">1d,</span> <span class="pre">A),rn_log10_As:array(float64,</span> <span class="pre">1d,</span> <span class="pre">A),cos_gwtheta:float64,cos_inc:float64,gwphi:float64,log10_fgw:float64,log10_h:float64,log10_mc:float64,phase0:float64,psi:float64,gwb_gamma:float64,gwb_log10_A:float64,idx_dists:array(int64,</span> <span class="pre">1d,</span> <span class="pre">A),idx_phases:array(int64,</span> <span class="pre">1d,</span> <span class="pre">A),idx_rn_gammas:array(int64,</span> <span class="pre">1d,</span> <span class="pre">A),idx_rn_log10_As:array(int64,</span> <span class="pre">1d,</span> <span class="pre">A),idx_cos_gwtheta:int64,idx_cos_inc:int64,idx_gwphi:int64,idx_log10_fgw:int64,idx_log10_h:int64,idx_log10_mc:int64,idx_phase0:int64,idx_psi:int64,idx_gwb_gamma:int64,idx_gwb_log10_A:int64,idx_rn:array(int64,</span> <span class="pre">1d,</span> <span class="pre">A),idx_gwb:array(int64,</span> <span class="pre">1d,</span> <span class="pre">A),idx_int:array(int64,</span> <span class="pre">1d,</span> <span class="pre">A),idx_cw_ext:array(int64,</span> <span class="pre">1d,</span> <span class="pre">A),idx_cw_int:array(int64,</span> <span class="pre">1d,</span> <span class="pre">A)&gt;</span></em><a class="headerlink" href="#QuickCW.CWFastLikelihoodNumba.CWInfo.class_type" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="QuickCW.CWFastLikelihoodNumba.FastLikeInfo">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">QuickCW.CWFastLikelihoodNumba.</span></span><span class="sig-name descname"><span class="pre">FastLikeInfo</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/QuickCW/CWFastLikelihoodNumba.html#FastLikeInfo"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#QuickCW.CWFastLikelihoodNumba.FastLikeInfo" title="Permalink to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="#QuickCW.CWFastLikelihoodNumba.FastLikeInfo" title="QuickCW.CWFastLikelihoodNumba.FastLikeInfo"><code class="xref py py-class docutils literal notranslate"><span class="pre">FastLikeInfo</span></code></a></p>
+<p>simple jitclass to store the various elements of fast likelihood calculation in a way that can be accessed quickly from a numba environment</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>logdet_base</strong> – </p>
+</dd>
+</dl>
+<p>Contibution to logdet without CW signal
+:param pos:
+(number of pulsars, 3) array holding 3d unit vector pointing towards each pulsar given by psr.pos
+:param pdist:
+(number of pulsars, 2) array holding distance and error of distance for each pulsar in kpc given by psr.pdist
+:param toas:
+List of arrays of TOAs for each pulsar
+:param Nvecs:
+List of N vectors
+:param Nrs:
+Residuals times inverse sqareroot N vectors
+:param max_toa:
+Maximum TOA over all pulsars
+:param x0:
+CWInfo object
+:param Npsr:
+Number of pulsars
+:param isqrNvecs:
+Inverse squareroot of N vectors
+:param TNvs:
+T vectros times inverse squareroot N vectors
+:param dotTNrs:
+Precalculated dot product of Nrs and TNvs
+:param chol_Sigmas:
+List of Cholesky decompositions of Sigma matrices
+:param phiinvs:
+List of phiinv matrices
+:param includeCW:
+Switch if we want to include the contribution of the CW signal or not [True]
+:param prior_recovery:
+If True, we return constant likelihood to be used for prior recovery diagnostic test [False]</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="QuickCW.CWFastLikelihoodNumba.FastLikeInfo.class_type">
+<span class="sig-name descname"><span class="pre">class_type</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">jitclass.FastLikeInfo#7f22190d4460&lt;resres:float64,logdet:float64,resres_array:array(float64,</span> <span class="pre">1d,</span> <span class="pre">A),logdet_array:array(float64,</span> <span class="pre">1d,</span> <span class="pre">A),logdet_base:float64,logdet_base_orig:float64,pos:array(float64,</span> <span class="pre">2d,</span> <span class="pre">C),pdist:array(float64,</span> <span class="pre">2d,</span> <span class="pre">C),toas:ListType[array(float64,</span> <span class="pre">1d,</span> <span class="pre">C)],Npsr:int64,max_toa:float64,phiinvs:ListType[array(float64,</span> <span class="pre">1d,</span> <span class="pre">C)],dotTNrs:ListType[array(float64,</span> <span class="pre">1d,</span> <span class="pre">C)],Nvecs:ListType[array(float64,</span> <span class="pre">1d,</span> <span class="pre">C)],isqrNvecs:ListType[array(float64,</span> <span class="pre">1d,</span> <span class="pre">C)],Nrs:ListType[array(float64,</span> <span class="pre">1d,</span> <span class="pre">C)],TNvs:ListType[array(float64,</span> <span class="pre">2d,</span> <span class="pre">F)],chol_Sigmas:ListType[array(float64,</span> <span class="pre">2d,</span> <span class="pre">F)],MMs:array(float64,</span> <span class="pre">3d,</span> <span class="pre">C),NN:array(float64,</span> <span class="pre">2d,</span> <span class="pre">C),cos_gwtheta:float64,gwphi:float64,log10_fgw:float64,log10_mc:float64,cw_p_dists:array(float64,</span> <span class="pre">1d,</span> <span class="pre">A),gwb_gamma:float64,gwb_log10_A:float64,rn_gammas:array(float64,</span> <span class="pre">1d,</span> <span class="pre">A),rn_log10_As:array(float64,</span> <span class="pre">1d,</span> <span class="pre">A),includeCW:bool,prior_recovery:bool&gt;</span></em><a class="headerlink" href="#QuickCW.CWFastLikelihoodNumba.FastLikeInfo.class_type" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="QuickCW.CWFastLikelihoodNumba.FastLikeMaster">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">QuickCW.CWFastLikelihoodNumba.</span></span><span class="sig-name descname"><span class="pre">FastLikeMaster</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">psrs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pta</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">params</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">x0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">includeCW</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">prior_recovery</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/QuickCW/CWFastLikelihoodNumba.html#FastLikeMaster"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#QuickCW.CWFastLikelihoodNumba.FastLikeMaster" title="Permalink to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>class to store pta things so they do not have to be recomputed when red noise is recomputed</p>
+<p>get Class for generating the fast CW likelihood.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>pta</strong> – </p>
+</dd>
+</dl>
+<p><cite>enterprise</cite> pta object.
+:param params:
+Dictionary of noise parameters.
+:param x0:
+CWInfo object, which is partially redundant with params but better handled by numba
+:param includeCW:
+Switch if we want to include the contribution of the CW signal or not [True]
+:param prior_recovery:
+If True, we return constant likelihood to be used for prior recovery diagnostic test [False]</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="QuickCW.CWFastLikelihoodNumba.FastLikeMaster.get_new_FastLike">
+<span class="sig-name descname"><span class="pre">get_new_FastLike</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">params</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/QuickCW/CWFastLikelihoodNumba.html#FastLikeMaster.get_new_FastLike"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#QuickCW.CWFastLikelihoodNumba.FastLikeMaster.get_new_FastLike" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="QuickCW.CWFastLikelihoodNumba.FastLikeMaster.recompute_FastLike">
+<span class="sig-name descname"><span class="pre">recompute_FastLike</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">FLI</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">x0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">params</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">chol_update</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mask</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/QuickCW/CWFastLikelihoodNumba.html#FastLikeMaster.recompute_FastLike"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#QuickCW.CWFastLikelihoodNumba.FastLikeMaster.recompute_FastLike" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="QuickCW.CWFastLikelihoodNumba.cholupdate">
+<span class="sig-prename descclassname"><span class="pre">QuickCW.CWFastLikelihoodNumba.</span></span><span class="sig-name descname"><span class="pre">cholupdate</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">L_in</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">diag_diff</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/QuickCW/CWFastLikelihoodNumba.html#cholupdate"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#QuickCW.CWFastLikelihoodNumba.cholupdate" title="Permalink to this definition"></a></dt>
+<dd><p>Jitted routine to update the Cholesky of a matrix instead of recomputing it.
+In principle could be faster, but right now it is not, so it’s not used.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>L_in</strong> – </p>
+</dd>
+</dl>
+<p>Previous Cholesky that we want to update
+:param diag_diff:
+Differences in the diagonal of the original matrix</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return L<span class="colon">:</span></dt>
+<dd class="field-odd"><p></p></dd>
+</dl>
+<p>Updated Cholesky</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="QuickCW.CWFastLikelihoodNumba.cholupdate_loop">
+<span class="sig-prename descclassname"><span class="pre">QuickCW.CWFastLikelihoodNumba.</span></span><span class="sig-name descname"><span class="pre">cholupdate_loop</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">chol_Sigmas</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pls_temp</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">old_phiinvs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Npsr</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/QuickCW/CWFastLikelihoodNumba.html#cholupdate_loop"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#QuickCW.CWFastLikelihoodNumba.cholupdate_loop" title="Permalink to this definition"></a></dt>
+<dd><p>Jitted loop over Sigma matrices to update their Cholesky.
+Currently not faster than recalculating from scratch, so not used.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>chol_Sigmas</strong> – </p>
+</dd>
+</dl>
+<p>List of Cholesky decompositions of Sigma matrices
+:param pls_temp:
+New list of tuples returned by pta.get_phiinv
+:param old_phiinvs:
+Old list of phiinv matrices
+:param Npsr:
+Number of pulsars (also number of Sigma matrices)</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return chol_Sigmas<span class="colon">:</span></dt>
+<dd class="field-odd"><p></p></dd>
+</dl>
+<p>List of updated Choleskies
+:return logdet_array:
+New array containing logdet values
+:return new_phiinvs:
+List of new phiinv matrices</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="QuickCW.CWFastLikelihoodNumba.create_Sigma">
+<span class="sig-prename descclassname"><span class="pre">QuickCW.CWFastLikelihoodNumba.</span></span><span class="sig-name descname"><span class="pre">create_Sigma</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">phiinv_loc</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">TNT</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Sigma</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/QuickCW/CWFastLikelihoodNumba.html#create_Sigma"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#QuickCW.CWFastLikelihoodNumba.create_Sigma" title="Permalink to this definition"></a></dt>
+<dd><p>create just the upper triangle of the Sigma matrix with phiinv_loc added to the diagonal, lower triangle will be garbage</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>phiinv_loc</strong> – </p>
+</dd>
+</dl>
+<p>phiinv matrix
+:param TNT:
+Precomputed matrix product of TNT
+:param Sigma:
+Initialized mtrix with the right shape to hold Sigma
+(allows for just overwriting instead of creating new array each time we update this)</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return Sigma<span class="colon">:</span></dt>
+<dd class="field-odd"><p></p></dd>
+</dl>
+<p>Upper trinagle Sigma matrix - lower triangle is junk</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="QuickCW.CWFastLikelihoodNumba.get_lnlikelihood_helper">
+<span class="sig-prename descclassname"><span class="pre">QuickCW.CWFastLikelihoodNumba.</span></span><span class="sig-name descname"><span class="pre">get_lnlikelihood_helper</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">resres</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">logdet</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pos</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pdist</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">NN</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">MMs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">includeCW</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">prior_recovery</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/QuickCW/CWFastLikelihoodNumba.html#get_lnlikelihood_helper"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#QuickCW.CWFastLikelihoodNumba.get_lnlikelihood_helper" title="Permalink to this definition"></a></dt>
+<dd><p>jittable helper for calculating the log likelihood in CWFastLikelihood</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>x0</strong> – </p>
+</dd>
+</dl>
+<p>CWInfo object
+:param resres:
+Array holding the (residual|residual) inner product
+:param logdet:
+Log determinant piece of the likelihood
+:param pos:
+(number of pulsars, 3) array holding 3d unit vector pointing towards each pulsar given by psr.pos
+:param pdist:
+(number of pulsars, 2) array holding distance and error of distance for each pulsar in kpc given by psr.pdist
+:param NN:
+N matrices holding (filter|residual) type inner products
+:param MMs:
+M matrices holding (filter|filter) type inner products
+:param includeCW:
+Switch if we want to include the contribution of the CW signal or not [True]
+:param prior_recovery:
+If True, we return constant likelihood to be used for prior recovery diagnostic test [False]</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return log_L<span class="colon">:</span></dt>
+<dd class="field-odd"><p></p></dd>
+</dl>
+<p>Log likelihood value</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="QuickCW.CWFastLikelihoodNumba.isclose">
+<span class="sig-prename descclassname"><span class="pre">QuickCW.CWFastLikelihoodNumba.</span></span><span class="sig-name descname"><span class="pre">isclose</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">a</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">b</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rtol</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1e-05</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">atol</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1e-08</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/QuickCW/CWFastLikelihoodNumba.html#isclose"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#QuickCW.CWFastLikelihoodNumba.isclose" title="Permalink to this definition"></a></dt>
+<dd><p>check if close in same way as np.isclose</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>a</strong> – First float to use in comparison</p></li>
+<li><p><strong>b</strong> – Second float to use in comparison</p></li>
+<li><p><strong>rtol</strong> – Realtive tolerance - default:1e-5</p></li>
+<li><p><strong>atol</strong> – Absolute tolerance - default:1e-8</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>True/False indicating if a and b are close to each other</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="QuickCW.CWFastLikelihoodNumba.logdet_Sigma_helper">
+<span class="sig-prename descclassname"><span class="pre">QuickCW.CWFastLikelihoodNumba.</span></span><span class="sig-name descname"><span class="pre">logdet_Sigma_helper</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">chol_Sigma</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/QuickCW/CWFastLikelihoodNumba.html#logdet_Sigma_helper"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#QuickCW.CWFastLikelihoodNumba.logdet_Sigma_helper" title="Permalink to this definition"></a></dt>
+<dd><p>get logdet sigma from cholesky of Sigma</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>chol_Sigma</strong> – </p>
+</dd>
+</dl>
+<p>Cholesky decomposition of Sigma matrix</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return 2*res<span class="colon">:</span></dt>
+<dd class="field-odd"><p></p></dd>
+</dl>
+<p>Contribution to logdet from this Sigma matrix</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="QuickCW.CWFastLikelihoodNumba.update_intrinsic_params">
+<span class="sig-prename descclassname"><span class="pre">QuickCW.CWFastLikelihoodNumba.</span></span><span class="sig-name descname"><span class="pre">update_intrinsic_params</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">isqrNvecs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Nrs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pos</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pdist</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">toas</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">NN</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">MMs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">SigmaTNrProds</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">invchol_Sigma_TNs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">idxs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dist_only</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/QuickCW/CWFastLikelihoodNumba.html#update_intrinsic_params"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#QuickCW.CWFastLikelihoodNumba.update_intrinsic_params" title="Permalink to this definition"></a></dt>
+<dd><p>Calculate inner products N=(res|S), M=(S|S)</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>x0</strong> – </p>
+</dd>
+</dl>
+<p>CWInfo object
+:param isqrNvecs:
+Inverse squareroot of N vectors
+:param Nrs:
+Residuals times inverse sqareroot N vectors
+:param pos:
+(number of pulsars, 3) array holding 3d unit vector pointing towards each pulsar given by psr.pos
+:param pdist:
+(number of pulsars, 2) array holding distance and error of distance for each pulsar in kpc given by psr.pdist
+:param toas:
+List of arrays of TOAs for each pulsar
+:param NN:
+N matrices holding (filter|residual) type inner products
+:param MMs:
+M matrices holding (filter|filter) type inner products
+:param SigmaTNrProds:
+—
+:param invchol_Sigma_TNs:
+—
+:param idxs:
+Indices of pulsar for which we want to update things
+:param dist_only:
+Option to skip parts of calculation whn only updating pulsar distances - not currently used</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="QuickCW.CWFastLikelihoodNumba.update_intrinsic_params2">
+<span class="sig-prename descclassname"><span class="pre">QuickCW.CWFastLikelihoodNumba.</span></span><span class="sig-name descname"><span class="pre">update_intrinsic_params2</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">isqrNvecs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Nrs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pos</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pdist</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">toas</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">NN</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">MMs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">TNvs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">chol_Sigmas</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">idxs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">resres_array</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dotTNrs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/QuickCW/CWFastLikelihoodNumba.html#update_intrinsic_params2"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#QuickCW.CWFastLikelihoodNumba.update_intrinsic_params2" title="Permalink to this definition"></a></dt>
+<dd><p>Calculate inner products N=(res|S), M=(S|S)</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>x0</strong> – </p>
+</dd>
+</dl>
+<p>CWInfo object
+:param isqrNvecs:
+Inverse squareroot of N vectors
+:param Nrs:
+Residuals times inverse sqareroot N vectors
+:param pos:
+(number of pulsars, 3) array holding 3d unit vector pointing towards each pulsar given by psr.pos
+:param pdist:
+(number of pulsars, 2) array holding distance and error of distance for each pulsar in kpc given by psr.pdist
+:param toas:
+List of arrays of TOAs for each pulsar
+:param NN:
+N matrices holding (filter|residual) type inner products
+:param MMs:
+M matrices holding (filter|filter) type inner products
+:param TNvs:
+T vectros times inverse squareroot N vectors
+:param chol_Sigmas:
+List of Cholesky decompositions of Sigma matrices
+:param idxs:
+Indices of pulsar for which we want to update things
+:param resres_array:
+Array containing contributions to (res|res)
+:param dotTNrs:
+Precalculated dot product of Nrs and TNvs</p>
+</dd></dl>
+
+</section>
+<section id="module-QuickCW.CWFastPrior">
+<span id="quickcw-cwfastprior-module"></span><h2>QuickCW.CWFastPrior module<a class="headerlink" href="#module-QuickCW.CWFastPrior" title="Permalink to this heading"></a></h2>
+<p>C 2021 Bence Becsy
+MCMC for CW fast likelihood (w/ Neil Cornish and Matthew Digman)
+Helpers for Getting Prior Draws</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="QuickCW.CWFastPrior.FastPrior">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">QuickCW.CWFastPrior.</span></span><span class="sig-name descname"><span class="pre">FastPrior</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">pta</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">psrs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">par_names_cw_ext</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/QuickCW/CWFastPrior.html#FastPrior"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#QuickCW.CWFastPrior.FastPrior" title="Permalink to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>helper class to set up information about priors</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>pta</strong> – </p>
+</dd>
+</dl>
+<p>enterprise PTA object
+:param psrs:
+list of enterprise pulsar objects
+:param par_names_cw_ext:
+list of projection parameters (previously called extrinsic parameters)</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="QuickCW.CWFastPrior.FastPrior.get_lnprior">
+<span class="sig-name descname"><span class="pre">get_lnprior</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x0</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/QuickCW/CWFastPrior.html#FastPrior.get_lnprior"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#QuickCW.CWFastPrior.FastPrior.get_lnprior" title="Permalink to this definition"></a></dt>
+<dd><p>wrapper to get ln prior</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="QuickCW.CWFastPrior.FastPrior.get_sample">
+<span class="sig-name descname"><span class="pre">get_sample</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">idx</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/QuickCW/CWFastPrior.html#FastPrior.get_sample"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#QuickCW.CWFastPrior.FastPrior.get_sample" title="Permalink to this definition"></a></dt>
+<dd><p>wrapper to quickly return random prior draw for the (idx)th parameter</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="QuickCW.CWFastPrior.FastPriorInfo">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">QuickCW.CWFastPrior.</span></span><span class="sig-name descname"><span class="pre">FastPriorInfo</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/QuickCW/CWFastPrior.html#FastPriorInfo"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#QuickCW.CWFastPrior.FastPriorInfo" title="Permalink to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="#QuickCW.CWFastPrior.FastPriorInfo" title="QuickCW.CWFastPrior.FastPriorInfo"><code class="xref py py-class docutils literal notranslate"><span class="pre">FastPriorInfo</span></code></a></p>
+<p>simple jitclass to store the various elements of fast prior calculation in a way that can be accessed quickly from a numba environment</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>uniform_par_ids</strong> – </p>
+</dd>
+</dl>
+<p>Indices of parameters with uniform prior
+:param uniform_lows:
+Lower prior bounds of uniform prior parameters
+:param uniform_highs:
+Upper prior bounds of uniform prior parameters
+:param lin_exp_par_ids:
+Indices of parameters with linear exponential prior
+:param lin_exp_lows:
+Lower prior bounds of linear exponential prior parameters
+:param lin_exp_highs:
+Upper prior bounds of linear exponential prior parameters
+:param normal_par_ids:
+Indices of parameters with normal prior
+:param normal_mus:
+Means of normal prior parameters
+:param normal_sigs:
+Standard deviations of normal prior parameters
+:param dm_par_ids:
+Indices of parameters with DM distance prior
+:param dm_dists:
+Mean distances of DM distance prior parameters
+:param dm_errs:
+Errors of DM distance prior parameters
+:param px_par_ids:
+Indices of parameters with parallax distance prior
+:param px_mus:
+Means of parallax distance prior parameters
+:param px_errs:
+Errors of parallax distance prior parameters
+:param cut_par_ids:
+Indices of parameters where an extra cut might be needed to stay in prior range (like distance)
+:param cut_lows:
+Lower bounds of these parameters
+:param cut_highs:
+Upper bounds of these parameters
+:param cw_ext_par_ids:
+Indices of projection parameters (previously called extrinsic parameters)
+:param cw_ext_lows:
+Lower bounds of extrinsic parameters
+:param cw_ext_highs:
+Upper bounds of extrinsic parameters
+:param global_common:
+Part of the log prior independent of the parameter values</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="QuickCW.CWFastPrior.FastPriorInfo.class_type">
+<span class="sig-name descname"><span class="pre">class_type</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">jitclass.FastPriorInfo#7f2218fccf10&lt;uniform_par_ids:array(int64,</span> <span class="pre">1d,</span> <span class="pre">A),uniform_lows:array(float64,</span> <span class="pre">1d,</span> <span class="pre">A),uniform_highs:array(float64,</span> <span class="pre">1d,</span> <span class="pre">A),lin_exp_par_ids:array(int64,</span> <span class="pre">1d,</span> <span class="pre">A),lin_exp_lows:array(float64,</span> <span class="pre">1d,</span> <span class="pre">A),lin_exp_highs:array(float64,</span> <span class="pre">1d,</span> <span class="pre">A),normal_par_ids:array(int64,</span> <span class="pre">1d,</span> <span class="pre">A),normal_mus:array(float64,</span> <span class="pre">1d,</span> <span class="pre">A),normal_sigs:array(float64,</span> <span class="pre">1d,</span> <span class="pre">A),dm_par_ids:array(int64,</span> <span class="pre">1d,</span> <span class="pre">A),dm_dists:array(float64,</span> <span class="pre">1d,</span> <span class="pre">A),dm_errs:array(float64,</span> <span class="pre">1d,</span> <span class="pre">A),px_par_ids:array(int64,</span> <span class="pre">1d,</span> <span class="pre">A),px_mus:array(float64,</span> <span class="pre">1d,</span> <span class="pre">A),px_errs:array(float64,</span> <span class="pre">1d,</span> <span class="pre">A),cut_par_ids:array(int64,</span> <span class="pre">1d,</span> <span class="pre">A),cut_lows:array(float64,</span> <span class="pre">1d,</span> <span class="pre">A),cut_highs:array(float64,</span> <span class="pre">1d,</span> <span class="pre">A),cw_ext_par_ids:array(int64,</span> <span class="pre">1d,</span> <span class="pre">A),cw_ext_lows:array(float64,</span> <span class="pre">1d,</span> <span class="pre">A),cw_ext_highs:array(float64,</span> <span class="pre">1d,</span> <span class="pre">A),global_common:float64&gt;</span></em><a class="headerlink" href="#QuickCW.CWFastPrior.FastPriorInfo.class_type" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="QuickCW.CWFastPrior.get_FastPriorInfo">
+<span class="sig-prename descclassname"><span class="pre">QuickCW.CWFastPrior.</span></span><span class="sig-name descname"><span class="pre">get_FastPriorInfo</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">pta</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">psrs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">par_names_cw_ext</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/QuickCW/CWFastPrior.html#get_FastPriorInfo"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#QuickCW.CWFastPrior.get_FastPriorInfo" title="Permalink to this definition"></a></dt>
+<dd><p>get FastPriorInfo object from pta</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>pta</strong> – </p>
+</dd>
+</dl>
+<p>enterprise PTA object
+:param psrs:
+List of enterprise pulsar objects
+:param par_names_cw_ext:
+List of parameter names which are projection parameters (previously called extrinsic parameters)</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="QuickCW.CWFastPrior.get_lnprior">
+<span class="sig-prename descclassname"><span class="pre">QuickCW.CWFastPrior.</span></span><span class="sig-name descname"><span class="pre">get_lnprior</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">FPI</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/QuickCW/CWFastPrior.html#get_lnprior"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#QuickCW.CWFastPrior.get_lnprior" title="Permalink to this definition"></a></dt>
+<dd><p>wrapper to get lnprior from jitted helper</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>x0</strong> – </p>
+</dd>
+</dl>
+<p>Array of parameter values for which we want to calculate the prior
+:param FPI:
+FastPriorInfo object</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p></p>
+</dd>
+</dl>
+<p>log prior</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="QuickCW.CWFastPrior.get_lnprior_array">
+<span class="sig-prename descclassname"><span class="pre">QuickCW.CWFastPrior.</span></span><span class="sig-name descname"><span class="pre">get_lnprior_array</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">samples</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">FPI</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/QuickCW/CWFastPrior.html#get_lnprior_array"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#QuickCW.CWFastPrior.get_lnprior_array" title="Permalink to this definition"></a></dt>
+<dd><p>wrapper to get lnprior from jitted helper</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>samples</strong> – </p>
+</dd>
+</dl>
+<p>2d array of parameter sets for which we want to calculate the prior
+:param FPI:
+FastPriorInfo object</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p></p>
+</dd>
+</dl>
+<p>Array of log prior values</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="QuickCW.CWFastPrior.get_lnprior_helper">
+<span class="sig-prename descclassname"><span class="pre">QuickCW.CWFastPrior.</span></span><span class="sig-name descname"><span class="pre">get_lnprior_helper</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">uniform_par_ids</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">uniform_lows</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">uniform_highs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lin_exp_par_ids</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lin_exp_lows</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lin_exp_highs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">normal_par_ids</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">normal_mus</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">normal_sigs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dm_par_ids</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dm_dists</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dm_errs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">px_par_ids</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">px_mus</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">px_errs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">global_common</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/QuickCW/CWFastPrior.html#get_lnprior_helper"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#QuickCW.CWFastPrior.get_lnprior_helper" title="Permalink to this definition"></a></dt>
+<dd><p>jittable helper for calculating the log prior</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>x0</strong> – </p>
+</dd>
+</dl>
+<p>Array of parameters for which we want to calculate the prior
+:param uniform_par_ids:
+Indices of parameters with uniform prior
+:param uniform_lows:
+Lower prior bounds of uniform prior parameters
+:param uniform_highs:
+Upper prior bounds of uniform prior parameters
+:param lin_exp_par_ids:
+Indices of parameters with linear exponential prior
+:param lin_exp_lows:
+Lower prior bounds of linear exponential prior parameters
+:param lin_exp_highs:
+Upper prior bounds of linear exponential prior parameters
+:param normal_par_ids:
+Indices of parameters with normal prior
+:param normal_mus:
+Means of normal prior parameters
+:param normal_sigs:
+Standard deviations of normal prior parameters
+:param dm_par_ids:
+Indices of parameters with DM distance prior
+:param dm_dists:
+Mean distances of DM distance prior parameters
+:param dm_errs:
+Errors of DM distance prior parameters
+:param px_par_ids:
+Indices of parameters with parallax distance prior
+:param px_mus:
+Means of parallax distance prior parameters
+:param px_errs:
+Errors of parallax distance prior parameters
+:param global_common:
+Part of the log prior independent of the parameter values</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return log_prior<span class="colon">:</span></dt>
+<dd class="field-odd"><p></p></dd>
+</dl>
+<p>Log prior</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="QuickCW.CWFastPrior.get_lnprior_helper_array">
+<span class="sig-prename descclassname"><span class="pre">QuickCW.CWFastPrior.</span></span><span class="sig-name descname"><span class="pre">get_lnprior_helper_array</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x0s</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">uniform_par_ids</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">uniform_lows</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">uniform_highs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lin_exp_par_ids</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lin_exp_lows</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lin_exp_highs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">normal_par_ids</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">normal_mus</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">normal_sigs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dm_par_ids</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dm_dists</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dm_errs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">px_par_ids</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">px_mus</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">px_errs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">global_common</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/QuickCW/CWFastPrior.html#get_lnprior_helper_array"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#QuickCW.CWFastPrior.get_lnprior_helper_array" title="Permalink to this definition"></a></dt>
+<dd><p>jittable helper for calculating the log prior for an array of points
+same as get_lnprior_helper, but can be called on an array of parameters</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>x0s</strong> – </p>
+</dd>
+</dl>
+<p>2D array of multiple parameter sets for which we want to calculate the prior
+:param uniform_par_ids:
+Indices of parameters with uniform prior
+:param uniform_lows:
+Lower prior bounds of uniform prior parameters
+:param uniform_highs:
+Upper prior bounds of uniform prior parameters
+:param lin_exp_par_ids:
+Indices of parameters with linear exponential prior
+:param lin_exp_lows:
+Lower prior bounds of linear exponential prior parameters
+:param lin_exp_highs:
+Upper prior bounds of linear exponential prior parameters
+:param normal_par_ids:
+Indices of parameters with normal prior
+:param normal_mus:
+Means of normal prior parameters
+:param normal_sigs:
+Standard deviations of normal prior parameters
+:param dm_par_ids:
+Indices of parameters with DM distance prior
+:param dm_dists:
+Mean distances of DM distance prior parameters
+:param dm_errs:
+Errors of DM distance prior parameters
+:param px_par_ids:
+Indices of parameters with parallax distance prior
+:param px_mus:
+Means of parallax distance prior parameters
+:param px_errs:
+Errors of parallax distance prior parameters
+:param global_common:
+Part of the log prior independent of the parameter values</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return log_priors<span class="colon">:</span></dt>
+<dd class="field-odd"><p></p></dd>
+</dl>
+<p>Array of log prior values</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="QuickCW.CWFastPrior.get_sample_full">
+<span class="sig-prename descclassname"><span class="pre">QuickCW.CWFastPrior.</span></span><span class="sig-name descname"><span class="pre">get_sample_full</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">n_par</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">FPI</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/QuickCW/CWFastPrior.html#get_sample_full"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#QuickCW.CWFastPrior.get_sample_full" title="Permalink to this definition"></a></dt>
+<dd><p>helper to get a full prior draw sample</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>n_par</strong> – </p>
+</dd>
+</dl>
+<p>Number of parameters
+:param FPI:
+FastPriorInfo object</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return new_point<span class="colon">:</span></dt>
+<dd class="field-odd"><p></p></dd>
+</dl>
+<p>Array with parameters drawn from their priors</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="QuickCW.CWFastPrior.get_sample_helper">
+<span class="sig-prename descclassname"><span class="pre">QuickCW.CWFastPrior.</span></span><span class="sig-name descname"><span class="pre">get_sample_helper</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">idx</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">uniform_par_ids</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">uniform_lows</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">uniform_highs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lin_exp_par_ids</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lin_exp_lows</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lin_exp_highs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">normal_par_ids</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">normal_mus</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">normal_sigs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dm_par_ids</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dm_dists</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dm_errs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">px_par_ids</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">px_mus</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">px_errs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/QuickCW/CWFastPrior.html#get_sample_helper"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#QuickCW.CWFastPrior.get_sample_helper" title="Permalink to this definition"></a></dt>
+<dd><p>jittable helper for prior draws - same as get_sample_helper_full but only for a single parameter</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>idx</strong> – </p>
+</dd>
+</dl>
+<p>Index of parameters for which we want a prior draw
+:param uniform_par_ids:
+Indices of parameters with uniform prior
+:param uniform_lows:
+Lower prior bounds of uniform prior parameters
+:param uniform_highs:
+Upper prior bounds of uniform prior parameters
+:param lin_exp_par_ids:
+Indices of parameters with linear exponential prior
+:param lin_exp_lows:
+Lower prior bounds of linear exponential prior parameters
+:param lin_exp_highs:
+Upper prior bounds of linear exponential prior parameters
+:param normal_par_ids:
+Indices of parameters with normal prior
+:param normal_mus:
+Means of normal prior parameters
+:param normal_sigs:
+Standard deviations of normal prior parameters
+:param dm_par_ids:
+Indices of parameters with DM distance prior
+:param dm_dists:
+Mean distances of DM distance prior parameters
+:param dm_errs:
+Errors of DM distance prior parameters
+:param px_par_ids:
+Indices of parameters with parallax distance prior
+:param px_mus:
+Means of parallax distance prior parameters
+:param px_errs:
+Errors of parallax distance prior parameters</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p></p>
+</dd>
+</dl>
+<p>Prior draw of the parameter of interest</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="QuickCW.CWFastPrior.get_sample_helper_full">
+<span class="sig-prename descclassname"><span class="pre">QuickCW.CWFastPrior.</span></span><span class="sig-name descname"><span class="pre">get_sample_helper_full</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">n_par</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">uniform_par_ids</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">uniform_lows</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">uniform_highs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lin_exp_par_ids</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lin_exp_lows</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lin_exp_highs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">normal_par_ids</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">normal_mus</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">normal_sigs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dm_par_ids</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dm_dists</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dm_errs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">px_par_ids</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">px_mus</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">px_errs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/QuickCW/CWFastPrior.html#get_sample_helper_full"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#QuickCW.CWFastPrior.get_sample_helper_full" title="Permalink to this definition"></a></dt>
+<dd><p>jittable helper for prior draws</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>n_par</strong> – </p>
+</dd>
+</dl>
+<p>Number of parameters in likelihood/prior
+:param uniform_par_ids:
+Indices of parameters with uniform prior
+:param uniform_lows:
+Lower prior bounds of uniform prior parameters
+:param uniform_highs:
+Upper prior bounds of uniform prior parameters
+:param lin_exp_par_ids:
+Indices of parameters with linear exponential prior
+:param lin_exp_lows:
+Lower prior bounds of linear exponential prior parameters
+:param lin_exp_highs:
+Upper prior bounds of linear exponential prior parameters
+:param normal_par_ids:
+Indices of parameters with normal prior
+:param normal_mus:
+Means of normal prior parameters
+:param normal_sigs:
+Standard deviations of normal prior parameters
+:param dm_par_ids:
+Indices of parameters with DM distance prior
+:param dm_dists:
+Mean distances of DM distance prior parameters
+:param dm_errs:
+Errors of DM distance prior parameters
+:param px_par_ids:
+Indices of parameters with parallax distance prior
+:param px_mus:
+Means of parallax distance prior parameters
+:param px_errs:
+Errors of parallax distance prior parameters</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return res<span class="colon">:</span></dt>
+<dd class="field-odd"><p></p></dd>
+</dl>
+<p>Array of prior draws</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="QuickCW.CWFastPrior.get_sample_idxs">
+<span class="sig-prename descclassname"><span class="pre">QuickCW.CWFastPrior.</span></span><span class="sig-name descname"><span class="pre">get_sample_idxs</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">old_point</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">idx_choose</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">FPI</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/QuickCW/CWFastPrior.html#get_sample_idxs"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#QuickCW.CWFastPrior.get_sample_idxs" title="Permalink to this definition"></a></dt>
+<dd><p>get just some indexes drawn from a prior</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>old_point</strong> – </p>
+</dd>
+</dl>
+<p>Old array of parameters
+:param idx_choose:
+List of indices for which we want to drawn from the prior
+:param FPI:
+FastPriorInfo object</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return new_point<span class="colon">:</span></dt>
+<dd class="field-odd"><p></p></dd>
+</dl>
+<p>New array of parameters</p>
+</dd></dl>
+
+</section>
+<section id="module-QuickCW.OutputUtils">
+<span id="quickcw-outpututils-module"></span><h2>QuickCW.OutputUtils module<a class="headerlink" href="#module-QuickCW.OutputUtils" title="Permalink to this heading"></a></h2>
+<p>C 2021 Bence Becsy
+MCMC for CW fast likelihood (w/ Neil Cornish and Matthew Digman)
+Helpers to print outputs</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="QuickCW.OutputUtils.output_hdf5_end">
+<span class="sig-prename descclassname"><span class="pre">QuickCW.OutputUtils.</span></span><span class="sig-name descname"><span class="pre">output_hdf5_end</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">chain_params</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">samples</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">log_likelihood</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">acc_fraction</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fisher_diag</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">par_names</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbosity</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/QuickCW/OutputUtils.html#output_hdf5_end"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#QuickCW.OutputUtils.output_hdf5_end" title="Permalink to this definition"></a></dt>
+<dd><p>output to hdf5 file at end of body of loop</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>chain_params</strong> – </p>
+</dd>
+</dl>
+<p>ChainParams object
+:param samples:
+Array with posterior samples
+:param log_likelihood:
+Array with log likelihood values corresponding to samples
+:param acc_fraction:
+Array with acceptance rates
+:param fisher diag:
+Array with the digonal elements of fisher matrix
+:param par_names:
+List of parameter names
+:param verbosity:
+Parameter indicating how much info to print (higher value means more prints)</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="QuickCW.OutputUtils.output_hdf5_loop">
+<span class="sig-prename descclassname"><span class="pre">QuickCW.OutputUtils.</span></span><span class="sig-name descname"><span class="pre">output_hdf5_loop</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">itrn</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">chain_params</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">samples</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">log_likelihood</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">acc_fraction</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fisher_diag</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">par_names</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">N</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbosity</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/QuickCW/OutputUtils.html#output_hdf5_loop"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#QuickCW.OutputUtils.output_hdf5_loop" title="Permalink to this definition"></a></dt>
+<dd><p>output to hdf5 at loop iteration</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>itrn</strong> – </p>
+</dd>
+</dl>
+<p>Overall index (as opposed to the block index itri or the index within saved values itrb)
+:param chain_params:
+ChainParams object
+:param samples:
+Array with posterior samples
+:param log_likelihood:
+Array with log likelihood values corresponding to samples
+:param acc_fraction:
+Array with acceptance rates
+:param fisher diag:
+Array with the digonal elements of fisher matrix
+:param par_names:
+List of parameter names
+:param N:
+Total number of samples
+:param verbosity:
+Parameter indicating how much info to print (higher value means more prints)</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="QuickCW.OutputUtils.print_acceptance_progress">
+<span class="sig-prename descclassname"><span class="pre">QuickCW.OutputUtils.</span></span><span class="sig-name descname"><span class="pre">print_acceptance_progress</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">itrn</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">N</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_int_block</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">a_yes</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">a_no</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">t_itr</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ti_loop</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tf1_loop</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Ts</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbosity</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/QuickCW/OutputUtils.html#print_acceptance_progress"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#QuickCW.OutputUtils.print_acceptance_progress" title="Permalink to this definition"></a></dt>
+<dd><p>print the acceptance fraction</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>itrn</strong> – </p>
+</dd>
+</dl>
+<p>Overall index (as opposed to the block index itri or the index within saved values itrb)
+:param N:
+Total number of iterations we asked for at startup
+:param n_int_block:
+Number of iterations within a block
+:param a_yes:
+Array holding number of accepted steps
+:param a_no:
+Array holding number of rejected steps
+:param t_itr:
+Time just before calling this function got from time.perf_counter()
+:param ti_loop:
+Time after initialization got from time.perf_counter()
+:param tf1_loop:
+Time at start of this block got from time.perf_counter()
+:param Ts:
+Temperature ladder
+:param verbosity:
+Parameter indicating how much info to print (higher value means more prints)</p>
+</dd></dl>
+
+</section>
+<section id="module-QuickCW.PulsarDistPriors">
+<span id="quickcw-pulsardistpriors-module"></span><h2>QuickCW.PulsarDistPriors module<a class="headerlink" href="#module-QuickCW.PulsarDistPriors" title="Permalink to this heading"></a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="QuickCW.PulsarDistPriors.DMDistParameter">
+<span class="sig-prename descclassname"><span class="pre">QuickCW.PulsarDistPriors.</span></span><span class="sig-name descname"><span class="pre">DMDistParameter</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dist</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">err</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">size</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/QuickCW/PulsarDistPriors.html#DMDistParameter"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#QuickCW.PulsarDistPriors.DMDistParameter" title="Permalink to this definition"></a></dt>
+<dd><p>Class factory for DM distance parameters with a pdf that is
+flat for dist+-err and a half Gaussian beyond that</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>dist</strong> – mean distance</p></li>
+<li><p><strong>err</strong> – distance error</p></li>
+<li><p><strong>size</strong> – length for vector parameter</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><code class="docutils literal notranslate"><span class="pre">DMDist</span></code> parameter class</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="QuickCW.PulsarDistPriors.DMDistPrior">
+<span class="sig-prename descclassname"><span class="pre">QuickCW.PulsarDistPriors.</span></span><span class="sig-name descname"><span class="pre">DMDistPrior</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dist</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">err</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/QuickCW/PulsarDistPriors.html#DMDistPrior"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#QuickCW.PulsarDistPriors.DMDistPrior" title="Permalink to this definition"></a></dt>
+<dd><p>Prior function for DMDist parameters.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>value</strong> – point where we want the prior evaluated</p></li>
+<li><p><strong>dist</strong> – mean distance</p></li>
+<li><p><strong>err</strong> – distance error</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>prior value</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="QuickCW.PulsarDistPriors.DMDistSampler">
+<span class="sig-prename descclassname"><span class="pre">QuickCW.PulsarDistPriors.</span></span><span class="sig-name descname"><span class="pre">DMDistSampler</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dist</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">err</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">size</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/QuickCW/PulsarDistPriors.html#DMDistSampler"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#QuickCW.PulsarDistPriors.DMDistSampler" title="Permalink to this definition"></a></dt>
+<dd><p>Sampling function for DMDist parameters.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>dist</strong> – mean distance</p></li>
+<li><p><strong>err</strong> – distance error</p></li>
+<li><p><strong>size</strong> – length for vector parameter</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>random draw from prior (float or ndarray with lenght size)</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="QuickCW.PulsarDistPriors.PXDistParameter">
+<span class="sig-prename descclassname"><span class="pre">QuickCW.PulsarDistPriors.</span></span><span class="sig-name descname"><span class="pre">PXDistParameter</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dist</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">err</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">size</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/QuickCW/PulsarDistPriors.html#PXDistParameter"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#QuickCW.PulsarDistPriors.PXDistParameter" title="Permalink to this definition"></a></dt>
+<dd><p>Class factory for PX distance parameters with a pdf of inverse Gaussian (since parallax is Gaussian)</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>dist</strong> – mean distance</p></li>
+<li><p><strong>err</strong> – distance error</p></li>
+<li><p><strong>size</strong> – length for vector parameter</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><code class="docutils literal notranslate"><span class="pre">PXDist</span></code> parameter class</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="QuickCW.PulsarDistPriors.PXDistPrior">
+<span class="sig-prename descclassname"><span class="pre">QuickCW.PulsarDistPriors.</span></span><span class="sig-name descname"><span class="pre">PXDistPrior</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dist</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">err</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/QuickCW/PulsarDistPriors.html#PXDistPrior"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#QuickCW.PulsarDistPriors.PXDistPrior" title="Permalink to this definition"></a></dt>
+<dd><p>Prior function for PXDist parameters.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>value</strong> – point where we want the prior evaluated</p></li>
+<li><p><strong>dist</strong> – mean distance</p></li>
+<li><p><strong>err</strong> – distance error</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>prior value</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="QuickCW.PulsarDistPriors.PXDistSampler">
+<span class="sig-prename descclassname"><span class="pre">QuickCW.PulsarDistPriors.</span></span><span class="sig-name descname"><span class="pre">PXDistSampler</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dist</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">err</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">size</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/QuickCW/PulsarDistPriors.html#PXDistSampler"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#QuickCW.PulsarDistPriors.PXDistSampler" title="Permalink to this definition"></a></dt>
+<dd><p>Sampling function for PXDist parameters.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>dist</strong> – mean distance</p></li>
+<li><p><strong>err</strong> – distance error</p></li>
+<li><p><strong>size</strong> – length for vector parameter</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>random draw from prior (float or ndarray with lenght size)</p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+<section id="module-QuickCW.QuickCW">
+<span id="quickcw-quickcw-module"></span><h2>QuickCW.QuickCW module<a class="headerlink" href="#module-QuickCW.QuickCW" title="Permalink to this heading"></a></h2>
+<p>C 2021 Bence Becsy
+MCMC for CW fast likelihood (w/ Neil Cornish and Matthew Digman)</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="QuickCW.QuickCW.QuickCW">
+<span class="sig-prename descclassname"><span class="pre">QuickCW.QuickCW.</span></span><span class="sig-name descname"><span class="pre">QuickCW</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">chain_params</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">psrs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">noise_json</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_legacy_equad</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">include_ecorr</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">amplitude_prior</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'UL'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">gwb_gamma_prior</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">psr_distance_file</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">backend_selection</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/QuickCW/QuickCW.html#QuickCW"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#QuickCW.QuickCW.QuickCW" title="Permalink to this definition"></a></dt>
+<dd><p>Set up all essential objects for QuickCW to do MCMC iterations</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>chain_params</strong> – ChainParams object</p></li>
+<li><p><strong>psrs</strong> – enterprise pulsar objects</p></li>
+<li><p><strong>noise_json</strong> – JSON file with noise dictionary [None]</p></li>
+<li><p><strong>use_legacy_equad</strong> – Option to use old convention for equad [False]</p></li>
+<li><p><strong>include_ecorr</strong> – Option to include ECORR white noise [True]</p></li>
+<li><p><strong>amplitude_prior</strong> – Prior to use on CW amplitude; ‘UL’ indicates uniform in amplitude prior (used for upper limits); ‘detection’ indicates uniform in log amplitude prior (used for Bayes factor calculation/detection)</p></li>
+<li><p><strong>gwb_gamma_prior</strong> – Option to specify prior range on GWB spectral index gamma; None means we use the default np.array([0,7]) [None]</p></li>
+<li><p><strong>psr_distance_file</strong> – File containing parallax and DM distance information for pulsars; If None, we use Gaussian prior with pulsar distance and error from psr objects [None]</p></li>
+<li><p><strong>backend_selection</strong> – Option to use an enterprise Selection based on backend; Usually use True for real data False for simulated data [True]</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return pta<span class="colon">:</span></dt>
+<dd class="field-even"><p>enterprise PTA object</p>
+</dd>
+<dt class="field-odd">Return mcc<span class="colon">:</span></dt>
+<dd class="field-odd"><p>MCMCChain onject</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="QuickCW.QuickCW.get_default_args">
+<span class="sig-prename descclassname"><span class="pre">QuickCW.QuickCW.</span></span><span class="sig-name descname"><span class="pre">get_default_args</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">func</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/QuickCW/QuickCW.html#get_default_args"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#QuickCW.QuickCW.get_default_args" title="Permalink to this definition"></a></dt>
+<dd><p>Gets default arguments from a python function</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="QuickCW.QuickCW.per_pulsar_prior">
+<span class="sig-prename descclassname"><span class="pre">QuickCW.QuickCW.</span></span><span class="sig-name descname"><span class="pre">per_pulsar_prior</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">enterprise_pulsar</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Pulsar</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pulsar_distances</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cw_delay_args</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">dict</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">CWSignal_args</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">dict</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/QuickCW/QuickCW.html#per_pulsar_prior"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#QuickCW.QuickCW.per_pulsar_prior" title="Permalink to this definition"></a></dt>
+<dd><p>Creates a CW signal applying distance priors to individual pulsars based on DM or PX in the pulsar_distances dict</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>enterprise_pulsar</strong> – </p>
+</dd>
+</dl>
+<p>enterprise pulsar object
+:param pulsar_distances:
+dictionary containing pulsar distance info
+:param cw_delay_args:
+arguments to be passed on to deterministic.cw_delay
+:param CWSignal_args:
+arguments to be passed on to deterministic.CWSignal</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return cw<span class="colon">:</span></dt>
+<dd class="field-odd"><p></p></dd>
+</dl>
+<p>enterprise signal object with the CW model</p>
+</dd></dl>
+
+</section>
+<section id="module-QuickCW.QuickCorrectionUtils">
+<span id="quickcw-quickcorrectionutils-module"></span><h2>QuickCW.QuickCorrectionUtils module<a class="headerlink" href="#module-QuickCW.QuickCorrectionUtils" title="Permalink to this heading"></a></h2>
+<p>C 2021 Bence Becsy
+MCMC for CW fast likelihood (w/ Neil Cornish and Matthew Digman)
+utils for correcting parameters to nominal ranges</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="QuickCW.QuickCorrectionUtils.check_merged">
+<span class="sig-prename descclassname"><span class="pre">QuickCW.QuickCorrectionUtils.</span></span><span class="sig-name descname"><span class="pre">check_merged</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">log10_fgw</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">log10_mc</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_toa</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/QuickCW/QuickCorrectionUtils.html#check_merged"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#QuickCW.QuickCorrectionUtils.check_merged" title="Permalink to this definition"></a></dt>
+<dd><p>check the maximum toa is not such that the source has already merged, and if so draw new parameters to avoid starting from nan likelihood</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>log10_fgw</strong> – </p>
+</dd>
+</dl>
+<p>log base 10 of GW frequency
+:param log10_mc:
+log base 10 of chirp mass
+:param max_toa:
+Latest TOA in any pulsar in the array</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p></p>
+</dd>
+</dl>
+<p>True if source already merged, False otherwise</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="QuickCW.QuickCorrectionUtils.correct_extrinsic">
+<span class="sig-prename descclassname"><span class="pre">QuickCW.QuickCorrectionUtils.</span></span><span class="sig-name descname"><span class="pre">correct_extrinsic</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">sample</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">x0</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/QuickCW/QuickCorrectionUtils.html#correct_extrinsic"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#QuickCW.QuickCorrectionUtils.correct_extrinsic" title="Permalink to this definition"></a></dt>
+<dd><p>correct extrinsic parameters for phases and cosines</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>sample</strong> – </p>
+</dd>
+</dl>
+<p>Array with parameters
+:param x0:
+CWInfo object</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return sample<span class="colon">:</span></dt>
+<dd class="field-odd"><p></p></dd>
+</dl>
+<p>Corrected sample array</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="QuickCW.QuickCorrectionUtils.correct_extrinsic_array">
+<span class="sig-prename descclassname"><span class="pre">QuickCW.QuickCorrectionUtils.</span></span><span class="sig-name descname"><span class="pre">correct_extrinsic_array</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">samples</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">x0</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/QuickCW/QuickCorrectionUtils.html#correct_extrinsic_array"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#QuickCW.QuickCorrectionUtils.correct_extrinsic_array" title="Permalink to this definition"></a></dt>
+<dd><dl class="simple">
+<dt>correct extrinsic parameters for phases and cosines</dt><dd><p>same as correct_extrinsic but handles mutiple samples</p>
+</dd>
+</dl>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>samples</strong> – </p>
+</dd>
+</dl>
+<p>2D array with parameters for multiple samples
+:param x0:
+CWInfo object</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return samples<span class="colon">:</span></dt>
+<dd class="field-odd"><p></p></dd>
+</dl>
+<p>Corrected samples array</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="QuickCW.QuickCorrectionUtils.correct_intrinsic">
+<span class="sig-prename descclassname"><span class="pre">QuickCW.QuickCorrectionUtils.</span></span><span class="sig-name descname"><span class="pre">correct_intrinsic</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">sample</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">x0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">freq_bounds</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cut_par_ids</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cut_lows</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cut_highs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/QuickCW/QuickCorrectionUtils.html#correct_intrinsic"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#QuickCW.QuickCorrectionUtils.correct_intrinsic" title="Permalink to this definition"></a></dt>
+<dd><p>correct intrinsic parameters for phases and cosines</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>sample</strong> – </p>
+</dd>
+</dl>
+<p>Array with parameters
+:param x0:
+CWInfo object
+:param freq_bounds:
+Lower and upper prior bounds of GW frequency
+:param cut_par_ids:
+Indices of parameters needing extra check
+:param cut_lows:
+Lower bounds of parameters needing extra check
+:param cut_highs:
+Upper bounds of parameters needing extra check</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return sample<span class="colon">:</span></dt>
+<dd class="field-odd"><p></p></dd>
+</dl>
+<p>Corrected sample array</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="QuickCW.QuickCorrectionUtils.reflect_cosines">
+<span class="sig-prename descclassname"><span class="pre">QuickCW.QuickCorrectionUtils.</span></span><span class="sig-name descname"><span class="pre">reflect_cosines</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cos_in</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">angle_in</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rotfac</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">3.141592653589793</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">modfac</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">6.283185307179586</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/QuickCW/QuickCorrectionUtils.html#reflect_cosines"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#QuickCW.QuickCorrectionUtils.reflect_cosines" title="Permalink to this definition"></a></dt>
+<dd><dl class="simple">
+<dt>helper to reflect cosines of coordinates around poles  to get them between -1 and 1,</dt><dd><p>which requires also rotating the signal by rotfac each time, then mod the angle by modfac</p>
+</dd>
+</dl>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>cos_in</strong> – </p>
+</dd>
+</dl>
+<p>cosine of polar angle
+:param angle_in:
+azimuthal angle
+:param rotfac:
+angle to get to the other side of pole [np.pi]
+:param modfac:
+angle to change azimuthal angle by before getting back to the same point [2*np.pi]</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return cos_in<span class="colon">:</span></dt>
+<dd class="field-odd"><p></p></dd>
+</dl>
+<p>Reflected cosine of polar angle
+:return angle_in:
+Reflected azimuthal angle</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="QuickCW.QuickCorrectionUtils.reflect_cosines_array">
+<span class="sig-prename descclassname"><span class="pre">QuickCW.QuickCorrectionUtils.</span></span><span class="sig-name descname"><span class="pre">reflect_cosines_array</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cos_ins</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">angle_ins</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rotfac</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">3.141592653589793</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">modfac</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">6.283185307179586</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/QuickCW/QuickCorrectionUtils.html#reflect_cosines_array"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#QuickCW.QuickCorrectionUtils.reflect_cosines_array" title="Permalink to this definition"></a></dt>
+<dd><dl class="simple">
+<dt>helper to reflect cosines of coordinates around poles  to get them between -1 and 1,</dt><dd><p>which requires also rotating the signal by rotfac each time, then mod the angle by modfac
+same as reflect_cosines but handles arrays</p>
+</dd>
+</dl>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>cos_in</strong> – </p>
+</dd>
+</dl>
+<p>cosine of polar angle
+:param angle_in:
+azimuthal angle
+:param rotfac:
+angle to get to the other side of pole [np.pi]
+:param modfac:
+angle to change azimuthal angle by before getting back to the same point [2*np.pi]</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return cos_in<span class="colon">:</span></dt>
+<dd class="field-odd"><p></p></dd>
+</dl>
+<p>Reflected cosine of polar angle
+:return angle_in:
+Reflected azimuthal angle</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="QuickCW.QuickCorrectionUtils.reflect_into_range">
+<span class="sig-prename descclassname"><span class="pre">QuickCW.QuickCorrectionUtils.</span></span><span class="sig-name descname"><span class="pre">reflect_into_range</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">x_low</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">x_high</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/QuickCW/QuickCorrectionUtils.html#reflect_into_range"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#QuickCW.QuickCorrectionUtils.reflect_into_range" title="Permalink to this definition"></a></dt>
+<dd><p>reflect an arbitrary parameter into a nominal range</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>x</strong> – </p>
+</dd>
+</dl>
+<p>Value of parameter to reflect in range
+:param x_low:
+Lower bound of parameter
+:param x_high:
+Upper bound of prameter</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return res<span class="colon">:</span></dt>
+<dd class="field-odd"><p></p></dd>
+</dl>
+<p>Value of parameter reflected into range</p>
+</dd></dl>
+
+</section>
+<section id="module-QuickCW.QuickFisherHelpers">
+<span id="quickcw-quickfisherhelpers-module"></span><h2>QuickCW.QuickFisherHelpers module<a class="headerlink" href="#module-QuickCW.QuickFisherHelpers" title="Permalink to this heading"></a></h2>
+<p>C 2021 Bence Becsy
+MCMC for CW fast likelihood (w/ Neil Cornish and Matthew Digman)
+Helpers to get fisher matrices</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="QuickCW.QuickFisherHelpers.fisher_rn_mm_pp_diagonal_helper">
+<span class="sig-prename descclassname"><span class="pre">QuickCW.QuickFisherHelpers.</span></span><span class="sig-name descname"><span class="pre">fisher_rn_mm_pp_diagonal_helper</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">params</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">x0_swap</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">FLI_swap</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">flm</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">par_names</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">epsilon_gammas</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">epsilon_log10_As</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Npsr</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">get_intrinsic_diag</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">start_safe</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">get_gwb</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/QuickCW/QuickFisherHelpers.html#fisher_rn_mm_pp_diagonal_helper"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#QuickCW.QuickFisherHelpers.fisher_rn_mm_pp_diagonal_helper" title="Permalink to this definition"></a></dt>
+<dd><p>helper to get the mm and pp values needed to calculate the diagonal fisher eigenvectors for the red noise parameters</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>params</strong> – </p></li>
+<li><p><strong>x0_swap</strong> – </p></li>
+</ul>
+</dd>
+</dl>
+<p>CWInfo object
+:param FLI_swap:
+FastLikeInfo object
+:param flm:
+FastLikeMaster object
+:param par_names:
+List of parameter names
+:param epsilon_gammas:</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>epsilon_log10_As</strong> – </p></li>
+<li><p><strong>Npsr</strong> – </p></li>
+</ul>
+</dd>
+</dl>
+<p>Number of pulsars
+:param get_intrinsic_diag:</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>start_safe</strong> – </p></li>
+<li><p><strong>get_gwb</strong> – </p></li>
+</ul>
+</dd>
+<dt class="field-even">Return pp1s<span class="colon">:</span></dt>
+<dd class="field-even"><p></p></dd>
+<dt class="field-odd">Return mm1s<span class="colon">:</span></dt>
+<dd class="field-odd"><p></p></dd>
+<dt class="field-even">Return nn1s<span class="colon">:</span></dt>
+<dd class="field-even"><p></p></dd>
+<dt class="field-odd">Return helper_tuple0<span class="colon">:</span></dt>
+<dd class="field-odd"><p></p></dd>
+<dt class="field-even">Return pps_gwb<span class="colon">:</span></dt>
+<dd class="field-even"><p></p></dd>
+<dt class="field-odd">Return mms_gwb<span class="colon">:</span></dt>
+<dd class="field-odd"><p></p></dd>
+<dt class="field-even">Return nns_gwb<span class="colon">:</span></dt>
+<dd class="field-even"><p></p></dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="QuickCW.QuickFisherHelpers.fisher_synthetic_FLI_helper">
+<span class="sig-prename descclassname"><span class="pre">QuickCW.QuickFisherHelpers.</span></span><span class="sig-name descname"><span class="pre">fisher_synthetic_FLI_helper</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">helper_tuple_RR</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">x0_swap</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">FLI_swap</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">params_old</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dist_mode</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">phase_mode</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/QuickCW/QuickFisherHelpers.html#fisher_synthetic_FLI_helper"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#QuickCW.QuickFisherHelpers.fisher_synthetic_FLI_helper" title="Permalink to this definition"></a></dt>
+<dd><p>helper to construct synthetic likelihoods for each pulsar from input MMs and NNs one by one</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>helper_tuple_RR</strong> – </p></li>
+<li><p><strong>x0_swap</strong> – </p></li>
+</ul>
+</dd>
+</dl>
+<p>CWInfo object
+:param FLI_swap:
+FastLikelihoodInfo object
+:param params_old:</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>dist_mode</strong> – </p></li>
+<li><p><strong>phase_mode</strong> – </p></li>
+</ul>
+</dd>
+<dt class="field-even">Return rrs<span class="colon">:</span></dt>
+<dd class="field-even"><p></p></dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="QuickCW.QuickFisherHelpers.get_FLI_mem">
+<span class="sig-prename descclassname"><span class="pre">QuickCW.QuickFisherHelpers.</span></span><span class="sig-name descname"><span class="pre">get_FLI_mem</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">FLI_swap</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/QuickCW/QuickFisherHelpers.html#get_FLI_mem"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#QuickCW.QuickFisherHelpers.get_FLI_mem" title="Permalink to this definition"></a></dt>
+<dd><p>store everything needed to reset FLI for non-red noise updates</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>FLI_swap</strong> – </p>
+</dd>
+</dl>
+<p>FastLikelihoodInfo object</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p></p>
+</dd>
+</dl>
+<dl class="simple">
+<dt>Tuple with following elements:</dt><dd><p>MMs0:               list of M matrices
+NN0:                list of N vectors
+resres_array0:      array with resres values
+logdet_array0:      array with logdet contributions
+logdet_base_old:    base value of logdet</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="QuickCW.QuickFisherHelpers.get_fisher_diagonal">
+<span class="sig-prename descclassname"><span class="pre">QuickCW.QuickFisherHelpers.</span></span><span class="sig-name descname"><span class="pre">get_fisher_diagonal</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">samples_fisher</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">par_names</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">x0_swap</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">flm</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">FLI_swap</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">get_intrinsic_diag</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">start_safe</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/QuickCW/QuickFisherHelpers.html#get_fisher_diagonal"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#QuickCW.QuickFisherHelpers.get_fisher_diagonal" title="Permalink to this definition"></a></dt>
+<dd><p>get the diagonal elements of the fisher matrix for all parameters</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="QuickCW.QuickFisherHelpers.get_fisher_eigenvectors">
+<span class="sig-prename descclassname"><span class="pre">QuickCW.QuickFisherHelpers.</span></span><span class="sig-name descname"><span class="pre">get_fisher_eigenvectors</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">params</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">par_names</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">par_names_to_perturb</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pta</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">epsilon</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.0001</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/QuickCW/QuickFisherHelpers.html#get_fisher_eigenvectors"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#QuickCW.QuickFisherHelpers.get_fisher_eigenvectors" title="Permalink to this definition"></a></dt>
+<dd><p>get fisher eigenvectors for a generic set of parameters the slow way</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="QuickCW.QuickFisherHelpers.get_fisher_eigenvectors_common">
+<span class="sig-prename descclassname"><span class="pre">QuickCW.QuickFisherHelpers.</span></span><span class="sig-name descname"><span class="pre">get_fisher_eigenvectors_common</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">params</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">x0_swap</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">FLI_swap</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">diagonal_data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">epsilon</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.0001</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">default_all</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/QuickCW/QuickFisherHelpers.html#get_fisher_eigenvectors_common"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#QuickCW.QuickFisherHelpers.get_fisher_eigenvectors_common" title="Permalink to this definition"></a></dt>
+<dd><p>update just the 4x4 block of common eigenvectors</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="QuickCW.QuickFisherHelpers.get_fisher_rn_block_eigenvectors">
+<span class="sig-prename descclassname"><span class="pre">QuickCW.QuickFisherHelpers.</span></span><span class="sig-name descname"><span class="pre">get_fisher_rn_block_eigenvectors</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">params</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">par_names</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">x0_swap</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">flm</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">FLI_swap</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">diagonal_data_loc</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/QuickCW/QuickFisherHelpers.html#get_fisher_rn_block_eigenvectors"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#QuickCW.QuickFisherHelpers.get_fisher_rn_block_eigenvectors" title="Permalink to this definition"></a></dt>
+<dd><p>get the diagonal elements of the fisher matrix with the needed local stabilizations</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>params</strong> – </p></li>
+<li><p><strong>par_names</strong> – </p></li>
+</ul>
+</dd>
+</dl>
+<p>List of parameter names
+:param x0_swap:
+CWInfo object
+:param flm:
+FastLikeMaster object
+:param FLI_swap:
+FastLikeInfo object
+:param diagonal_data_loc:</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return eig_rn<span class="colon">:</span></dt>
+<dd class="field-odd"><p></p></dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="QuickCW.QuickFisherHelpers.get_fishers">
+<span class="sig-prename descclassname"><span class="pre">QuickCW.QuickFisherHelpers.</span></span><span class="sig-name descname"><span class="pre">get_fishers</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">samples</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">par_names</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">x0_swap</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">flm</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">FLI_swap</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">get_diag</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">get_common</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">get_rn_block</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">get_intrinsic_diag</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">start_safe</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/QuickCW/QuickFisherHelpers.html#get_fishers"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#QuickCW.QuickFisherHelpers.get_fishers" title="Permalink to this definition"></a></dt>
+<dd><p>get all the red noise eigenvectors in a block, and if get_diag is True also get all the diagonal fisher matrix elements</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>samples</strong> – </p>
+</dd>
+</dl>
+<p>Array of samples
+:param par_names:
+List of parameter names
+:param x0_swap:
+CWInfo object
+:param flm:
+FastLikeMaster object
+:param FLI_swap:
+FastLikeInfo object
+:param get_diag:</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>get_common</strong> – </p></li>
+<li><p><strong>get_rn_block</strong> – </p></li>
+<li><p><strong>get_intrinsic_diag</strong> – </p></li>
+<li><p><strong>start_safe</strong> – </p></li>
+</ul>
+</dd>
+<dt class="field-even">Return eig_rn<span class="colon">:</span></dt>
+<dd class="field-even"><p></p></dd>
+<dt class="field-odd">Return fisher_diag<span class="colon">:</span></dt>
+<dd class="field-odd"><p></p></dd>
+<dt class="field-even">Return eig_common<span class="colon">:</span></dt>
+<dd class="field-even"><p></p></dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="QuickCW.QuickFisherHelpers.params_perturb_helper">
+<span class="sig-prename descclassname"><span class="pre">QuickCW.QuickFisherHelpers.</span></span><span class="sig-name descname"><span class="pre">params_perturb_helper</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">params</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">x0_swap</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">FLI_swap</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">flm</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">par_names</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">idxs_targ</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">epsilons</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dist_mode</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">phase_mode</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mask</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/QuickCW/QuickFisherHelpers.html#params_perturb_helper"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#QuickCW.QuickFisherHelpers.params_perturb_helper" title="Permalink to this definition"></a></dt>
+<dd><p>helper to perturb the specified parameters by factors of epsilon en masse</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>params</strong> – </p>
+</dd>
+</dl>
+<p>array of parameter values
+:param x0_swap:
+CWInfo object
+:param FLI_swap:
+FastLikelihoodInfo object
+:param flm:
+FastLikeMaster object
+:param par_names:
+List of parameter names
+:param idxs_targ:
+Indices of parameters to be perturbed
+:param epsilon:
+Amount of perturbation
+:param dist_mode:
+Specify if pulsar distances are being perturbed [False]
+:param phase_mode:
+Specify if phases are being perturbed [False]
+:param mask:
+Mask to specify which pulsars need to be updated [None]
+If None, all pulsars are updated</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return paramsPP<span class="colon">:</span></dt>
+<dd class="field-odd"><p></p></dd>
+</dl>
+<p>Perturbed parameters
+:return FLI_memp:
+FastLikeInfo object for the perturbed parameters</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="QuickCW.QuickFisherHelpers.safe_reset_swap">
+<span class="sig-prename descclassname"><span class="pre">QuickCW.QuickFisherHelpers.</span></span><span class="sig-name descname"><span class="pre">safe_reset_swap</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">FLI_swap</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">x0_swap</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">params_old</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">FLI_mem0</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/QuickCW/QuickFisherHelpers.html#safe_reset_swap"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#QuickCW.QuickFisherHelpers.safe_reset_swap" title="Permalink to this definition"></a></dt>
+<dd><p>safely reset everything back to the initial values as input for self consistency in future calculations</p>
+</dd></dl>
+
+</section>
+<section id="module-QuickCW.QuickMCMCUtils">
+<span id="quickcw-quickmcmcutils-module"></span><h2>QuickCW.QuickMCMCUtils module<a class="headerlink" href="#module-QuickCW.QuickMCMCUtils" title="Permalink to this heading"></a></h2>
+<p>C 2021 Bence Becsy
+MCMC for CW fast likelihood (w/ Neil Cornish and Matthew Digman)
+Helpers for MCMC; extrinsic blocks and parallel tempering</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="QuickCW.QuickMCMCUtils.ChainParams">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">QuickCW.QuickMCMCUtils.</span></span><span class="sig-name descname"><span class="pre">ChainParams</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">T_max:</span> <span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_chain:</span> <span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_block_status_update:</span> <span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_int_block:</span> <span class="pre">int</span> <span class="pre">=</span> <span class="pre">1000</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_update_fisher:</span> <span class="pre">int</span> <span class="pre">=</span> <span class="pre">100000</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">save_every_n:</span> <span class="pre">int</span> <span class="pre">=</span> <span class="pre">10000</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fisher_eig_downsample:</span> <span class="pre">int</span> <span class="pre">=</span> <span class="pre">10</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">T_ladder:</span> <span class="pre">~typing.Optional[list]</span> <span class="pre">=</span> <span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">includeCW:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">prior_recovery:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbosity:</span> <span class="pre">int</span> <span class="pre">=</span> <span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">freq_bounds:</span> <span class="pre">~numpy.ndarray</span> <span class="pre">=</span> <span class="pre">array([</span>&#160;&#160; <span class="pre">nan</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">1.e-07])</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">gwb_comps:</span> <span class="pre">int</span> <span class="pre">=</span> <span class="pre">14</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cos_gwtheta_bounds:</span> <span class="pre">~numpy.ndarray</span> <span class="pre">=</span> <span class="pre">array([-1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">1])</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">gwphi_bounds:</span> <span class="pre">~numpy.ndarray</span> <span class="pre">=</span> <span class="pre">array([0.</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">6.28318531])</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">de_history_size:</span> <span class="pre">int</span> <span class="pre">=</span> <span class="pre">5000</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">thin_de:</span> <span class="pre">int</span> <span class="pre">=</span> <span class="pre">10000</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">log_fishers:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">log_mean_likelihoods:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">savefile:</span> <span class="pre">~typing.Optional[str]</span> <span class="pre">=</span> <span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">thin:</span> <span class="pre">int</span> <span class="pre">=</span> <span class="pre">100</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">samples_precision:</span> <span class="pre">type</span> <span class="pre">=</span> <span class="pre">&lt;class</span> <span class="pre">'numpy.float32'&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">save_first_n_chains:</span> <span class="pre">int</span> <span class="pre">=</span> <span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">prior_draw_prob:</span> <span class="pre">float</span> <span class="pre">=</span> <span class="pre">0.1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">de_prob:</span> <span class="pre">float</span> <span class="pre">=</span> <span class="pre">0.6</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fisher_prob:</span> <span class="pre">float</span> <span class="pre">=</span> <span class="pre">0.3</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rn_emp_dist_file:</span> <span class="pre">~typing.Optional[str]</span> <span class="pre">=</span> <span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dist_jump_weight:</span> <span class="pre">float</span> <span class="pre">=</span> <span class="pre">0.2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rn_jump_weight:</span> <span class="pre">float</span> <span class="pre">=</span> <span class="pre">0.3</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">gwb_jump_weight:</span> <span class="pre">float</span> <span class="pre">=</span> <span class="pre">0.1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">common_jump_weight:</span> <span class="pre">float</span> <span class="pre">=</span> <span class="pre">0.2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">all_jump_weight:</span> <span class="pre">float</span> <span class="pre">=</span> <span class="pre">0.2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fix_rn:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">zero_rn:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fix_gwb:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">zero_gwb:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/QuickCW/QuickMCMCUtils.html#ChainParams"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#QuickCW.QuickMCMCUtils.ChainParams" title="Permalink to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>store basic parameters the govern the evolution of the mcmc chain</p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="QuickCW.QuickMCMCUtils.MCMCChain">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">QuickCW.QuickMCMCUtils.</span></span><span class="sig-name descname"><span class="pre">MCMCChain</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">chain_params</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">psrs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pta</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_toa</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">noisedict</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ti</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/QuickCW/QuickMCMCUtils.html#MCMCChain"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#QuickCW.QuickMCMCUtils.MCMCChain" title="Permalink to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>store the miscellaneous objects needed to manage the mcmc chain</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="QuickCW.QuickMCMCUtils.MCMCChain.advance_N_blocks">
+<span class="sig-name descname"><span class="pre">advance_N_blocks</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">N_blocks</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/QuickCW/QuickMCMCUtils.html#MCMCChain.advance_N_blocks"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#QuickCW.QuickMCMCUtils.MCMCChain.advance_N_blocks" title="Permalink to this definition"></a></dt>
+<dd><p>advance the state of the MCMC system by N_blocks of size</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="QuickCW.QuickMCMCUtils.MCMCChain.advance_block">
+<span class="sig-name descname"><span class="pre">advance_block</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/QuickCW/QuickMCMCUtils.html#MCMCChain.advance_block"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#QuickCW.QuickMCMCUtils.MCMCChain.advance_block" title="Permalink to this definition"></a></dt>
+<dd><p>advance the state of the mcmc chain by 1 entire block, updating fisher matrices and differential evolution as necessary</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="QuickCW.QuickMCMCUtils.MCMCChain.do_status_update">
+<span class="sig-name descname"><span class="pre">do_status_update</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">itrn</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">N_blocks</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/QuickCW/QuickMCMCUtils.html#MCMCChain.do_status_update"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#QuickCW.QuickMCMCUtils.MCMCChain.do_status_update" title="Permalink to this definition"></a></dt>
+<dd><p>print a status update</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="QuickCW.QuickMCMCUtils.MCMCChain.output_and_wrap_state">
+<span class="sig-name descname"><span class="pre">output_and_wrap_state</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">itrn</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">N_blocks</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">do_output</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/QuickCW/QuickMCMCUtils.html#MCMCChain.output_and_wrap_state"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#QuickCW.QuickMCMCUtils.MCMCChain.output_and_wrap_state" title="Permalink to this definition"></a></dt>
+<dd><p>wrap the samples around to the first element and save the old ones to the hdf5 file</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="QuickCW.QuickMCMCUtils.MCMCChain.update_de_history">
+<span class="sig-name descname"><span class="pre">update_de_history</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">itrn</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/QuickCW/QuickMCMCUtils.html#MCMCChain.update_de_history"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#QuickCW.QuickMCMCUtils.MCMCChain.update_de_history" title="Permalink to this definition"></a></dt>
+<dd><p>update de history array</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="QuickCW.QuickMCMCUtils.MCMCChain.update_fishers">
+<span class="sig-name descname"><span class="pre">update_fishers</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">itrn</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/QuickCW/QuickMCMCUtils.html#MCMCChain.update_fishers"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#QuickCW.QuickMCMCUtils.MCMCChain.update_fishers" title="Permalink to this definition"></a></dt>
+<dd><p>handle fisher matrix update logic</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="QuickCW.QuickMCMCUtils.MCMCChain.update_fishers_partial">
+<span class="sig-name descname"><span class="pre">update_fishers_partial</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">itrn1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">itrn2</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/QuickCW/QuickMCMCUtils.html#MCMCChain.update_fishers_partial"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#QuickCW.QuickMCMCUtils.MCMCChain.update_fishers_partial" title="Permalink to this definition"></a></dt>
+<dd><p>handle fisher matrix update logic, itrn1 and itrn2 must be ranges over which no changes in the total set of intrinsic parameters occur
+so that we can skip the intrinsic update</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="QuickCW.QuickMCMCUtils.MCMCChain.validate_consistent">
+<span class="sig-name descname"><span class="pre">validate_consistent</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">itrb</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">full_validate</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/QuickCW/QuickMCMCUtils.html#MCMCChain.validate_consistent"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#QuickCW.QuickMCMCUtils.MCMCChain.validate_consistent" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="QuickCW.QuickMCMCUtils.add_rn_eig_starting_point">
+<span class="sig-prename descclassname"><span class="pre">QuickCW.QuickMCMCUtils.</span></span><span class="sig-name descname"><span class="pre">add_rn_eig_starting_point</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">samples</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">par_names</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">x0_swap</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">flm</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">FLI_swap</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">chain_params</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Npsr</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">FPI</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/QuickCW/QuickMCMCUtils.html#add_rn_eig_starting_point"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#QuickCW.QuickMCMCUtils.add_rn_eig_starting_point" title="Permalink to this definition"></a></dt>
+<dd><p>add a fisher eig jump to the starting point of each chain based only on the fisher matrix at the first point</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="QuickCW.QuickMCMCUtils.do_extrinsic_block">
+<span class="sig-prename descclassname"><span class="pre">QuickCW.QuickMCMCUtils.</span></span><span class="sig-name descname"><span class="pre">do_extrinsic_block</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">n_chain</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">samples</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">itrb</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Ts</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">x0s</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">FLIs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">FPI</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_par_tot</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">log_likelihood</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_int_block</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fisher_diag</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">a_yes</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">a_no</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/QuickCW/QuickMCMCUtils.html#do_extrinsic_block"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#QuickCW.QuickMCMCUtils.do_extrinsic_block" title="Permalink to this definition"></a></dt>
+<dd><p>do blocks of just the extrinsic parameters, which should be very fast</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="QuickCW.QuickMCMCUtils.do_pt_swap">
+<span class="sig-prename descclassname"><span class="pre">QuickCW.QuickMCMCUtils.</span></span><span class="sig-name descname"><span class="pre">do_pt_swap</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">n_chain</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">samples</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">itrb</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Ts</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">a_yes</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">a_no</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">x0s</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">FLIs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">log_likelihood</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fisher_diag</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/QuickCW/QuickMCMCUtils.html#do_pt_swap"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#QuickCW.QuickMCMCUtils.do_pt_swap" title="Permalink to this definition"></a></dt>
+<dd><p>do the parallel tempering swap</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="QuickCW.QuickMCMCUtils.get_param_names">
+<span class="sig-prename descclassname"><span class="pre">QuickCW.QuickMCMCUtils.</span></span><span class="sig-name descname"><span class="pre">get_param_names</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">pta</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/QuickCW/QuickMCMCUtils.html#get_param_names"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#QuickCW.QuickMCMCUtils.get_param_names" title="Permalink to this definition"></a></dt>
+<dd><p>get the name Lists for various parameters</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="QuickCW.QuickMCMCUtils.initialize_de_buffer">
+<span class="sig-prename descclassname"><span class="pre">QuickCW.QuickMCMCUtils.</span></span><span class="sig-name descname"><span class="pre">initialize_de_buffer</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">sample0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_par_tot</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">par_names</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">chain_params</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">x0_swap</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">FPI</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">eig_rn</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/QuickCW/QuickMCMCUtils.html#initialize_de_buffer"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#QuickCW.QuickMCMCUtils.initialize_de_buffer" title="Permalink to this definition"></a></dt>
+<dd><p>set up differential evolution</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="QuickCW.QuickMCMCUtils.initialize_sample_helper">
+<span class="sig-prename descclassname"><span class="pre">QuickCW.QuickMCMCUtils.</span></span><span class="sig-name descname"><span class="pre">initialize_sample_helper</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">chain_params</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_par_tot</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Npsr</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_toa</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">par_names</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">par_names_cw_ext</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">par_names_cw_int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">FPI</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pta</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">noisedict</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rn_emp_dist</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/QuickCW/QuickMCMCUtils.html#initialize_sample_helper"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#QuickCW.QuickMCMCUtils.initialize_sample_helper" title="Permalink to this definition"></a></dt>
+<dd><p>initialize starting samples for each chain to a random point</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="QuickCW.QuickMCMCUtils.uniform">
+<span class="sig-prename descclassname"><span class="pre">QuickCW.QuickMCMCUtils.</span></span><span class="sig-name descname"><span class="pre">uniform</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">low</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">high</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">size</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#QuickCW.QuickMCMCUtils.uniform" title="Permalink to this definition"></a></dt>
+<dd><p>Draw samples from a uniform distribution.</p>
+<p>Samples are uniformly distributed over the half-open interval
+<code class="docutils literal notranslate"><span class="pre">[low,</span> <span class="pre">high)</span></code> (includes low, but excludes high).  In other words,
+any value within the given interval is equally likely to be drawn
+by <cite>uniform</cite>.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>New code should use the <cite>~numpy.random.Generator.uniform</cite>
+method of a <cite>~numpy.random.Generator</cite> instance instead;
+please see the <span class="xref std std-ref">random-quick-start</span>.</p>
+</div>
+<dl class="simple">
+<dt>low<span class="classifier">float or array_like of floats, optional</span></dt><dd><p>Lower boundary of the output interval.  All values generated will be
+greater than or equal to low.  The default value is 0.</p>
+</dd>
+<dt>high<span class="classifier">float or array_like of floats</span></dt><dd><p>Upper boundary of the output interval.  All values generated will be
+less than or equal to high.  The high limit may be included in the 
+returned array of floats due to floating-point rounding in the 
+equation <code class="docutils literal notranslate"><span class="pre">low</span> <span class="pre">+</span> <span class="pre">(high-low)</span> <span class="pre">*</span> <span class="pre">random_sample()</span></code>.  The default value 
+is 1.0.</p>
+</dd>
+<dt>size<span class="classifier">int or tuple of ints, optional</span></dt><dd><p>Output shape.  If the given shape is, e.g., <code class="docutils literal notranslate"><span class="pre">(m,</span> <span class="pre">n,</span> <span class="pre">k)</span></code>, then
+<code class="docutils literal notranslate"><span class="pre">m</span> <span class="pre">*</span> <span class="pre">n</span> <span class="pre">*</span> <span class="pre">k</span></code> samples are drawn.  If size is <code class="docutils literal notranslate"><span class="pre">None</span></code> (default),
+a single value is returned if <code class="docutils literal notranslate"><span class="pre">low</span></code> and <code class="docutils literal notranslate"><span class="pre">high</span></code> are both scalars.
+Otherwise, <code class="docutils literal notranslate"><span class="pre">np.broadcast(low,</span> <span class="pre">high).size</span></code> samples are drawn.</p>
+</dd>
+</dl>
+<dl class="simple">
+<dt>out<span class="classifier">ndarray or scalar</span></dt><dd><p>Drawn samples from the parameterized uniform distribution.</p>
+</dd>
+</dl>
+<p>randint : Discrete uniform distribution, yielding integers.
+random_integers : Discrete uniform distribution over the closed</p>
+<blockquote>
+<div><p>interval <code class="docutils literal notranslate"><span class="pre">[low,</span> <span class="pre">high]</span></code>.</p>
+</div></blockquote>
+<p>random_sample : Floats uniformly distributed over <code class="docutils literal notranslate"><span class="pre">[0,</span> <span class="pre">1)</span></code>.
+random : Alias for <cite>random_sample</cite>.
+rand : Convenience function that accepts dimensions as input, e.g.,</p>
+<blockquote>
+<div><p><code class="docutils literal notranslate"><span class="pre">rand(2,2)</span></code> would generate a 2-by-2 array of floats,
+uniformly distributed over <code class="docutils literal notranslate"><span class="pre">[0,</span> <span class="pre">1)</span></code>.</p>
+</div></blockquote>
+<p>random.Generator.uniform: which should be used for new code.</p>
+<p>The probability density function of the uniform distribution is</p>
+<div class="math notranslate nohighlight">
+\[p(x) = \frac{1}{b - a}\]</div>
+<p>anywhere within the interval <code class="docutils literal notranslate"><span class="pre">[a,</span> <span class="pre">b)</span></code>, and zero elsewhere.</p>
+<p>When <code class="docutils literal notranslate"><span class="pre">high</span></code> == <code class="docutils literal notranslate"><span class="pre">low</span></code>, values of <code class="docutils literal notranslate"><span class="pre">low</span></code> will be returned.
+If <code class="docutils literal notranslate"><span class="pre">high</span></code> &lt; <code class="docutils literal notranslate"><span class="pre">low</span></code>, the results are officially undefined
+and may eventually raise an error, i.e. do not rely on this
+function to behave when passed arguments satisfying that
+inequality condition. The <code class="docutils literal notranslate"><span class="pre">high</span></code> limit may be included in the
+returned array of floats due to floating-point rounding in the
+equation <code class="docutils literal notranslate"><span class="pre">low</span> <span class="pre">+</span> <span class="pre">(high-low)</span> <span class="pre">*</span> <span class="pre">random_sample()</span></code>. For example:</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">x</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">(</span><span class="mi">5</span><span class="o">*</span><span class="mf">0.99999999</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">x</span>
+<span class="go">5.0</span>
+</pre></div>
+</div>
+<p>Draw samples from the distribution:</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">s</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">uniform</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">1000</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>All values are within the given interval:</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">np</span><span class="o">.</span><span class="n">all</span><span class="p">(</span><span class="n">s</span> <span class="o">&gt;=</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+<span class="go">True</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">np</span><span class="o">.</span><span class="n">all</span><span class="p">(</span><span class="n">s</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">)</span>
+<span class="go">True</span>
+</pre></div>
+</div>
+<p>Display the histogram of the samples, along with the
+probability density function:</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">count</span><span class="p">,</span> <span class="n">bins</span><span class="p">,</span> <span class="n">ignored</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">hist</span><span class="p">(</span><span class="n">s</span><span class="p">,</span> <span class="mi">15</span><span class="p">,</span> <span class="n">density</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">bins</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ones_like</span><span class="p">(</span><span class="n">bins</span><span class="p">),</span> <span class="n">linewidth</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;r&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+</dd></dl>
+
+</section>
+<section id="module-QuickCW.QuickMTHelpers">
+<span id="quickcw-quickmthelpers-module"></span><h2>QuickCW.QuickMTHelpers module<a class="headerlink" href="#module-QuickCW.QuickMTHelpers" title="Permalink to this heading"></a></h2>
+<p>C 2021 Bence Becsy
+MCMC for CW fast likelihood (w/ Neil Cornish and Matthew Digman)</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="QuickCW.QuickMTHelpers.add_rn_eig_jump">
+<span class="sig-prename descclassname"><span class="pre">QuickCW.QuickMTHelpers.</span></span><span class="sig-name descname"><span class="pre">add_rn_eig_jump</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">scale_eig0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">scale_eig1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">new_point</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rn_base</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">idx_rn</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Npsr</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">all_eigs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/QuickCW/QuickMTHelpers.html#add_rn_eig_jump"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#QuickCW.QuickMTHelpers.add_rn_eig_jump" title="Permalink to this definition"></a></dt>
+<dd><p>add a fisher eigenvalue jump to the red noise parameters in place</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="QuickCW.QuickMTHelpers.do_intrinsic_update_mt">
+<span class="sig-prename descclassname"><span class="pre">QuickCW.QuickMTHelpers.</span></span><span class="sig-name descname"><span class="pre">do_intrinsic_update_mt</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">mcc</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">itrb</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/QuickCW/QuickMTHelpers.html#do_intrinsic_update_mt"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#QuickCW.QuickMTHelpers.do_intrinsic_update_mt" title="Permalink to this definition"></a></dt>
+<dd><p>do the intrinsic update using the multiple try mcmc algorithm</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="QuickCW.QuickMTHelpers.do_mt_step">
+<span class="sig-prename descclassname"><span class="pre">QuickCW.QuickMTHelpers.</span></span><span class="sig-name descname"><span class="pre">do_mt_step</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">mcc</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">j</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">itrb</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">new_point</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">samples_current</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">FLI_mem_save</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">recompute_rn</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">log_proposal_ratio</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/QuickCW/QuickMTHelpers.html#do_mt_step"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#QuickCW.QuickMTHelpers.do_mt_step" title="Permalink to this definition"></a></dt>
+<dd><p>compute the multiple tries and chose a sample</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="QuickCW.QuickMTHelpers.get_mt_weights">
+<span class="sig-prename descclassname"><span class="pre">QuickCW.QuickMTHelpers.</span></span><span class="sig-name descname"><span class="pre">get_mt_weights</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x0_extras</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">FLI_use</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Ts</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">log_posterior_old</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tries</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">log_prior_news</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/QuickCW/QuickMTHelpers.html#get_mt_weights"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#QuickCW.QuickMTHelpers.get_mt_weights" title="Permalink to this definition"></a></dt>
+<dd><p>Helper function to quickly return multiple tries and their likelihoods fo MTMCMC</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="QuickCW.QuickMTHelpers.get_ref_mt_weights">
+<span class="sig-prename descclassname"><span class="pre">QuickCW.QuickMTHelpers.</span></span><span class="sig-name descname"><span class="pre">get_ref_mt_weights</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x0_extras</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">FLI_use</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Ts</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">log_posterior_old</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">chosen_trial</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ref_tries</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">log_prior_refs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/QuickCW/QuickMTHelpers.html#get_ref_mt_weights"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#QuickCW.QuickMTHelpers.get_ref_mt_weights" title="Permalink to this definition"></a></dt>
+<dd><p>Helper function to quickly return multiple tries and their likelihoods fo MTMCMC</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="QuickCW.QuickMTHelpers.set_params">
+<span class="sig-prename descclassname"><span class="pre">QuickCW.QuickMTHelpers.</span></span><span class="sig-name descname"><span class="pre">set_params</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">sample_set</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">jumps</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fisher_mask</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">random_draws_from_prior</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">x0</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/QuickCW/QuickMTHelpers.html#set_params"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#QuickCW.QuickMTHelpers.set_params" title="Permalink to this definition"></a></dt>
+<dd><p>assign parameters to tries for multiple try mcmc</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="QuickCW.QuickMTHelpers.uniform">
+<span class="sig-prename descclassname"><span class="pre">QuickCW.QuickMTHelpers.</span></span><span class="sig-name descname"><span class="pre">uniform</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">low</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">high</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">size</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#QuickCW.QuickMTHelpers.uniform" title="Permalink to this definition"></a></dt>
+<dd><p>Draw samples from a uniform distribution.</p>
+<p>Samples are uniformly distributed over the half-open interval
+<code class="docutils literal notranslate"><span class="pre">[low,</span> <span class="pre">high)</span></code> (includes low, but excludes high).  In other words,
+any value within the given interval is equally likely to be drawn
+by <cite>uniform</cite>.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>New code should use the <cite>~numpy.random.Generator.uniform</cite>
+method of a <cite>~numpy.random.Generator</cite> instance instead;
+please see the <span class="xref std std-ref">random-quick-start</span>.</p>
+</div>
+<dl class="simple">
+<dt>low<span class="classifier">float or array_like of floats, optional</span></dt><dd><p>Lower boundary of the output interval.  All values generated will be
+greater than or equal to low.  The default value is 0.</p>
+</dd>
+<dt>high<span class="classifier">float or array_like of floats</span></dt><dd><p>Upper boundary of the output interval.  All values generated will be
+less than or equal to high.  The high limit may be included in the 
+returned array of floats due to floating-point rounding in the 
+equation <code class="docutils literal notranslate"><span class="pre">low</span> <span class="pre">+</span> <span class="pre">(high-low)</span> <span class="pre">*</span> <span class="pre">random_sample()</span></code>.  The default value 
+is 1.0.</p>
+</dd>
+<dt>size<span class="classifier">int or tuple of ints, optional</span></dt><dd><p>Output shape.  If the given shape is, e.g., <code class="docutils literal notranslate"><span class="pre">(m,</span> <span class="pre">n,</span> <span class="pre">k)</span></code>, then
+<code class="docutils literal notranslate"><span class="pre">m</span> <span class="pre">*</span> <span class="pre">n</span> <span class="pre">*</span> <span class="pre">k</span></code> samples are drawn.  If size is <code class="docutils literal notranslate"><span class="pre">None</span></code> (default),
+a single value is returned if <code class="docutils literal notranslate"><span class="pre">low</span></code> and <code class="docutils literal notranslate"><span class="pre">high</span></code> are both scalars.
+Otherwise, <code class="docutils literal notranslate"><span class="pre">np.broadcast(low,</span> <span class="pre">high).size</span></code> samples are drawn.</p>
+</dd>
+</dl>
+<dl class="simple">
+<dt>out<span class="classifier">ndarray or scalar</span></dt><dd><p>Drawn samples from the parameterized uniform distribution.</p>
+</dd>
+</dl>
+<p>randint : Discrete uniform distribution, yielding integers.
+random_integers : Discrete uniform distribution over the closed</p>
+<blockquote>
+<div><p>interval <code class="docutils literal notranslate"><span class="pre">[low,</span> <span class="pre">high]</span></code>.</p>
+</div></blockquote>
+<p>random_sample : Floats uniformly distributed over <code class="docutils literal notranslate"><span class="pre">[0,</span> <span class="pre">1)</span></code>.
+random : Alias for <cite>random_sample</cite>.
+rand : Convenience function that accepts dimensions as input, e.g.,</p>
+<blockquote>
+<div><p><code class="docutils literal notranslate"><span class="pre">rand(2,2)</span></code> would generate a 2-by-2 array of floats,
+uniformly distributed over <code class="docutils literal notranslate"><span class="pre">[0,</span> <span class="pre">1)</span></code>.</p>
+</div></blockquote>
+<p>random.Generator.uniform: which should be used for new code.</p>
+<p>The probability density function of the uniform distribution is</p>
+<div class="math notranslate nohighlight">
+\[p(x) = \frac{1}{b - a}\]</div>
+<p>anywhere within the interval <code class="docutils literal notranslate"><span class="pre">[a,</span> <span class="pre">b)</span></code>, and zero elsewhere.</p>
+<p>When <code class="docutils literal notranslate"><span class="pre">high</span></code> == <code class="docutils literal notranslate"><span class="pre">low</span></code>, values of <code class="docutils literal notranslate"><span class="pre">low</span></code> will be returned.
+If <code class="docutils literal notranslate"><span class="pre">high</span></code> &lt; <code class="docutils literal notranslate"><span class="pre">low</span></code>, the results are officially undefined
+and may eventually raise an error, i.e. do not rely on this
+function to behave when passed arguments satisfying that
+inequality condition. The <code class="docutils literal notranslate"><span class="pre">high</span></code> limit may be included in the
+returned array of floats due to floating-point rounding in the
+equation <code class="docutils literal notranslate"><span class="pre">low</span> <span class="pre">+</span> <span class="pre">(high-low)</span> <span class="pre">*</span> <span class="pre">random_sample()</span></code>. For example:</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">x</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">(</span><span class="mi">5</span><span class="o">*</span><span class="mf">0.99999999</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">x</span>
+<span class="go">5.0</span>
+</pre></div>
+</div>
+<p>Draw samples from the distribution:</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">s</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">uniform</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">1000</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>All values are within the given interval:</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">np</span><span class="o">.</span><span class="n">all</span><span class="p">(</span><span class="n">s</span> <span class="o">&gt;=</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+<span class="go">True</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">np</span><span class="o">.</span><span class="n">all</span><span class="p">(</span><span class="n">s</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">)</span>
+<span class="go">True</span>
+</pre></div>
+</div>
+<p>Display the histogram of the samples, along with the
+probability density function:</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">count</span><span class="p">,</span> <span class="n">bins</span><span class="p">,</span> <span class="n">ignored</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">hist</span><span class="p">(</span><span class="n">s</span><span class="p">,</span> <span class="mi">15</span><span class="p">,</span> <span class="n">density</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">bins</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ones_like</span><span class="p">(</span><span class="n">bins</span><span class="p">),</span> <span class="n">linewidth</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;r&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+</dd></dl>
+
+</section>
+<section id="module-QuickCW.const_mcmc">
+<span id="quickcw-const-mcmc-module"></span><h2>QuickCW.const_mcmc module<a class="headerlink" href="#module-QuickCW.const_mcmc" title="Permalink to this heading"></a></h2>
+<p>store mcmc constants for global reference</p>
+</section>
+<section id="module-QuickCW.lapack_wrappers">
+<span id="quickcw-lapack-wrappers-module"></span><h2>QuickCW.lapack_wrappers module<a class="headerlink" href="#module-QuickCW.lapack_wrappers" title="Permalink to this heading"></a></h2>
+<p>C 2021 Matthew Digman
+various jit compatible interfaces to cython lapack functions</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="QuickCW.lapack_wrappers.solve_triangular">
+<span class="sig-prename descclassname"><span class="pre">QuickCW.lapack_wrappers.</span></span><span class="sig-name descname"><span class="pre">solve_triangular</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lower_a</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">trans_a</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">unitdiag</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">overwrite_b</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/QuickCW/lapack_wrappers.html#solve_triangular"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#QuickCW.lapack_wrappers.solve_triangular" title="Permalink to this definition"></a></dt>
+<dd><p>solve x*B=y</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>x</strong> – </p>
+</dd>
+</dl>
+<p>triangular matrix (must be either type of contiguous)
+:param y:
+vector (must be fortran ordered)</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return B<span class="colon">:</span></dt>
+<dd class="field-odd"><p></p></dd>
+</dl>
+<p>Solution to x*B=y</p>
+</dd></dl>
+
+</section>
+<section id="quickcw-test-fisher-convergence-module">
+<h2>QuickCW.test_fisher_convergence module<a class="headerlink" href="#quickcw-test-fisher-convergence-module" title="Permalink to this heading"></a></h2>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Bence Becsy, Neil Cornish, Matthew Digman.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
