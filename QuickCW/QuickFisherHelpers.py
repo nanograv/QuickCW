@@ -556,7 +556,26 @@ def safe_reset_swap(FLI_swap,x0_swap,params_old,FLI_mem0):
 ################################################################################
 
 def get_fisher_diagonal(samples_fisher, par_names, x0_swap, flm, FLI_swap,get_intrinsic_diag=True,start_safe=False):
-    """get the diagonal elements of the fisher matrix for all parameters"""
+    """get the diagonal elements of the fisher matrix for all parameters
+
+    :param samples_fisher:          --
+    :param par_names:               List of parameter names
+    :param x0_swap:                 CWInfo object
+    :param flm:                     FastLikeMaster object
+    :param FLI_swap:                FastLikeInfo object
+    :param get_intrinsic_diag:      --
+    :param start_safe:              --
+
+    :return 1/np.sqrt(fisher_diag): --
+    :return pp2s:                   --
+    :return mm2s:                   --
+    :return nn2s:                   --
+    :return epsilons:               --
+    :return helper_tuple0:          --
+    :return pps:                    --
+    :return mms:                    --
+    :return nns:                    --
+    """
     #this print out occurs a bit excessively frequently
     #print("Updating Fisher Diagonals")
     dim = len(par_names)
@@ -771,7 +790,17 @@ def get_fisher_diagonal(samples_fisher, par_names, x0_swap, flm, FLI_swap,get_in
     return 1/np.sqrt(fisher_diag),(pp2s,mm2s,nn2s,epsilons,helper_tuple0,pps,mms,nns)
 
 def get_fisher_eigenvectors_common(params, x0_swap, FLI_swap, diagonal_data, epsilon=1e-4,default_all=False):
-    """update just the 4x4 block of common eigenvectors"""
+    """update just the 4x4 block of common eigenvectors
+
+    :param params:          Parameters where the fisher is to be calculated
+    :param x0_swap:         CWInfo object
+    :param FLI_swap:        FastLikeInfo object
+    :param diagonal_data:   --
+    :param epsilon:         Perturbation values [1e-4]
+    :param default_all:     --
+
+    :return:                Matrix with fisher eigenvectors
+    """
     print("Updating Common Parameter Fisher Eigenvectors")
     dim = 4
     idx_to_perturb = x0_swap.idx_cw_int[:dim]
@@ -936,7 +965,16 @@ def get_fisher_eigenvectors_common(params, x0_swap, FLI_swap, diagonal_data, eps
     return (np.sqrt(1.0/np.abs(W))*v).T
 
 def get_fisher_eigenvectors(params, par_names, par_names_to_perturb, pta, epsilon=1e-4):
-    """get fisher eigenvectors for a generic set of parameters the slow way"""
+    """get fisher eigenvectors for a generic set of parameters the slow way
+
+    :param params:                  Parameter values where fisher is to be calculated
+    :param par_names:               List of parameter names
+    :param par_names_to_perturb:    Subset of par_names for which we want to calculate the fisher
+    :param pta:                     enterprise PTA object
+    :param epsilon:                 Perturbation values [1e-4]
+
+    :return:                        Matrix with fisher eigenvectors
+    """
     try:
         dim = len(par_names_to_perturb)
         fisher = np.zeros((dim,dim))

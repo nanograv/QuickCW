@@ -35,7 +35,22 @@ from QuickCW.OutputUtils import print_acceptance_progress,output_hdf5_loop,outpu
 ################################################################################
 @njit(parallel=True)
 def do_extrinsic_block(n_chain, samples, itrb, Ts, x0s, FLIs, FPI, n_par_tot, log_likelihood, n_int_block, fisher_diag, a_yes, a_no):
-    """do blocks of just the extrinsic parameters, which should be very fast"""
+    """do blocks of just the extrinsic parameters, which should be very fast
+
+    :param n_chain:         Number of PT chains
+    :param samples:         Array holding posterior samples
+    :param itrb:            Index within saved values (as opposed to block index itri or overall index itrn)
+    :param Ts:              List of PT temperatures
+    :param x0s:             List of CWInfo objects
+    :param FLIs:            List of FastLikeInfo objects
+    :param FPI:             FastPriorInfo object
+    :param n_par_tot:       Number of total parameters
+    :param log_likelihood:  Array holding log likelihood values
+    :param n_int_block:     Number of iterations to be done in a block
+    :param fisher_diag:     Diagonal fisher
+    :param a_yes:           Array to hold number of accepted steps
+    :param a_no:            Array to hold number of rejected steps
+    """
     n_par_ext = x0s[0].idx_cw_ext.size
 
     #treat all phases where fisher is saturated as 1 parameter for counting purposes in jump scaling
@@ -115,9 +130,19 @@ def do_extrinsic_block(n_chain, samples, itrb, Ts, x0s, FLIs, FPI, n_par_tot, lo
 ################################################################################
 @njit()
 def do_pt_swap(n_chain, samples, itrb, Ts, a_yes, a_no, x0s, FLIs, log_likelihood,fisher_diag):
-    """do the parallel tempering swap"""
-    #print("PT")
+    """do the parallel tempering swap
 
+    :param n_chain:         Number of PT chains
+    :param samples:         Array holding posterior samples
+    :param itrb:            Index within saved values (as opposed to block index itri or overall index itrn)
+    :param Ts:              List of PT temperatures
+    :param a_yes:           Array to hold number of accepted steps
+    :param a_no:            Array to hold number of rejected steps
+    :param x0s:             List of CWInfo objects
+    :param FLIs:            List of FastLikeInfo objects
+    :param log_likelihood:  Array holding log likelihood values
+    :param fisher_diag:     Diagonal fisher
+    """
     #print("PT")
 
     #set up map to help keep track of swaps
@@ -160,76 +185,21 @@ def do_pt_swap(n_chain, samples, itrb, Ts, a_yes, a_no, x0s, FLIs, log_likelihoo
     fisher_diag[:] = fisher_diag_new
     FLIs[:] = List(FLIs_new)
     x0s[:] = List(x0s_new)
-#@njit()
-#def do_pt_swap(n_chain, samples, itrb, Ts, a_yes, a_no, x0s, FLIs, log_likelihood,fisher_diag):
-#    """do the parallel tempering swap"""
-#    #print("PT")
-#
-#    #print("PT")
-#
-#    #set up map to help keep track of swaps
-#    swap_map = list(range(n_chain))
-#
-#    #get log_Ls from all the chains
-#    log_Ls = []
-#    for j in range(n_chain):
-#        log_Ls.append(log_likelihood[j,itrb])
-#
-#    target_shuffle = np.random.permutation(np.arange(0,n_chain))
-#
-#    targets = np.zeros(n_chain,dtype=np.int64)
-#    targets[target_shuffle[:n_chain//2]] = target_shuffle[n_chain//2:n_chain]
-#    targets[target_shuffle[n_chain//2:n_chain]] = target_shuffle[:n_chain//2]
-#
-#    #loop through and propose a swap at each chain (starting from hottest chain and going down in T) and keep track of results in swap_map
-#    #for swap_chain in reversed(range(n_chain-1)):
-#    #for swap_chain in range(n_chain-2, -1, -1):  # same as reversed(range(n_chain-1)) but supported in numba
-#    #    assert swap_map[swap_chain] == swap_chain
-#    for itrt in range(0,n_chain):
-#        itrt_target = targets[itrt]
-#        if itrt>itrt_target:
-#            continue
-#
-#        assert swap_map[itrt] == itrt
-#        assert swap_map[itrt_target] == itrt_target
-#
-#        log_acc_ratio = -log_Ls[itrt] / Ts[itrt]
-#        log_acc_ratio += -log_Ls[itrt_target] / Ts[itrt_target]
-#        log_acc_ratio += log_Ls[itrt_target] / Ts[itrt]
-#        log_acc_ratio += log_Ls[itrt] / Ts[itrt_target]
-#
-#        acc_decide = np.log(uniform(0.0, 1.0, 1))
-#        if acc_decide<=log_acc_ratio:# and do_PT:
-#            swap_map[itrt], swap_map[itrt_target] = swap_map[itrt_target], swap_map[itrt]
-#            #if np.abs(itrt_target-itrt)==1:
-#            if Ts[itrt_target]!=Ts[itrt]:
-#                a_yes[cm.idx_PT,itrt] += 1
-#                a_yes[cm.idx_PT,itrt_target] += 1
-#            #a_yes[0,swap_chain]+=1
-#        else:
-#            #if np.abs(itrt_target-itrt)==1:
-#            if Ts[itrt_target]!=Ts[itrt]:
-#                a_no[cm.idx_PT,itrt] += 1
-#                a_no[cm.idx_PT,itrt_target] += 1
-#            #a_no[0,swap_chain]+=1
-#
-#    #loop through the chains and record the new samples and log_Ls
-#    FLIs_new = []
-#    x0s_new = []
-#    fisher_diag_new = np.zeros_like(fisher_diag)
-#    for j in range(n_chain):
-#        samples[j,itrb+1,:] = samples[swap_map[j],itrb,:]
-#        fisher_diag_new[j,:] = fisher_diag[swap_map[j],:]
-#        log_likelihood[j,itrb+1] = log_likelihood[swap_map[j],itrb]
-#        FLIs_new.append(FLIs[swap_map[j]])
-#        x0s_new.append(x0s[swap_map[j]])
-#
-#    fisher_diag[:] = fisher_diag_new
-#    FLIs[:] = List(FLIs_new)
-#    x0s[:] = List(x0s_new)
 
 def add_rn_eig_starting_point(samples,par_names,x0_swap,flm,FLI_swap,chain_params,Npsr,FPI):
-    """add a fisher eig jump to the starting point of each chain based only on the fisher matrix at the first point"""
+    """add a fisher eig jump to the starting point of each chain based only on the fisher matrix at the first point
+
+    :param samples:         Samples to perturb
+    :param par_names:       List of parameter names
+    :param x0_swap:         CWInfo object
+    :param flm:             FastLikeMaster object
+    :param FLI_swap:        FastLikeInfo object
+    :param chain_params:    ChainParams object
+    :param Npsr:            Number of pulsars
+    :param FPI:             FastPriorInfo object
+
+    :return samples:        Perturbed samples
+    """
     eig_rn0,_,_ = get_fishers(samples[0:1],par_names,x0_swap,flm, FLI_swap,\
                               get_diag=False,get_rn_block=True,get_common=False,get_intrinsic_diag=False)
     scaling = 0.*2.38/np.sqrt(2*Npsr/2)
@@ -243,7 +213,18 @@ def add_rn_eig_starting_point(samples,par_names,x0_swap,flm,FLI_swap,chain_param
 
 
 def initialize_de_buffer(sample0,n_par_tot,par_names,chain_params,x0_swap,FPI,eig_rn):
-    """set up differential evolution"""
+    """set up differential evolution
+
+    :param sample0:         Parameter values to start the RN from
+    :param n_par_tot:       Number of total parameters
+    :param par_names:       List of parameter names
+    :param chain_params:    ChainParams object
+    :param x0_swap:         CWInfo object
+    :param FPI:             FastPriorInfo object
+    :param eig_rn:          RN eigenvectors
+
+    :return de_history:     Array holding initial differenctial evolution buffer
+    """
     de_history = np.zeros((chain_params.n_chain, chain_params.de_history_size, n_par_tot))
 
     #initialize the rn parameters to the starting point plus a fisher matrix jump
@@ -269,7 +250,22 @@ def initialize_de_buffer(sample0,n_par_tot,par_names,chain_params,x0_swap,FPI,ei
     return de_history
 
 def initialize_sample_helper(chain_params,n_par_tot,Npsr,max_toa,par_names,par_names_cw_ext,par_names_cw_int,FPI,pta,noisedict,rn_emp_dist):
-    """initialize starting samples for each chain to a random point"""
+    """initialize starting samples for each chain to a random point
+
+    :param chain_params:        ChainParams object
+    :param n_par_tot:           Total number of parameters
+    :param Npsr:                Number of pulsars
+    :param max_toa:             Latest TOA in any pulsar in the array
+    :param par_names:           List of parameter names
+    :param par_names_cw_ext:    List of parameter names which are projection parameters (previously called extrinsic parameters)
+    :param par_names_cw_int:    List of parameter names which are shape parameters (previously called intrinsic parameters)
+    :param FPI:                 FastPriorInfo object
+    :param pta:                 enterprise PTA object
+    :param noisedict:           Noise dictionary
+    :param rn_emp_dist:         RN empirical distributions
+
+    :return samples:            Array to hold posterior samples initialized for the first sample
+    """
     samples = np.zeros((chain_params.n_chain, chain_params.save_every_n+1, n_par_tot))
     #samples_load = np.load('samples_final_wde_respace3.npy')
     #samples_load = np.load('samples_final_node18.npy')
@@ -353,7 +349,16 @@ def initialize_sample_helper(chain_params,n_par_tot,Npsr,max_toa,par_names,par_n
     return samples
 
 def get_param_names(pta):
-    """get the name Lists for various parameters"""
+    """get the name Lists for various parameters
+
+    :param pta:                 enterprise PTA object
+
+    :return par_names:          List of parameter names
+    :return par_names_cw:       List of parameter names describing the CW signal
+    :return par_names_cw_int:   List of parameter names which are projection parameters (previously called extrinsic parameters)
+    :return par_names_cw_ext:   List of parameter names which are shape parameters (previously called intrinsic parameters)
+    :return par_names_noise:    List of noise parameter names
+    """
     par_names = List(pta.param_names)
     par_names_cw = List(['0_cos_gwtheta', '0_cos_inc', '0_gwphi', '0_log10_fgw', '0_log10_h',
                          '0_log10_mc', '0_phase0', '0_psi'])
@@ -373,7 +378,45 @@ def get_param_names(pta):
     return par_names,par_names_cw,par_names_cw_int,par_names_cw_ext,par_names_noise
 
 class ChainParams():
-    """store basic parameters the govern the evolution of the mcmc chain"""
+    """store basic parameters the govern the evolution of the mcmc chain
+
+    :param T_max:
+    :param n_chain:
+    :param n_block_status_update:
+    :param n_int_block:
+    :param n_update_fisher:
+    :param save_every_n:
+    :param fisher_eig_downsample:
+    :param T_ladder:
+    :param includeCW:
+    :param prior_recovery:
+    :param verbosity:
+    :param freq_bounds:
+    :param gwb_comps:
+    :param cos_gwtheta_bounds:
+    :param gwphi_bounds:
+    :param de_history_size:
+    :param thin_de:
+    :param log_fishers:
+    :param log_mean_likelihoods:
+    :param savefile:
+    :param thin:
+    :param samples_precision:
+    :param save_first_n_chains:
+    :param prior_draw_prob:
+    :param de_prob:
+    :param fisher_prob:
+    :param rn_emp_dist_file:
+    :param dist_jump_weight:
+    :param rn_jump_weight:
+    :param gwb_jump_weight:
+    :param common_jump_weight:
+    :param all_jump_weight:
+    :param fix_rn:
+    :param zero_rn:
+    :param fix_gwb:
+    :param zero_gwb:
+    """
 
     def __init__(self, T_max: float, n_chain: int, n_block_status_update: int, n_int_block: int = 1000,
                  n_update_fisher: int = 100_000, save_every_n: int = 10_000,
@@ -927,51 +970,4 @@ class MCMCChain():
         print('whole function time = %8.3f s'%(tf-self.ti))
         print('loop time = %8.3f s'%(tf-self.ti_loop))
 
-
-#class TemperatureAdaptedEmpiricalDistribution():
-#    """object to adapt a 2d empirical distribution from enterprise to a specific temperature"""
-#    def __init__(self,rn_emp_dist0,T):
-#        self.rn_emp_dist0 = rn_emp_dist0
-#        self.T = T
-#        self._edges = self.rn_emp_dist0._edges.copy()
-#        self._wids = self.rn_emp_dist0._wids.copy()
-#        self._Nbins = self.rn_emp_dist0._Nbins.copy()
-#        area = np.outer(*self._wids)
-#
-#        self._pdf = (self.rn_emp_dist0._pdf.copy())**(1./max(1,T)) #raise pdf to a power
-#        self._cdf = np.cumsum((self._pdf*area).ravel())
-#
-#        #need to adapt cdf and pdf to take into account correct normalization
-#        self.renorm = self._cdf[-1]
-#        self._pdf /= self.renorm
-#        self._cdf /= self.renorm
-#
-#        self._logpdf = np.log(self._pdf)
-#
-#    def draw(self):
-#        """copied from enterprise_extensions"""
-#        draw = np.random.rand()
-#        draw_bin = np.searchsorted(self._cdf, draw)
-#        idx = np.unravel_index(draw_bin, self._Nbins)
-#        samp = [self._edges[ii, idx[ii]] + self._wids[ii, idx[ii]]*np.random.rand()
-#                                for ii in range(2)]
-#        return np.array(samp)
-#
-#    def prob(self, params):
-#        """copied from enterprise_extensions"""
-#        ix, iy = [np.searchsorted(self._edges[ii], params[ii]) - 1 for ii in range(2)]
-#
-#        return self._pdf[ix, iy]
-#
-#    def logprob(self, params):
-#        """copied from enterprise_extensions"""
-#        ix, iy = [np.searchsorted(self._edges[ii], params[ii]) - 1 for ii in range(2)]
-#        return self._logpdf[ix, iy]
-#
-#    def get_emp_dist_T_ladder(self):
-#        emp_dist0 = mcc.rn_emp_dist
-#        pdf0 = emp_dist0.pdf_
-#        for j,T in enumerate(self.chain_params.Ts):
-#            pdfT = pdf0**(1./T) #raise pdf to power beta
-#
 
