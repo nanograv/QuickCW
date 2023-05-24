@@ -380,42 +380,42 @@ def get_param_names(pta):
 class ChainParams():
     """store basic parameters the govern the evolution of the mcmc chain
 
-    :param T_max:
-    :param n_chain:
-    :param n_block_status_update:
-    :param n_int_block:
-    :param n_update_fisher:
-    :param save_every_n:
-    :param fisher_eig_downsample:
-    :param T_ladder:
-    :param includeCW:
-    :param prior_recovery:
-    :param verbosity:
-    :param freq_bounds:
-    :param gwb_comps:
-    :param cos_gwtheta_bounds:
-    :param gwphi_bounds:
-    :param de_history_size:
-    :param thin_de:
-    :param log_fishers:
-    :param log_mean_likelihoods:
-    :param savefile:
-    :param thin:
-    :param samples_precision:
-    :param save_first_n_chains:
-    :param prior_draw_prob:
-    :param de_prob:
-    :param fisher_prob:
-    :param rn_emp_dist_file:
-    :param dist_jump_weight:
-    :param rn_jump_weight:
-    :param gwb_jump_weight:
-    :param common_jump_weight:
-    :param all_jump_weight:
-    :param fix_rn:
-    :param zero_rn:
-    :param fix_gwb:
-    :param zero_gwb:
+    :param T_max:                   Maximum temperature of PT ladder
+    :param n_chain:                 Number of PT chains
+    :param n_block_status_update:   Number of blocks between status updates
+    :param n_int_block:             Number of iterations in a block [1_000]
+    :param n_update_fisher:         Number of iterations between Fisher updates [100_000]
+    :param save_every_n:            Number of iterations between saving intermediate results (needs to be intiger multiple of n_int_block) [10_000]
+    :param fisher_eig_downsample:   Multiplier for how much less to do more expensive updates to fisher eigendirections for red noise and common parameters compared to diagonal elements [10]
+    :param T_ladder:                Temperature ladder; if None, geometrically spaced ladder is made with n_chain chains reaching T_max [None]
+    :param includeCW:               If False, we are not including the CW in the likelihood (good for testing) [True]
+    :param prior_recovery:          If True, likelihood is set to a constant (good for testing the prior recovery of the MCMC) [False]
+    :param verbosity:               Parameter indicating how much info to print (higher value means more prints) [1]
+    :param freq_bounds:             Lower and upper prior bounds on the GW frequency of the CW; np.nan lower bound is automatically turned into one over the observation time [[np.nan, 1.e-07]] 
+    :param gwb_comps:               Number of frequency components to model in the GWB [14]
+    :param cos_gwtheta_bounds:      Prior bounds on the cosine of the GW theta sky location parameter (useful e.g. for targeted searches) [[-1,1]]
+    :param gwphi_bounds:            Prior bounds on the the GW phi sky location parameter (useful e.g. for targeted searches) [[0,2*np.pi]]
+    :param de_history_size:         Size of the differential evolution buffer
+    :param thin_de:                 How much to thin samples for the DE buffer
+    :param log_fishers:             --
+    :param log_mean_likelihoods:    --
+    :param savefile:                File name to save the results to, if None, no results are saved [None]
+    :param thin:                    How much to thin the samples by for saving [100]
+    :param samples_precision:       Precision to use for the saved samples [np.single]
+    :param save_first_n_chains:     Number of PT chains to save [1]
+    :param prior_draw_prob:         Probability of prior draws [0.1]
+    :param de_prob:                 Probability of DE jumps [0.6]
+    :param fisher_prob:             Probability of fisher updates [0.3]
+    :param rn_emp_dist_file:        Filename with empirical distribution to use for per psr RN, if None, do not do empirical distribution jumps [None]
+    :param dist_jump_weight:        Weight if jumps changing pulsar distances [0.2]
+    :param rn_jump_weight:          Weight of jumps changing RN parameters [0.3]
+    :param gwb_jump_weight:         Weight of jumps changing GWB parameters [0.1]
+    :param common_jump_weight:      Weight of jumps changing common CW shape parameters (sky location, frequency, chirp mass) [0.2]
+    :param all_jump_weight:         Weight of jumps changing all parameters [0.2]
+    :param fix_rn:                  If True, we fix per psr RN parameters to the value it starts at [False]
+    :param zero_rn:                 If True, we fix per psr RN amplitude to a very low value effectively turning it off [False]
+    :param fix_gwb:                 If True, we fix GWB parameters to the value it starts at [False]
+    :param zero_gwb:                If True, we fix GWB amplitude to a very low value effectively turning it off [False]
     """
 
     def __init__(self, T_max: float, n_chain: int, n_block_status_update: int, n_int_block: int = 1000,
@@ -532,7 +532,15 @@ class ChainParams():
 
 
 class MCMCChain():
-    """store the miscellaneous objects needed to manage the mcmc chain"""
+    """store the miscellaneous objects needed to manage the mcmc chain
+
+    :param chain_params:    ChainParams object
+    :param psrs:            List of enterprise pulsar objects
+    :param pta:             enterprise PTA object
+    :param max_toa:         Latest TOA in any pulsar in the array
+    :param noisedict:       Noise dictionary
+    :param ti:              Time after initialization got from time.perf_counter()
+    """
     def __init__(self,chain_params,psrs,pta,max_toa,noisedict,ti):
         #set up fast likelihoods
         self.chain_params = chain_params

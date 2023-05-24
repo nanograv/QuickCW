@@ -19,7 +19,13 @@ from time import perf_counter
 #version using multiple try mcmc (based on Table 6 of https://vixra.org/pdf/1712.0244v3.pdf)
 #@profile
 def do_intrinsic_update_mt(mcc, itrb):
-    """do the intrinsic update using the multiple try mcmc algorithm"""
+    """do the intrinsic update using the multiple try mcmc algorithm
+
+    :param mcc:             MCMCChain onject
+    :param itrb:            Index within saved values (as opposed to block index itri or overall index itrn)
+
+    :return mcc.FLI_swap:   FastLikeInfo object
+    """
     Npsr = mcc.x0s[0].Npsr
     Ts = mcc.chain_params.Ts
     for j in range(mcc.n_chain):
@@ -514,7 +520,22 @@ def do_intrinsic_update_mt(mcc, itrb):
 
 
 def do_mt_step(mcc,j,itrb,new_point,samples_current,FLI_mem_save,recompute_rn,log_proposal_ratio):
-    """compute the multiple tries and chose a sample"""
+    """compute the multiple tries and chose a sample
+
+    :param mcc:                     MCMCChain onject
+    :param j:                       Index of PT chain
+    :param itrb:                    Index within saved values (as opposed to block index itri or overall index itrn)
+    :param new_point:               Proposed new point (with new shape parameters)
+    :param samples_current:         Current point in parameter space
+    :param FLI_mem_save:            Parts of FLI object saved to memory
+    :param recompute_rn:            If True, recompute everything needed to go to new RN parameters
+    :param log_proposal_ratio:      Log of the proposal ratio needed to calculate acceptance probability
+
+    :return log_acc_ratio:          Log of acceptance probability
+    :return chosen_trial:           Index of chosen trial
+    :return sample_choose:          Parameters of the chosen trial
+    :return log_Ls[chosen_trial]:   Log likelihood of the chosen trial
+    """
     Ts = mcc.chain_params.Ts
 
     log_prior_old = CWFastPrior.get_lnprior(samples_current, mcc.FPI)
@@ -609,7 +630,19 @@ def do_mt_step(mcc,j,itrb,new_point,samples_current,FLI_mem_save,recompute_rn,lo
 
 @njit(parallel=True)
 def get_mt_weights(x0_extras, FLI_use, Ts, log_posterior_old,tries,log_prior_news):
-    """Helper function to quickly return multiple tries and their likelihoods fo MTMCMC"""
+    """Helper function to quickly return multiple tries and their likelihoods fo MTMCMC
+
+    :param x0_extras:           List of extra CWInfo objects for parallelizing multiple try
+    :param FLI_use:             FastLikeInfo object
+    :param Ts:                  List of PT temperatures
+    :param log_posterior_old:   Log posterior at old parameters
+    :param tries:               Parameters at a set of multiple tries for which we want to calculate the weights
+    :param log_prior_news:      Log prior values at propose new points
+
+    :return mt_weights:         Multiple try weights
+    :return log_Ls:             Log likelihoods
+    :return log_mt_norm_shift:  Amount to shift the multiple try weights (helps with using floating point precision efficiently)
+    """
     #NOTE isfinite does not work with fastmath enabled
     #set up needed arrays
     log_mt_weights = np.zeros(cm.n_multi_try)
@@ -644,7 +677,18 @@ def get_mt_weights(x0_extras, FLI_use, Ts, log_posterior_old,tries,log_prior_new
 
 @njit()
 def add_rn_eig_jump(scale_eig0,scale_eig1,new_point,rn_base,idx_rn,Npsr,all_eigs=False):
-    """add a fisher eigenvalue jump to the red noise parameters in place"""
+    """add a fisher eigenvalue jump to the red noise parameters in place
+
+    :param scale_eig0:  Amount to scale jump in gamma values by
+    :param scale_eig1:  Amount to scale in log10_A values by
+    :param new_point:   Parameter values to add RN jump to
+    :param rn_base:     RN values to jump from (usually justa slice of new_point)
+    :param idx_rn:      Indices of new_point containing RN parameters
+    :param Npsr:        Number of pulsars
+    :param all_eigs:    If True, perturb all pulsars' RN, if False, pick randomly [False]
+
+    :return new_point:  Perturbed parameter values
+    """
     which_eig = np.random.choice(2, size=Npsr)
     jump_sizes = np.random.normal(0., 1.,Npsr)
 
@@ -662,7 +706,16 @@ def add_rn_eig_jump(scale_eig0,scale_eig1,new_point,rn_base,idx_rn,Npsr,all_eigs
 
 @njit()
 def set_params(sample_set,jumps,fisher_mask,random_draws_from_prior,x0):
-    """assign parameters to tries for multiple try mcmc"""
+    """assign parameters to tries for multiple try mcmc
+
+    :param sample_set:              Samples to start from
+    :param jumps:                   Precaluclated fisher jumps to use
+    :param fisher_mask:             Mask determining which projection parameters to do fisher jump vs prior draw in
+    :param random_draws_from_prior: Precalculated prior draws to use
+    :param x0:                      CWInfo object
+
+    :return ref_tries:              2D array holding samples at multiple trials
+    """
     ref_tries = np.zeros((cm.n_multi_try, sample_set.size))
     #jumps and random_draws_from_prior should give a null jump for the 0th value
 
@@ -684,7 +737,19 @@ def set_params(sample_set,jumps,fisher_mask,random_draws_from_prior,x0):
 
 @njit(parallel=True)
 def get_ref_mt_weights(x0_extras, FLI_use, Ts, log_posterior_old, chosen_trial,ref_tries,log_prior_refs):
-    """Helper function to quickly return multiple tries and their likelihoods fo MTMCMC"""
+    """Helper function to quickly return multiple tries and their likelihoods fo MTMCMC
+
+    :param x0_extras:           List of extra CWInfo objects for parallelizing multiple try
+    :param FLI_use:             FastLikeInfo object
+    :param Ts:                  List of PT temperatures
+    :param log_posterior_old:   Log posterior at old parameters
+    :param chosen_trial:        Index of chosen trial
+    :param ref_tries:           Parameters at a set of reference multiple tries for which we want to calculate the weights
+    :param log_prior_refs:      Log prior values at reference points
+
+    :return ref_mt_weights:     Reference point multiply try weights
+    :return log_ref_mt_norm_shift: Amount to shift the reference point multiple try weights (helps with using floating point precision efficiently)
+    """
     #NOTE isfinite does not work with fastmath enabled
     #set up needed arrays
     log_ref_mt_weights = np.zeros(cm.n_multi_try)
