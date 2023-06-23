@@ -1,7 +1,7 @@
 # QuickCW
 Fast continuous wave (CW) analysis for pulsar timing array data
 
-See [arXiv:2204.07160](https://arxiv.org/abs/2204.07160) for details on the method, and the [Quick-start Guide](https://github.com/bencebecsy/QuickCW/blob/main/docs/how_to_run_QuickCW.md) for details on how to run the code yourself!
+See [arXiv:2204.07160](https://arxiv.org/abs/2204.07160) for details on the method, and the [Quick-start Guide](https://github.com/nanograv/QuickCW/blob/main/docs/how_to_run_QuickCW.md) for details on how to run the code yourself!
 
 Citation:
 ```
