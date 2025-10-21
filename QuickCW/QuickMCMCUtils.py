@@ -175,13 +175,17 @@ def do_pt_swap(n_chain, samples, itrb, Ts, a_yes, a_no, x0s, FLIs, log_likelihoo
     FLIs_new = []
     x0s_new = []
     fisher_diag_new = np.zeros_like(fisher_diag)
+    samples_new = np.zeros_like(samples)
+    log_likelihood_new = np.zeros_like(log_likelihood)
     for j in range(n_chain):
-        samples[j,itrb+1,:] = samples[swap_map[j],itrb,:]
+        samples_new[j,itrb+1,:] = samples[swap_map[j],itrb,:]
         fisher_diag_new[j,:] = fisher_diag[swap_map[j],:]
-        log_likelihood[j,itrb+1] = log_likelihood[swap_map[j],itrb]
+        log_likelihood_new[j,itrb+1] = log_likelihood[swap_map[j],itrb]
         FLIs_new.append(FLIs[swap_map[j]])
         x0s_new.append(x0s[swap_map[j]])
 
+    samples = samples_new
+    log_likelihood = log_likelihood_new
     fisher_diag[:] = fisher_diag_new
     FLIs[:] = List(FLIs_new)
     x0s[:] = List(x0s_new)
