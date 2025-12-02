@@ -2,18 +2,23 @@
 # -*- coding:utf-8 -*-
 # Copyright (C) 2022 Bence Becsy, Neil Cornish, Matthew Digman
 #
-# This program is free software; you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation; either version 2 of the License, or
-# (at your option) any later version.
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
 #
-# You should have received a copy of the GNU General Public License along
-# with this program; if not, write to the Free Software Foundation, Inc.,
-# 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
 
 """
 Setup script for QuickCW
@@ -22,19 +27,43 @@ can install like this: pip install -e .
 from setuptools import setup, find_packages
 
 setup(
-    author='Bence Becsy',
     name='QuickCW',
     version='1.1.0',
-    install_requires=[
-         'numpy',
-         'enterprise_extensions',
-         'numba',
-         'h5py',
-    ],
+    description='Fast continuous wave (CW) analysis for pulsar timing array data',
+    long_description=open('README.md').read(),
+    long_description_content_type='text/markdown',
+    author='Bence Becsy',
+    author_email='bence.becsy@nanograv.org',
+    url='https://github.com/nanograv/QuickCW',
+    license='MIT',
+    keywords='pulsar timing array, gravitational waves, continuous waves, MCMC',
     python_requires='>=3.7',
     packages=find_packages(include=['QuickCW']),
     scripts=['runQuickMCMC.py'],
-    long_description=open('README.md').read(),
-    )
+    install_requires=[
+        'numpy',
+        'enterprise',
+        'enterprise_extensions',
+        'numba',
+        'h5py',
+    ],
+    classifiers=[
+        'Development Status :: 4 - Beta',
+        'Intended Audience :: Science/Research',
+        'Topic :: Scientific/Engineering :: Astronomy',
+        'License :: OSI Approved :: MIT License',
+        'Programming Language :: Python :: 3',
+        'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: 3.8',
+        'Programming Language :: Python :: 3.9',
+        'Programming Language :: Python :: 3.10',
+        'Programming Language :: Python :: 3.11',
+    ],
+    project_urls={
+        'Documentation': 'https://github.com/nanograv/QuickCW',
+        'Source': 'https://github.com/nanograv/QuickCW',
+        'Tracker': 'https://github.com/nanograv/QuickCW/issues',
+    },
+)
 
 
